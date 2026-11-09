@@ -1,6 +1,6 @@
 import { APPS } from '@note/shared/manifest';
 import { request } from '../api/client';
-import type { DesktopItem, Note } from '../api/types';
+import type { DesktopItem, Note, Sticky } from '../api/types';
 import { useDesktop } from './desktopStore';
 import { IconGrid } from './IconGrid';
 import { openApp, openDesktopItem } from './openApp';
@@ -26,8 +26,9 @@ export function Desktop() {
   };
 
   const newSticky = async () => {
-    await request('/stickies', { method: 'POST', body: { body: '' } });
-    openApp('stickies');
+    const created = await request<Sticky>('/stickies', { method: 'POST', body: { body: '' } });
+    // The id travels in the payload so an already open board jumps to the new card.
+    openApp('stickies', { payload: { stickyId: created.id } });
   };
 
   const onContextMenu = (event: React.MouseEvent) => {
@@ -36,7 +37,7 @@ export function Desktop() {
     openMenu(event.clientX, event.clientY, [
       { id: 'folder', label: 'Nowy folder', run: () => void createFolder() },
       { id: 'note', label: 'Nowa notatka', run: () => void newNote() },
-      { id: 'sticky', label: 'Nowa karteczka', run: () => void newSticky },
+      { id: 'sticky', label: 'Nowa karteczka', run: () => void newSticky() },
     ]);
   };
 

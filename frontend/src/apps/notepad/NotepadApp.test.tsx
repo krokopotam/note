@@ -80,6 +80,17 @@ describe('notepad window', () => {
     expect(api.get).toHaveBeenCalledWith(55);
   });
 
+  it('opens a note pushed into the payload of an already open window', async () => {
+    api.get.mockImplementation(async (id: number) => note(id, { title: `Notatka ${id}`, body: `treść ${id}` }));
+    const { rerender } = renderNotepad();
+    await screen.findByTestId('editor');
+
+    rerender(<NotepadApp windowKey="notepad" appId="notepad" payload={{ noteId: 77 }} />);
+
+    expect(await screen.findByTestId('editor')).toHaveValue('treść 77');
+    expect(api.get).toHaveBeenCalledWith(77);
+  });
+
   it('sends keywords to the API as the search box is used', async () => {
     renderNotepad();
     await screen.findByTestId('note-row-1');

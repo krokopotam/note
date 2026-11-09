@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { STICKY_COLORS } from '@note/shared/manifest';
 import { formatStamp } from '../../shared/format';
 import { useStickies, type StickyColor } from './stickiesStore';
 import type { Sticky } from '../../api/types';
+import type { AppProps } from '../../shell/registry';
 import styles from './StickiesApp.module.css';
 
 /**
@@ -11,14 +12,24 @@ import styles from './StickiesApp.module.css';
  * Browsing means search, sorting and pinning — all resolved by the backend, so
  * this file is only about rendering cards and forwarding intent.
  */
-export function StickiesApp() {
+export function StickiesApp({ payload }: AppProps) {
   const state = useStickies();
+  const requestedId = typeof payload.stickyId === 'number' ? payload.stickyId : undefined;
+  const seenId = useRef(requestedId);
 
   useEffect(() => {
-    void state.load();
+    void useStickies.getState().load();
     // The board loads once per window; store changes must not trigger a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A card created from the desktop menu arrives through a changed payload while
+  // this window may already be open: re-read the board so it shows up.
+  useEffect(() => {
+    if (requestedId === undefined || requestedId === seenId.current) return;
+    seenId.current = requestedId;
+    void useStickies.getState().load();
+  }, [requestedId]);
 
   return (
     <div className={styles.app} data-testid="stickies">

@@ -36,6 +36,15 @@ describe('window store', () => {
     });
   });
 
+  it('replaces the payload when an open app is opened again', () => {
+    openApp('notepad', { payload: { noteId: 1 } });
+    openApp('notepad', { payload: { noteId: 2 } });
+
+    const windows = useWindows.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0].payload).toEqual({ noteId: 2 });
+  });
+
   it('gives every folder its own window', () => {
     openFolder(folder(1, 'Biuro'));
     openFolder(folder(2, 'Prywatne'));

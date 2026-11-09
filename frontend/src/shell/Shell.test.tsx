@@ -35,6 +35,19 @@ function fakeBackend() {
   mockedRequest.mockImplementation(async (path: string, options?: RequestOptions) => {
     const body = options?.body as Partial<DesktopItem> | undefined;
     if (path === '/desktop/items' && !options?.method) return { items: table.map((row) => ({ ...row })) };
+    if (path === '/notes' && options?.method === 'POST') {
+      return { id: 900, title: 'Bez tytułu', body: '', created_at: stamp, updated_at: stamp };
+    }
+    if (path === '/stickies' && options?.method === 'POST') {
+      return {
+        id: 901,
+        body: '',
+        color: 'yellow',
+        pinned: false,
+        created_at: stamp,
+        updated_at: stamp,
+      };
+    }
     if (path === '/desktop/favorites') {
       return {
         slots: [
@@ -205,6 +218,36 @@ describe('desktop shell', () => {
       method: 'POST',
       body: { kind: 'folder', name: 'Nowy folder', x: 2, y: 0 },
     });
+  });
+
+  it('creates a note from the desktop menu and opens the notepad', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+
+    await userEvent.pointer([
+      { target: screen.getByTestId('desktop'), coords: { x: 400, y: 400 }, keys: '[MouseRight]' },
+    ]);
+    await userEvent.click(
+      within(await screen.findByTestId('context-menu')).getByRole('menuitem', { name: 'Nowa notatka' }),
+    );
+
+    expect(mockedRequest).toHaveBeenCalledWith('/notes', { method: 'POST', body: { body: '' } });
+    expect(await screen.findByTestId('window-notepad')).toBeInTheDocument();
+  });
+
+  it('creates a card from the desktop menu and opens the board', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+
+    await userEvent.pointer([
+      { target: screen.getByTestId('desktop'), coords: { x: 400, y: 400 }, keys: '[MouseRight]' },
+    ]);
+    await userEvent.click(
+      within(await screen.findByTestId('context-menu')).getByRole('menuitem', { name: 'Nowa karteczka' }),
+    );
+
+    expect(mockedRequest).toHaveBeenCalledWith('/stickies', { method: 'POST', body: { body: '' } });
+    expect(await screen.findByTestId('window-stickies')).toBeInTheDocument();
   });
 
   it('deletes an icon from its context menu', async () => {

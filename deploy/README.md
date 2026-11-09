@@ -3,6 +3,20 @@
 Serwer: `10.8.0.1` (`ssh ubuntu@10.8.0.1`), aplikacja w `/home/ubuntu/src/note`,
 backend na `127.0.0.1:8120`, nginx + certyfikat letsencrypt, basic auth `test` / `milka`.
 
+## Kiedy VPN stoi
+
+`10.8.0.1` jest za WireGuardem. Ten sam serwer słucha SSH na publicznym adresie, więc
+można podmienić hosta: `HOST_SSH=ubuntu@57.129.68.45 ./deploy/push.sh`.
+
+## Wymagania po stronie serwera
+
+Node **22.5+** (backend używa `better-sqlite3`, który dobiera sobie binarium pod wersję Node).
+Jeśli go nie ma:
+
+```bash
+./deploy/install-node.sh      # oficjalna paczka do /usr/local, niczego nie nadpisuje
+```
+
 ## Pierwszy raz
 
 ```bash
@@ -36,7 +50,7 @@ wykluczone są chronione przed usunięciem. Baza (`data/note.db`) przeżywa każ
 | zmienne środowiskowe | `/etc/default/note.wincyj.pl` |
 | logi aplikacji | `/var/log/note/app.log` |
 | vhost nginx | `/etc/nginx/sites-available/note.wincyj.pl` |
-| hasło basic auth | `/etc/nginx/.htpasswd-test` |
+| hasło basic auth | `/etc/nginx/note.wincyj.pl.htpasswd` |
 
 ## Diagnostyka
 
@@ -51,10 +65,15 @@ sudo nginx -t
 
 ## Kopia zapasowa bazy
 
-Baza jest jednym plikiem, więc kopią jest jego skopiowanie (WAL dołączone):
+Baza jest jednym plikiem, więc kopią jest jego skopiowanie. Żeby nie ściąć połowy
+wpisów żyjących w WAL, zrzut robi się przez SQLite (CLI nie jest potrzebne — używamy
+modułu, który i tak ma aplikacja):
 
 ```bash
-ssh ubuntu@10.8.0.1 'sqlite3 /home/ubuntu/src/note/data/note.db ".backup /home/ubuntu/note-backup.db"'
+ssh ubuntu@10.8.0.1 'cd /home/ubuntu/src/note && node -e "
+  const db = require(\"better-sqlite3\")(\"data/note.db\");
+  db.backup(\"/home/ubuntu/note-backup.db\").then(() => console.log(\"zrobione\"));
+"'
 ```
 
 ## Co zmienia na serwerze

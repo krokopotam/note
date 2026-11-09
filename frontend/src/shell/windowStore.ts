@@ -65,8 +65,15 @@ export const useWindows = create<WindowStore>((set, get) => ({
     const windowKey = key ?? appId;
     const existing = get().windows.find((win) => win.key === windowKey);
     if (existing) {
-      get().focus(windowKey);
-      if (existing.title !== title) get().setTitle(windowKey, title);
+      // The app is already open: refresh title and payload so it can react to
+      // what the user asked for (e.g. the desktop's "Nowa notatka" pointing at a
+      // note that must now be shown in the existing window).
+      set((state) => ({
+        focusedKey: windowKey,
+        windows: state.windows.map((win) =>
+          win.key === windowKey ? { ...win, title, payload, minimized: false } : win,
+        ),
+      }));
       return windowKey;
     }
 

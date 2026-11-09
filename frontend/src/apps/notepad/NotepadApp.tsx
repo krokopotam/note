@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatStamp, preview } from '../../shared/format';
 import { cancelAutosave, useNotepad } from './notepadStore';
 import type { AppProps } from '../../shell/registry';
@@ -13,14 +13,22 @@ import styles from './NotepadApp.module.css';
  */
 export function NotepadApp({ payload }: AppProps) {
   const state = useNotepad();
+  const requestedNoteId = typeof payload.noteId === 'number' ? payload.noteId : undefined;
+  const seenNoteId = useRef(requestedNoteId);
 
   useEffect(() => {
-    const noteId = typeof payload.noteId === 'number' ? payload.noteId : undefined;
-    void state.init(noteId);
+    void useNotepad.getState().init(requestedNoteId);
     return cancelAutosave;
-    // Payload is fixed for the lifetime of the window; init must not re-run on store changes.
+    // Start-up only: re-running init on every store change would reload over the user's tabs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // "Nowa notatka" on the desktop reuses this window and only changes the payload.
+  useEffect(() => {
+    if (requestedNoteId === undefined || requestedNoteId === seenNoteId.current) return;
+    seenNoteId.current = requestedNoteId;
+    void useNotepad.getState().openNote(requestedNoteId);
+  }, [requestedNoteId]);
 
   const active = state.activeNoteId !== null ? (state.byId[state.activeNoteId] ?? null) : null;
 

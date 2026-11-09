@@ -8,20 +8,27 @@ set -euo pipefail
 DOMAIN="note.wincyj.pl"
 AUTH_USER="${AUTH_USER:-test}"
 AUTH_PASS="${AUTH_PASS:-milka}"
-HTPASSWD="/etc/nginx/.htpasswd-${AUTH_USER}"
+# Nazwa i położenie jak w pozostałych aplikacjach: /etc/nginx/<domena>.htpasswd
+HTPASSWD="/etc/nginx/$DOMAIN.htpasswd"
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() { printf '\n== %s\n' "$*"; }
 die() { printf '\nBŁĄD: %s\n' "$*" >&2; exit 1; }
 
-[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ] || die \
+# /etc/letsencrypt jest tylko dla roota, więc sprawdzenie też musi iść przez sudo
+sudo test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" || die \
   "brak certyfikatu /etc/letsencrypt/live/$DOMAIN — najpierw:
    sudo certbot certonly --webroot -w /var/www/html -d $DOMAIN -n"
 
-log "użytkownik basic auth: $AUTH_USER (plik $HTPASSWD)"
+log "basic auth: użytkownik $AUTH_USER w $HTPASSWD"
 if command -v htpasswd >/dev/null; then
-  # -b: hasło z argumentu, -B: bcrypt (najmocniejszy wariant obsługiwany przez nginx)
-  sudo htpasswd -B -b "$HTPASSWD" "$AUTH_USER" "$AUTH_PASS"
+  # -b: hasło z argumentu, -B: bcrypt (najmocniejszy wariant obsługiwany przez nginx),
+  # -c tylko przy tworzeniu pliku tej domeny — istniejących wpisów nie nadpisujemy.
+  if sudo test -f "$HTPASSWD"; then
+    sudo htpasswd -B -b "$HTPASSWD" "$AUTH_USER" "$AUTH_PASS"
+  else
+    sudo htpasswd -B -c -b "$HTPASSWD" "$AUTH_USER" "$AUTH_PASS"
+  fi
 else
   # Fallback bez apache2-utils: hash APR1, też akceptowany przez nginx.
   HASH="$(openssl passwd -apr1 "$AUTH_PASS")"

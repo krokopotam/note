@@ -23,6 +23,11 @@ const sticky = (id: number, overrides: Partial<Sticky> = {}): Sticky => ({
   ...overrides,
 });
 
+/** The board is a window view, so it always gets window props. */
+function renderBoard(payload: Record<string, unknown> = {}) {
+  return render(<StickiesApp windowKey="stickies" appId="stickies" payload={payload} />);
+}
+
 beforeEach(() => {
   useStickies.setState(stickiesDefaults);
   vi.resetAllMocks();
@@ -34,7 +39,7 @@ beforeEach(() => {
 
 describe('stickies board', () => {
   it('renders a card per sticky', async () => {
-    render(<StickiesApp />);
+    renderBoard();
 
     expect(await screen.findByTestId('sticky-1')).toHaveTextContent('karteczka 1');
     expect(screen.getByTestId('sticky-2')).toBeInTheDocument();
@@ -42,7 +47,7 @@ describe('stickies board', () => {
   });
 
   it('commits the text when the card loses focus', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     const card = await screen.findByRole('textbox', { name: 'Treść karteczki 1' });
 
     await userEvent.clear(card);
@@ -54,7 +59,7 @@ describe('stickies board', () => {
   });
 
   it('does not send an update when the text was not changed', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     const card = await screen.findByRole('textbox', { name: 'Treść karteczki 1' });
 
     await userEvent.click(card);
@@ -64,7 +69,7 @@ describe('stickies board', () => {
   });
 
   it('searches through the API', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Szukaj na karteczkach' }), 'baterie');
@@ -73,7 +78,7 @@ describe('stickies board', () => {
   });
 
   it('filters to pinned cards', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Tylko przypięte' }));
@@ -82,7 +87,7 @@ describe('stickies board', () => {
   });
 
   it('sorts on request', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sortuj karteczki' }), 'created_asc');
@@ -91,7 +96,7 @@ describe('stickies board', () => {
   });
 
   it('creates an empty card and shows it immediately', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     await userEvent.click(screen.getByRole('button', { name: 'Nowa karteczka' }));
@@ -100,7 +105,7 @@ describe('stickies board', () => {
   });
 
   it('repaints a card in another colour', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     const card = await screen.findByTestId('sticky-1');
@@ -110,7 +115,7 @@ describe('stickies board', () => {
   });
 
   it('pins a card and re-reads the board so it moves to the front', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     const pin = await screen.findByTestId('pin-1');
 
     await userEvent.click(pin);
@@ -120,7 +125,7 @@ describe('stickies board', () => {
   });
 
   it('deletes a card', async () => {
-    render(<StickiesApp />);
+    renderBoard();
     await screen.findByTestId('sticky-1');
 
     await userEvent.click(screen.getByRole('button', { name: 'Usuń karteczkę 1' }));
@@ -129,10 +134,23 @@ describe('stickies board', () => {
     expect(screen.queryByTestId('sticky-1')).not.toBeInTheDocument();
   });
 
+  it('re-reads the board when a card is pushed into the payload', async () => {
+    api.list.mockResolvedValue({ items: [sticky(1)], total: 1 });
+    const { rerender } = render(<StickiesApp windowKey="stickies" appId="stickies" payload={{}} />);
+    await screen.findByTestId('sticky-1');
+    expect(api.list).toHaveBeenCalledTimes(1);
+
+    api.list.mockResolvedValue({ items: [sticky(9, { body: 'z pulpitu' }), sticky(1)], total: 2 });
+    rerender(<StickiesApp windowKey="stickies" appId="stickies" payload={{ stickyId: 9 }} />);
+
+    expect(await screen.findByTestId('sticky-9')).toHaveTextContent('z pulpitu');
+    expect(api.list).toHaveBeenCalledTimes(2);
+  });
+
   it('says so when nothing matches', async () => {
     api.list.mockResolvedValue({ items: [], total: 0 });
 
-    render(<StickiesApp />);
+    renderBoard();
 
     expect(await screen.findByText('Brak karteczek. Zapisz pierwszą myśl.')).toBeInTheDocument();
   });

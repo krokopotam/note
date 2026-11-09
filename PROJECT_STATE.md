@@ -13,9 +13,12 @@ notatnik (wiele zakładek + historia + wyszukiwarka) i karteczki.
 | Notatnik (zakładki, autosave, historia, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Build produkcyjny (`frontend/dist`, 181 kB / 59 kB gzip) | przechodzi |
-| Wdrożenie na `note.wincyj.pl` | **blocked**: VPN `wg0` do 10.8.0.1 wymaga hasła do klucza prywatnego |
+| Wdrożenie `https://note.wincyj.pl` (basic auth `test`) | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 194 przechodzą (backend 61, frontend 133). `npm run lint` → czysto.
+Testy: `npm test` → 199 przechodzi (backend 61, frontend 138). `npm run lint` → czysto.
+
+Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
+baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
 
 ## Decyzje
 

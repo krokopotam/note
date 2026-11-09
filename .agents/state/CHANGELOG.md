@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-11-09 — wdrożenie na note.wincyj.pl
+- Serwer `10.8.0.1` (przez publiczny adres, VPN `wg0` wymaga hasła do klucza): Node 22.23.4 z oficjalnej
+  paczki do `/usr/local`, aplikacja w `/home/ubuntu/src/note`, serwis systemd, nginx + letsencrypt,
+  basic auth `test` w `/etc/nginx/note.wincyj.pl.htpasswd` (konwencja jak przy pozostałych domenach).
+- Nowe: `deploy/install-node.sh`; vhost dostał `error_page 502 503 504` z komunikatem po polsku.
+- Testy: frontend 133 → 138 (payload okna, menu kontekstowe), razem 199.
+
+### Naprawione podczas wdrażania i audytu
+- `frontend/src/shell/Desktop.tsx` — `run: () => void newSticky` podawało referencję zamiast wywołać
+  funkcję: „Nowa karteczka” z menu pulpitu nie tworzyła nic.
+- `frontend/src/shell/windowStore.ts` — ponowne otwarcie aplikacji nie odświeżało `payload`, więc
+  „Nowa notatka” przy otwartym notatniku nie pokazywała nowej notatki.
+- `deploy/install-https.sh` — `/etc/letsencrypt` jest tylko dla roota (sprawdzenie certu przez `sudo test`),
+  `htpasswd` potrzebuje `-c` przy tworzeniu pliku domeny.
+
 ## 2026-11-09 — MVP: pulpit, kalkulator, notatnik, karteczki
 - Nowy projekt: backend Express + SQLite (plik `data/note.db`, migracje w `backend/src/db/migrations`),
   shelf pulpitu (siatka ikon, foldery, okna, dock macOS-style, launcher Ubuntu-style, menu kontekstowe),
