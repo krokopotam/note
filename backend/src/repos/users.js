@@ -69,6 +69,28 @@ export function touchLogin(db, userId, now = nowIso()) {
 }
 
 /**
+ * Delete an account. Sessions, notes (and their revisions), stickies, icons,
+ * favourites and the notepad session all follow through ON DELETE CASCADE —
+ * the counts are read first so the CLI can say what disappeared.
+ *
+ * Irreversible by design; `adopt` is how content is kept instead.
+ */
+export function deleteUser(db, userId) {
+  const count = (sql) => db.prepare(sql).get(userId).n;
+  const before = {
+    sessions: count('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?'),
+    notes: count('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?'),
+    stickies: count('SELECT COUNT(*) AS n FROM stickies WHERE user_id = ?'),
+    desktop_items: count('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?'),
+  };
+
+  const info = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  if (info.changes === 0) throw new HttpError(404, 'not_found', `user ${userId} does not exist`);
+
+  return before;
+}
+
+/**
  * Move every piece of content from one account to another (CLI: "adopt the data
  * that predates accounts"). Notes come with their revisions because revisions are
  * reached through their note.

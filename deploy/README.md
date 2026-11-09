@@ -78,6 +78,7 @@ sudo nginx -t
 # w awaryjnym razie: konto do logowania
 npm run cli -- list
 npm run cli -- set-password ala <hasło>
+npm run cli -- remove ala        # usunięcie konta razem z jego danymi
 ```
 
 Test przez curl wymaga ciasteczka: `curl -c /tmp/jar -X POST -H 'Content-Type: application/json' -d '{"username":"ala","password":"..."}' https://note.wincyj.pl/api/auth/login`,

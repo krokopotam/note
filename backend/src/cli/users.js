@@ -6,6 +6,7 @@
  *   npm run cli -- list
  *   npm run cli -- set-password wincyj <hasło>     # also unlocks the account
  *   npm run cli -- lock wincyj                     # kill every session, forbid login
+  npm run cli -- remove ala                      # delete the account and all its content
  *   npm run cli -- adopt wincyj ala                # move all of wincyj's data to ala
  *   npm run cli -- seed ala                        # give an account the starter desktop
  *   npm run cli -- sessions wincyj
@@ -21,6 +22,7 @@ import { seedUser } from '../repos/seed.js';
 import { destroyAllForUser, listSessions } from '../repos/sessions.js';
 import {
   adoptDataFrom,
+  deleteUser,
   findByUsername,
   listUsers,
   setPassword,
@@ -30,6 +32,7 @@ const USAGE = `użycie: npm run cli -- <polecenie> [argumenty]
   list
   set-password <login> [hasło]     (albo NOTE_PASSWORD=...)
   lock <login>
+  remove <login>                    (usuwa też jego dane)
   adopt <z-czyje> <na-kogo>
   seed <login>
   sessions <login>`;
@@ -89,6 +92,21 @@ export function run(db, args) {
       setPassword(db, account.id, LOCKED_HASH);
       const killed = destroyAllForUser(db, account.id);
       console.log(`konto ${account.username} zablokowane (wygaszone sesji: ${killed})`);
+      return;
+    }
+
+    case 'remove': {
+      const [username] = rest;
+      const account = mustFind(db, username);
+      if (!account) return;
+
+      const removed = deleteUser(db, account.id);
+      console.log(
+        `usunięto konto ${username} wraz z:`,
+        Object.entries(removed)
+          .map(([what, n]) => `${what}=${n}`)
+          .join(' '),
+      );
       return;
     }
 

@@ -106,6 +106,26 @@ describe('users CLI', () => {
     ).toEqual(['calculator']);
   });
 
+  it('removes an account together with everything it owned', async () => {
+    const db = ctx.db;
+    await ctx.api.post('/api/notes').send({ title: 'Ala', body: 'zostaje' });
+    const { agent } = await signInAnother(ctx, { username: 'ola' });
+    await agent.post('/api/notes').send({ title: 'Ola', body: 'x' });
+    await agent.post('/api/stickies').send({ body: 'myśl' });
+    const ola = findByUsername(db, 'ola');
+
+    const output = cli(db, 'remove', 'ola');
+
+    expect(output).toContain('notes=1');
+    expect(output).toContain('stickies=1');
+    expect(findByUsername(db, 'ola')).toBeUndefined();
+    // ala is untouched, and nothing of ola's survives anywhere.
+    expect((await ctx.api.get('/api/notes')).body.items.map((note) => note.title)).toEqual(['Ala']);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?').get(ola.id).n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').get(ola.id).n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM note_revisions').get().n).toBe(0);
+  });
+
   it('says so when the account does not exist', () => {
     const output = cli(ctx.db, 'lock', 'duch');
 

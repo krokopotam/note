@@ -80,6 +80,7 @@ Logowanie i rejestracja mają limit prób (w procesie + `limit_req` w nginx).
 npm run cli -- list                          # kto jest
 npm run cli -- set-password ala <hasło>      # reset (i odblokowanie) — wygasza sesje
 npm run cli -- lock ala                      # zablokuj konto i wszystkie sesje
+npm run cli -- remove ala                     # usuń konto razem z jego danymi (np. śmieciowe)
 npm run cli -- adopt ala ola                 # przenieś CAŁE dane między kontami
 npm run cli -- seed ala                      # daj kontu startowy pulpit
 npm run cli -- sessions ala                  # otwarte sesje
