@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-11-09 — karteczka tworzona przez pomyłkę nie zostaje na pulpicie
+- 'Nowa karteczka' klikana kilkakrotnie zostawiała puste karty; nowa karta dostaje kursor, a jeśli
+  user kliknie obok nie wpisawszy nic — sama znika. Karta, do której coś wpisano, zostaje zawsze.
+- Testy: frontend 138 → 142 (razem 203).
+
 ## 2026-11-09 — wdrożenie na note.wincyj.pl
 - Serwer `10.8.0.1` (przez publiczny adres, VPN `wg0` wymaga hasła do klucza): Node 22.23.4 z oficjalnej
   paczki do `/usr/local`, aplikacja w `/home/ubuntu/src/note`, serwis systemd, nginx + letsencrypt,

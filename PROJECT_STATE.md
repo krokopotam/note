@@ -15,7 +15,7 @@ notatnik (wiele zakładek + historia + wyszukiwarka) i karteczki.
 | Build produkcyjny (`frontend/dist`, 181 kB / 59 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` (basic auth `test`) | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 199 przechodzi (backend 61, frontend 138). `npm run lint` → czysto.
+Testy: `npm test` → 203 przechodzą (backend 61, frontend 142). `npm run lint` → czysto.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
