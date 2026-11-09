@@ -1,0 +1,26 @@
+[Unit]
+Description=Pulpit note (note.wincyj.pl)
+Documentation=https://github.com/krokopotam/note
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=@APP_DIR@
+# PORT / HOST / DB_FILE nadpisujemy bez ruszania jednostki
+EnvironmentFile=-/etc/default/note.wincyj.pl
+Environment=NODE_ENV=production
+# ścieżka do node wstawiana przez install.sh (na serwerze bywa z nvm)
+ExecStart=@NODE@ backend/src/index.js
+Restart=always
+RestartSec=5
+# bez tego stdout jest buforowany i w logu nic nie widać
+StandardOutput=append:/var/log/note/app.log
+StandardError=append:/var/log/note/app.log
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

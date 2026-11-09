@@ -1,0 +1,54 @@
+.dock {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(18, 24, 34, 0.72);
+  backdrop-filter: blur(12px);
+  z-index: 900;
+}
+
+.item {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition: transform 120ms ease-out;
+  display: grid;
+  place-items: end center;
+}
+
+.item:hover,
+.item:focus-visible {
+  transform: scale(1.28) translateY(-6px);
+}
+
+.dot {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.dotOn {
+  background: #cfe1ff;
+}
+
+.focused {
+  position: absolute;
+  inset: -6px -4px -10px;
+  border: 1px solid rgba(207, 225, 255, 0.5);
+  border-radius: 10px;
+}

@@ -1,0 +1,13 @@
+.wrap {
+  position: relative;
+  height: 100%;
+  min-height: 220px;
+  padding: 6px;
+  background: #171e2a;
+}
+
+.missing {
+  padding: 20px;
+  color: #93a2bd;
+  font-size: 13px;
+}

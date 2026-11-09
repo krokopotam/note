@@ -4,10 +4,17 @@ __pycache__/
 .venv/
 venv/
 
-# builds / dist
+# builds
 dist/
 build/
 *.tsbuildinfo
+
+# runtime data: the SQLite file lives inside the app folder on purpose,
+# but it is state, not source
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # env / local config
 .env

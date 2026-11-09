@@ -1,0 +1,32 @@
+.shell {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1200px 700px at 18% 12%, #2b3a55 0%, transparent 60%),
+    radial-gradient(900px 600px at 85% 80%, #23405c 0%, transparent 55%),
+    #0d1219;
+  overflow: hidden;
+}
+
+.toast {
+  position: absolute;
+  right: 16px;
+  bottom: 96px;
+  max-width: 360px;
+  padding: 10px 14px;
+  border: 1px solid #ff8a80;
+  border-radius: 8px;
+  background: #3a1d20;
+  color: #ffd9d5;
+  font-size: 13px;
+  z-index: 990;
+}
+
+.loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #9fb0cc;
+  font-size: 13px;
+}

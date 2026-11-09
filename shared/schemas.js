@@ -1,0 +1,194 @@
+/**
+ * API contracts as zod schemas: the backend validates every inbound payload with
+ * these, and the frontend derives its TypeScript types from the same objects
+ * (type-only imports, so nothing of zod reaches the browser).
+ *
+ * Column naming follows the SQLite schema (snake_case) on purpose: a DTO is a
+ * direct projection of a row, so there is exactly one mapping to keep in mind.
+ */
+import { z } from 'zod';
+import {
+  DESKTOP_KINDS,
+  DESKTOP_NAME_MAX,
+  FAVORITE_SLOTS,
+  NOTE_BODY_MAX,
+  NOTE_TITLE_MAX,
+  SORT_ORDERS,
+  STICKY_BODY_MAX,
+  STICKY_COLORS,
+} from './manifest.js';
+
+export const NoteSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  body: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const NoteRevisionSchema = z.object({
+  id: z.number().int(),
+  note_id: z.number().int(),
+  title: z.string(),
+  body: z.string(),
+  created_at: z.string(),
+});
+
+export const StickySchema = z.object({
+  id: z.number().int(),
+  body: z.string(),
+  color: z.enum(STICKY_COLORS),
+  pinned: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const DesktopItemSchema = z.object({
+  id: z.number().int(),
+  kind: z.enum(DESKTOP_KINDS),
+  name: z.string(),
+  app_id: z.string().nullable(),
+  parent_id: z.number().int().nullable(),
+  x: z.number().int(),
+  y: z.number().int(),
+  created_at: z.string(),
+});
+
+/**
+ * @param {z.ZodTypeAny} item
+ * @returns {z.ZodObject<{items: z.ZodArray<z.ZodTypeAny>, total: z.ZodNumber}>}
+ */
+/** List envelopes. Written out per resource on purpose: a generic helper in a
+ * plain .js file loses the item type, and these types are what the frontend
+ * compiles against. */
+export const NotePageSchema = z.object({
+  items: z.array(NoteSchema),
+  total: z.number().int(),
+});
+
+export const StickyPageSchema = z.object({
+  items: z.array(StickySchema),
+  total: z.number().int(),
+});
+
+export const DesktopItemsSchema = z.object({
+  items: z.array(DesktopItemSchema),
+});
+
+/** Ordering values accepted by the list endpoints; the UI renders labels for these. */
+export const SortOrderSchema = z.enum(SORT_ORDERS);
+
+/** Payload for creating a note. Title falls back to the first line of the body. */
+export const NoteCreateSchema = z.object({
+  title: z.string().trim().min(1).max(NOTE_TITLE_MAX).optional(),
+  body: z.string().max(NOTE_BODY_MAX).default(''),
+});
+
+/** Payload for patching a note; at least one field must be present. */
+export const NotePatchSchema = z
+  .object({
+    title: z.string().trim().min(1).max(NOTE_TITLE_MAX).optional(),
+    body: z.string().max(NOTE_BODY_MAX).optional(),
+  })
+  .refine((value) => value.title !== undefined || value.body !== undefined, {
+    message: 'title or body is required',
+  });
+
+export const StickyCreateSchema = z.object({
+  body: z.string().max(STICKY_BODY_MAX).default(''),
+  color: z.enum(STICKY_COLORS).default('yellow'),
+  pinned: z.boolean().default(false),
+});
+
+export const StickyPatchSchema = z.object({
+  body: z.string().max(STICKY_BODY_MAX).optional(),
+  color: z.enum(STICKY_COLORS).optional(),
+  pinned: z.boolean().optional(),
+});
+
+export const DesktopItemCreateSchema = z
+  .object({
+    kind: z.enum(DESKTOP_KINDS),
+    name: z.string().trim().min(1).max(DESKTOP_NAME_MAX),
+    app_id: z.string().trim().min(1).max(60).nullable().optional(),
+    parent_id: z.number().int().nonnegative().nullable().optional(),
+    x: z.number().int().min(0).default(0),
+    y: z.number().int().min(0).default(0),
+  })
+  .refine((value) => (value.kind === 'app' ? typeof value.app_id === 'string' : true), {
+    message: 'app item requires app_id',
+    path: ['app_id'],
+  });
+
+export const DesktopItemPatchSchema = z.object({
+  name: z.string().trim().min(1).max(DESKTOP_NAME_MAX).optional(),
+  x: z.number().int().min(0).optional(),
+  y: z.number().int().min(0).optional(),
+  parent_id: z.number().int().nonnegative().nullable().optional(),
+});
+
+export const FavoritesPutSchema = z.object({
+  slot: z.enum(FAVORITE_SLOTS),
+  app_ids: z.array(z.string().trim().min(1).max(60)).max(32),
+});
+
+export const FavoritesSlotSchema = z.object({
+  slot: z.enum(FAVORITE_SLOTS),
+  app_ids: z.array(z.string()),
+});
+
+export const FavoritesSchema = z.object({
+  slots: z.array(FavoritesSlotSchema),
+});
+
+export const NotepadSessionSchema = z.object({
+  tabs: z.array(z.number().int()).max(100),
+  active_note_id: z.number().int().nullable().default(null),
+});
+
+/**
+ * Shared list query contract: `q` is a keyword search, `sort` maps to a fixed
+ * ORDER BY in SQL, `limit`/`offset` paginate.
+ */
+export const ListQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  sort: z.enum(SORT_ORDERS).default('updated_desc'),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+/** `?pinned=true` filter of the stickies list. Explicit strings: z.coerce.boolean() would accept "false". */
+export const PinnedOnlySchema = z.enum(['true', 'false']).default('false');
+
+/** Uniform error body so the UI can render failures without special-casing routes. */
+export const ApiErrorSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+  }),
+});
+
+/**
+ * Validate inbound data or throw an error the middleware turns into the uniform
+ * error body. Keeps route handlers free of branching.
+ *
+ * @param {z.ZodTypeAny} schema
+ * @param {unknown} data
+ * @param {string} code - error code reported to the client
+ * @returns {any} parsed data
+ */
+export function parseOrThrow(schema, data, code = 'validation_error') {
+  const result = schema.safeParse(data);
+  if (result.success) return result.data;
+
+  const details = result.error.issues.map((issue) => ({
+    path: issue.path.join('.'),
+    message: issue.message,
+  }));
+  const error = new Error(details[0]?.message ?? 'invalid payload');
+  error.code = code;
+  error.status = 400;
+  error.details = details;
+  throw error;
+}

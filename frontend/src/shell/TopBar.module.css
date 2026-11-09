@@ -1,0 +1,33 @@
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  background: rgba(9, 12, 19, 0.82);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #dbe4f4;
+  font-size: 13px;
+  z-index: 960;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.app {
+  flex: 1;
+  opacity: 0.85;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clock {
+  font-variant-numeric: tabular-nums;
+}

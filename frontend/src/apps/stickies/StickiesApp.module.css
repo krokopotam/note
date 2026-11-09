@@ -1,0 +1,189 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #151b26;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1;
+  min-width: 160px;
+}
+
+.search,
+.sort {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: #101724;
+  color: #e7eefb;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #a7b5cd;
+}
+
+.create {
+  border: none;
+  border-radius: 6px;
+  background: #2f6fed;
+  color: #f5f9ff;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.board {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 150px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.pinned {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.yellow {
+  background: #ffd83d;
+}
+
+.green {
+  background: #7fd8a0;
+}
+
+.blue {
+  background: #8ec6ff;
+}
+
+.pink {
+  background: #ffb3c7;
+}
+
+.purple {
+  background: #c4b0ff;
+}
+
+.cardText {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #1d2430;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+
+.cardBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swatches {
+  display: flex;
+  gap: 3px;
+  margin-right: auto;
+}
+
+.swatch {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.swatchOn {
+  box-shadow: 0 0 0 2px rgba(20, 26, 36, 0.85);
+}
+
+.swatch[data-color='yellow'] {
+  background: #ffd83d;
+}
+
+.swatch[data-color='green'] {
+  background: #7fd8a0;
+}
+
+.swatch[data-color='blue'] {
+  background: #8ec6ff;
+}
+
+.swatch[data-color='pink'] {
+  background: #ffb3c7;
+}
+
+.swatch[data-color='purple'] {
+  background: #c4b0ff;
+}
+
+.pin,
+.delete {
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #222a37;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.stamp {
+  font-size: 10px;
+  color: rgba(20, 26, 36, 0.65);
+}
+
+.empty {
+  color: #8fa0bb;
+  font-size: 13px;
+}
+
+.error {
+  margin: 8px 12px 0;
+  color: #ff9d96;
+  font-size: 12px;
+}
+
+.footer {
+  padding: 6px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: #7f8da6;
+}

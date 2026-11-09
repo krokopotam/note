@@ -1,0 +1,21 @@
+{
+  "name": "note",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Desktop-like web environment: desktop shell, calculator, notepad, stickies",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace backend & npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend"
+  }
+}

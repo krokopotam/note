@@ -1,0 +1,25 @@
+.desktop {
+  position: absolute;
+  inset: 0;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.empty {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #b9c4d9;
+}
+
+.empty button {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eaf0fb;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}

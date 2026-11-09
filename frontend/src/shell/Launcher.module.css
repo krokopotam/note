@@ -1,0 +1,94 @@
+.launcher {
+  position: absolute;
+  left: 0;
+  top: 32px;
+  bottom: 0;
+  width: 56px;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(12, 16, 24, 0.72);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 900;
+}
+
+.gridButton,
+.item {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #dde6f7;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.gridButton:hover,
+.item:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.running {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 2px;
+  background: #cfe1ff;
+}
+
+.overlay {
+  position: absolute;
+  inset: 32px 0 0 56px;
+  padding: 32px;
+  background: rgba(9, 12, 19, 0.94);
+  z-index: 950;
+  overflow: auto;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.bigItem {
+  width: 112px;
+  padding: 12px 6px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #e7edf9;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bigItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dismiss {
+  margin-top: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd6ea;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
