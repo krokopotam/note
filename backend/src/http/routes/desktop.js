@@ -29,7 +29,7 @@ export function desktopRouter(db, { apps = [] } = {}) {
   };
 
   router.get('/items', (req, res) => {
-    res.json({ items: listItems(db) });
+    res.json({ items: listItems(db, req.userId) });
   });
 
   router.post('/items', (req, res) => {
@@ -37,25 +37,25 @@ export function desktopRouter(db, { apps = [] } = {}) {
     if (input.app_id && !knownAppIds.has(input.app_id)) {
       throw new HttpError(400, 'unknown_app', `app ${input.app_id} is not installed`);
     }
-    res.status(201).json(createItem(db, input));
+    res.status(201).json(createItem(db, req.userId, input));
   });
 
   router.patch('/items/:id', (req, res) => {
     const patch = parseOrThrow(DesktopItemPatchSchema, req.body, 'validation_error');
-    const item = updateItem(db, idOf(req.params.id), patch);
+    const item = updateItem(db, req.userId, idOf(req.params.id), patch);
     if (!item) throw new HttpError(404, 'not_found', 'item does not exist');
     res.json(item);
   });
 
   router.delete('/items/:id', (req, res) => {
-    if (!deleteItem(db, idOf(req.params.id))) {
+    if (!deleteItem(db, req.userId, idOf(req.params.id))) {
       throw new HttpError(404, 'not_found', 'item does not exist');
     }
     res.status(204).end();
   });
 
   router.get('/favorites', (req, res) => {
-    res.json({ slots: getFavorites(db) });
+    res.json({ slots: getFavorites(db, req.userId) });
   });
 
   router.put('/favorites', (req, res) => {
@@ -64,7 +64,7 @@ export function desktopRouter(db, { apps = [] } = {}) {
     if (unknown.length) {
       throw new HttpError(400, 'unknown_app', `apps not installed: ${unknown.join(', ')}`);
     }
-    res.json(putFavorites(db, slot, appIds));
+    res.json(putFavorites(db, req.userId, slot, appIds));
   });
 
   return router;

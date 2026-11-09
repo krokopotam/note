@@ -13,9 +13,14 @@ import {
   FAVORITE_SLOTS,
   NOTE_BODY_MAX,
   NOTE_TITLE_MAX,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
   SORT_ORDERS,
   STICKY_BODY_MAX,
   STICKY_COLORS,
+  USERNAME_HINT,
+  USERNAME_PATTERN,
+  normalizeUsername,
 } from './manifest.js';
 
 export const NoteSchema = z.object({
@@ -145,6 +150,46 @@ export const NotepadSessionSchema = z.object({
   tabs: z.array(z.number().int()).max(100),
   active_note_id: z.number().int().nullable().default(null),
 });
+
+// --- accounts ---------------------------------------------------------------
+
+/** What the shell is told about the signed-in user. Never the hash, never the salt. */
+export const UserSchema = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  created_at: z.string(),
+  last_login_at: z.string().nullable(),
+});
+
+/**
+ * Registration: the password is typed twice, and the server checks the two agree.
+ * Usernames are normalised (trim + lowercase) before the pattern is applied.
+ */
+export const RegisterSchema = z
+  .object({
+    username: z.string(),
+    password: z.string().min(PASSWORD_MIN_LENGTH, `hasło musi mieć co najmniej ${PASSWORD_MIN_LENGTH} znaków`).max(PASSWORD_MAX_LENGTH, 'hasło jest za długie'),
+    password_confirm: z.string(),
+    remember: z.boolean().optional().default(false),
+  })
+  .transform((value) => ({ ...value, username: normalizeUsername(value.username) }))
+  .refine((value) => USERNAME_PATTERN.test(value.username), {
+    message: USERNAME_HINT,
+    path: ['username'],
+  })
+  .refine((value) => value.password === value.password_confirm, {
+    message: 'hasła różnią się',
+    path: ['password_confirm'],
+  });
+
+/** Login. No minimum password length here: a short one must fail on the hash, not on the schema. */
+export const LoginSchema = z
+  .object({
+    username: z.string(),
+    password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+    remember: z.boolean().optional().default(false),
+  })
+  .transform((value) => ({ ...value, username: normalizeUsername(value.username) }));
 
 /**
  * Shared list query contract: `q` is a keyword search, `sort` maps to a fixed

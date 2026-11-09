@@ -1,0 +1,130 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 520px at 20% 10%, rgba(96, 132, 255, 0.22), transparent 60%),
+    radial-gradient(700px 460px at 85% 85%, rgba(255, 132, 196, 0.16), transparent 65%),
+    linear-gradient(160deg, #101724 0%, #0d1219 60%, #0a0e14 100%);
+  z-index: 1200;
+}
+
+.card {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 26px 24px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(18, 24, 34, 0.92);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.brand {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+
+.tagline {
+  margin: -8px 0 4px;
+  color: rgba(232, 238, 251, 0.6);
+  font-size: 13px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab,
+.tabActive {
+  flex: 1;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(232, 238, 251, 0.72);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tabActive {
+  color: #0d1219;
+  background: #e8eefb;
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(232, 238, 251, 0.68);
+}
+
+.field input {
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  color: #e8eefb;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+}
+
+.field input:focus {
+  border-color: #7aa2ff;
+  outline: none;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(232, 238, 251, 0.8);
+  cursor: pointer;
+}
+
+.remember input {
+  width: 15px;
+  height: 15px;
+  accent-color: #7aa2ff;
+}
+
+.submit {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #e8eefb;
+  color: #0d1219;
+  font-size: 14px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(214, 68, 88, 0.18);
+  border: 1px solid rgba(214, 68, 88, 0.45);
+  color: #ffd7dd;
+  font-size: 13px;
+}
+
+.hint {
+  margin: 0;
+  color: rgba(232, 238, 251, 0.5);
+  font-size: 12px;
+  text-align: center;
+}

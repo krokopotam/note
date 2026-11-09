@@ -1,7 +1,13 @@
 # Wdrożenie note.wincyj.pl
 
 Serwer: `10.8.0.1` (`ssh ubuntu@10.8.0.1`), aplikacja w `/home/ubuntu/src/note`,
-backend na `127.0.0.1:8120`, nginx + certyfikat letsencrypt, basic auth `test` / `milka`.
+backend na `127.0.0.1:8120`, nginx + certyfikat letsencrypt.
+
+**Konta pilnuje aplikacja**, nie nginx: każdy, kto wejdzie na `https://note.wincyj.pl`,
+może założyć konto (login + hasło dwa razy). Podstawowe hasło nginx-a, które tu było
+wcześniej (`test` / `milka`), zostało wyłączone — stałoby przed ekranem logowania i
+odcinałoby nowych użytkowników od rejestracji. Plik `/etc/nginx/note.wincyj.pl.htpasswd`
+pozostał na dysku, ale nic go już nie używa.
 
 ## Kiedy VPN stoi
 
@@ -26,9 +32,16 @@ Jeśli go nie ma:
 # na serwerze — certyfikat
 sudo certbot certonly --webroot -w /var/www/html -d note.wincyj.pl -n
 
-# na serwerze — HTTPS + basic auth
+# na serwerze — HTTPS + vhost
 /home/ubuntu/src/note/deploy/install-https.sh
+
+# na serwerze — przejęcie danych, które powstały przed kontami
+npm run cli -- set-password wincyj <hasło>
 ```
+
+Migracja `002_users.sql` przy pierwszym starcie tworzy tabele `users` i `sessions` oraz
+przypisuje wszystkie istniejące wcześniejsze dane do konta `wincyj` (zablokowanego, aż
+ktoś ustawi mu hasło przez `npm run cli`). Nic nie jest usuwane ani przenoszone inaczej.
 
 ## Kolejne wersje
 
@@ -50,7 +63,7 @@ wykluczone są chronione przed usunięciem. Baza (`data/note.db`) przeżywa każ
 | zmienne środowiskowe | `/etc/default/note.wincyj.pl` |
 | logi aplikacji | `/var/log/note/app.log` |
 | vhost nginx | `/etc/nginx/sites-available/note.wincyj.pl` |
-| hasło basic auth | `/etc/nginx/note.wincyj.pl.htpasswd` |
+| konta i sesje | tabele `users` / `sessions` w `data/note.db` |
 
 ## Diagnostyka
 
@@ -59,9 +72,16 @@ ssh ubuntu@10.8.0.1
 sudo systemctl status note.wincyj.pl.service
 tail -50 /var/log/note/app.log
 sudo tail -50 /var/log/nginx/note.error.log
-curl -s -u test:milka http://127.0.0.1:8120/api/health     # pomijając nginx
+curl -s http://127.0.0.1:8120/api/health     # pomijając nginx
 sudo nginx -t
+
+# w awaryjnym razie: konto do logowania
+npm run cli -- list
+npm run cli -- set-password ala <hasło>
 ```
+
+Test przez curl wymaga ciasteczka: `curl -c /tmp/jar -X POST -H 'Content-Type: application/json' -d '{"username":"ala","password":"..."}' https://note.wincyj.pl/api/auth/login`,
+potem `curl -b /tmp/jar https://note.wincyj.pl/api/notes`.
 
 ## Kopia zapasowa bazy
 
@@ -78,6 +98,6 @@ ssh ubuntu@10.8.0.1 'cd /home/ubuntu/src/note && node -e "
 
 ## Co zmienia na serwerze
 
-Wyłącznie własne pliki: nową jednostkę systemd, nowy `/etc/default/...`, nowy katalog logów,
-nowy vhost i nowy plik htpasswd. Wspólny `/etc/nginx/nginx.conf` ani cudze vhosty nie są ruszane.
+Wyłącznie własne pliki: nowa jednostka systemd, nowy `/etc/default/...`, nowy katalog logów,
+nowy vhost. Wspólny `/etc/nginx/nginx.conf` ani cudze vhosty nie są ruszane.
 `install.sh` dodatkowo sprawdza, czy port `8120` jest wolny, zanim cokolwiek zainstaluje.

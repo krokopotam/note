@@ -25,6 +25,19 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+type UnauthorizedListener = () => void;
+
+let unauthorizedListener: UnauthorizedListener | null = null;
+
+/**
+ * Tell the shell when the server stopped accepting our session (expired, logged in
+ * from another window and killed, …). The auth store decides what that means; the
+ * client only reports, so no component has to look for a 401.
+ */
+export function setUnauthorizedListener(listener: UnauthorizedListener | null): void {
+  unauthorizedListener = listener;
+}
+
 /**
  * The single place the frontend talks to the backend.
  *
@@ -44,7 +57,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const text = await response.text();
   const parsed = safeJson(text);
 
-  if (!response.ok) throw toApiError(response.status, parsed);
+  if (!response.ok) {
+    const error = toApiError(response.status, parsed);
+    if (error.status === 401) unauthorizedListener?.();
+    throw error;
+  }
 
   return parsed as T;
 }

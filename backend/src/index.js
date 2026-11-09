@@ -1,9 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APPS } from '@note/shared';
 import { createApp } from './app.js';
 import { openDb } from './db/index.js';
-import { seedIfEmpty } from './repos/seed.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(HERE, '..', '..');
@@ -20,8 +18,9 @@ const config = {
 };
 
 const db = openDb(config.dbFile);
-seedIfEmpty(db, APPS);
 
+// New accounts are seeded with their own desktop when they register, so booting
+// the server changes nobody's data.
 createApp({ db, staticDir: config.staticDir }).listen(config.port, config.host, () => {
   console.log(`[note] http://${config.host}:${config.port} db=${config.dbFile}`);
 });

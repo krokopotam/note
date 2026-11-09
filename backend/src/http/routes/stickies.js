@@ -25,28 +25,33 @@ export function stickiesRouter(db) {
   router.get('/', (req, res) => {
     const query = parseListQuery(req.query);
     const onlyPinned = parseOrThrow(PinnedOnlySchema, req.query.pinned, 'invalid_query') === 'true';
-    res.json(listStickies(db, { ...query, onlyPinned }));
+    res.json(listStickies(db, req.userId, { ...query, onlyPinned }));
   });
 
   router.post('/', (req, res) => {
     const input = parseOrThrow(StickyCreateSchema, req.body, 'validation_error');
-    res.status(201).json(createSticky(db, input));
+    res.status(201).json(createSticky(db, req.userId, input));
   });
 
   router.get('/:id', (req, res) => {
-    const sticky = getSticky(db, idOf(req.params.id));
+    const sticky = getSticky(db, req.userId, idOf(req.params.id));
     if (!sticky) throw new HttpError(404, 'not_found', 'sticky does not exist');
     res.json(sticky);
   });
 
   router.patch('/:id', (req, res) => {
-    const sticky = updateSticky(db, idOf(req.params.id), parseOrThrow(StickyPatchSchema, req.body, 'validation_error'));
+    const sticky = updateSticky(
+      db,
+      req.userId,
+      idOf(req.params.id),
+      parseOrThrow(StickyPatchSchema, req.body, 'validation_error'),
+    );
     if (!sticky) throw new HttpError(404, 'not_found', 'sticky does not exist');
     res.json(sticky);
   });
 
   router.delete('/:id', (req, res) => {
-    if (!deleteSticky(db, idOf(req.params.id))) {
+    if (!deleteSticky(db, req.userId, idOf(req.params.id))) {
       throw new HttpError(404, 'not_found', 'sticky does not exist');
     }
     res.status(204).end();

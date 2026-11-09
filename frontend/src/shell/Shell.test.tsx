@@ -2,8 +2,9 @@ import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { request, type RequestOptions } from '../api/client';
+import { ApiError, request, type RequestOptions } from '../api/client';
 import { Shell } from './Shell';
+import { useAuth } from './authStore';
 import { desktopDefaults, useDesktop } from './desktopStore';
 import { windowDefaults, useWindows } from './windowStore';
 import type { DesktopItem } from '../api/types';
@@ -18,7 +19,12 @@ const mockedRequest = vi.mocked(request);
 
 const stamp = '2026-01-01T00:00:00.000Z';
 
+const user = { id: 1, username: 'ala', created_at: stamp, last_login_at: stamp };
+
 let table: DesktopItem[] = [];
+
+/** Whether the fake server recognises the (imaginary) cookie of this test run. */
+let signedIn = true;
 
 const item = (overrides: Partial<DesktopItem> & { id: number }): DesktopItem => ({
   kind: 'app',
@@ -34,6 +40,21 @@ const item = (overrides: Partial<DesktopItem> & { id: number }): DesktopItem => 
 function fakeBackend() {
   mockedRequest.mockImplementation(async (path: string, options?: RequestOptions) => {
     const body = options?.body as Partial<DesktopItem> | undefined;
+
+    if (path === '/auth/me') {
+      if (!signedIn) throw new ApiError(401, 'unauthorized', 'zaloguj się');
+      return { user };
+    }
+    if (path === '/auth/login' || path === '/auth/register') {
+      signedIn = true;
+      return { user };
+    }
+    if (path === '/auth/logout') {
+      signedIn = false;
+      return undefined;
+    }
+    if (!signedIn) throw new ApiError(401, 'unauthorized', 'zaloguj się');
+
     if (path === '/desktop/items' && !options?.method) return { items: table.map((row) => ({ ...row })) };
     if (path === '/notes' && options?.method === 'POST') {
       return { id: 900, title: 'Bez tytułu', body: '', created_at: stamp, updated_at: stamp };
@@ -91,6 +112,8 @@ async function drag(from: HTMLElement, toX: number, toY: number) {
 beforeEach(() => {
   useDesktop.setState(desktopDefaults);
   useWindows.setState(windowDefaults);
+  signedIn = true;
+  useAuth.setState({ status: 'signed-in', user, busy: false, error: null });
   vi.resetAllMocks();
   table = [
     item({ id: 1, name: 'Kalkulator', app_id: 'calculator', x: 0, y: 0 }),
@@ -291,10 +314,81 @@ describe('desktop shell', () => {
   });
 
   it('tells the user when the desktop cannot be loaded', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+
+    // The API goes away for everything but the session check.
+    mockedRequest.mockImplementation(async (path: string) => {
+      if (path === '/auth/me') return { user };
+      throw new Error('offline');
+    });
+    await useDesktop.getState().load();
+
+    expect(await screen.findByTestId('error-toast')).toHaveTextContent('offline');
+  });
+});
+
+describe('signing in', () => {
+  it('shows the login form to a stranger, and nothing of the desktop', async () => {
+    signedIn = false;
+
+    render(<Shell />);
+
+    expect(await screen.findByTestId('login-screen')).toBeInTheDocument();
+    expect(screen.queryByTestId('icon-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dock-calculator')).not.toBeInTheDocument();
+  });
+
+  it('waits for the answer before deciding what to show', () => {
+    useAuth.setState({ status: 'booting', user: null, error: null });
+    mockedRequest.mockImplementation(() => new Promise(() => {}));
+
+    render(<Shell />);
+
+    expect(screen.getByTestId('boot-splash')).toBeInTheDocument();
+  });
+
+  it('paints the desktop after a successful login', async () => {
+    signedIn = false;
+    render(<Shell />);
+    const form = await screen.findByTestId('login-screen');
+
+    await userEvent.type(within(form).getByLabelText('Login'), 'ala');
+    await userEvent.type(within(form).getByLabelText('Hasło'), 'mojehaslo123');
+    await userEvent.click(within(form).getByRole('button', { name: 'Wejdź' }));
+
+    expect(await screen.findByTestId('icon-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-screen')).not.toBeInTheDocument();
+    expect(screen.getByTestId('topbar-user')).toHaveTextContent('ala');
+  });
+
+  it('logs out and hands the screen back to the login form', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Wyloguj' }));
+
+    expect(await screen.findByTestId('login-screen')).toBeInTheDocument();
+    expect(screen.queryByTestId('topbar-user')).not.toBeInTheDocument();
+  });
+
+  it('hands the screen back the moment the session is known to be gone', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+
+    // What the 401 listener does (covered in authStore.test.ts): anonymous again.
+    useAuth.setState({ status: 'anonymous', user: null });
+
+    expect(await screen.findByTestId('login-screen')).toBeInTheDocument();
+  });
+
+  it('explains itself when the server is unreachable while deciding who is here', async () => {
+    useAuth.setState({ status: 'booting', user: null, error: null });
     mockedRequest.mockRejectedValue(new Error('offline'));
 
     render(<Shell />);
 
-    expect(await screen.findByTestId('error-toast')).toHaveTextContent('offline');
+    expect(await screen.findByTestId('login-screen')).toBeInTheDocument();
+    expect(screen.getByTestId('login-error')).toHaveTextContent('Nie udało się połączyć');
   });
 });

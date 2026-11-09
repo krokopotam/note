@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { ContextMenu } from './ContextMenu';
+import { LoginScreen } from './LoginScreen';
+import { useAuth, watchSessionLoss } from './authStore';
 import { Desktop } from './Desktop';
 import { Dock } from './Dock';
 import { Launcher } from './Launcher';
@@ -14,8 +16,13 @@ import styles from './Shell.module.css';
  *
  * Window stacking is a plain map over the store — there is no portal trickery,
  * because the shell owns the whole viewport anyway.
+ *
+ * Nothing of it renders until the session is known: boot asks the server who this
+ * cookie belongs to, and an unknown visitor gets the login form instead.
  */
 export function Shell() {
+  const authStatus = useAuth((state) => state.status);
+  const boot = useAuth((state) => state.boot);
   const load = useDesktop((state) => state.load);
   const status = useDesktop((state) => state.status);
   const error = useDesktop((state) => state.error);
@@ -23,8 +30,24 @@ export function Shell() {
   const focusedKey = useWindows((state) => state.focusedKey);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void boot();
+    // A 401 anywhere later (10 days passed, account locked) brings the login form back.
+    return watchSessionLoss();
+  }, [boot]);
+
+  useEffect(() => {
+    if (authStatus === 'signed-in') void load();
+  }, [authStatus, load]);
+
+  if (authStatus === 'booting') {
+    return (
+      <div className={styles.boot} data-testid="boot-splash">
+        note
+      </div>
+    );
+  }
+
+  if (authStatus === 'anonymous') return <LoginScreen />;
 
   return (
     <div className={styles.shell} data-testid="shell">

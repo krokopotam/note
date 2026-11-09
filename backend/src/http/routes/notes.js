@@ -29,16 +29,16 @@ export function notesRouter(db) {
   };
 
   router.get('/', (req, res) => {
-    res.json(listNotes(db, parseListQuery(req.query)));
+    res.json(listNotes(db, req.userId, parseListQuery(req.query)));
   });
 
   router.post('/', (req, res) => {
     const input = parseOrThrow(NoteCreateSchema, req.body, 'validation_error');
-    res.status(201).json(createNote(db, input));
+    res.status(201).json(createNote(db, req.userId, input));
   });
 
   router.get('/:id', (req, res) => {
-    const note = getNote(db, idOf(req.params.id));
+    const note = getNote(db, req.userId, idOf(req.params.id));
     if (!note) throw new HttpError(404, 'not_found', 'note does not exist');
     res.json(note);
   });
@@ -46,26 +46,26 @@ export function notesRouter(db) {
   router.patch('/:id', (req, res) => {
     const id = idOf(req.params.id);
     const patch = parseOrThrow(NotePatchSchema, req.body, 'validation_error');
-    const note = updateNote(db, id, patch);
+    const note = updateNote(db, req.userId, id, patch);
     if (!note) throw new HttpError(404, 'not_found', 'note does not exist');
     res.json(note);
   });
 
   router.delete('/:id', (req, res) => {
-    if (!deleteNote(db, idOf(req.params.id))) {
+    if (!deleteNote(db, req.userId, idOf(req.params.id))) {
       throw new HttpError(404, 'not_found', 'note does not exist');
     }
     res.status(204).end();
   });
 
   router.get('/:id/revisions', (req, res) => {
-    const revisions = listRevisions(db, idOf(req.params.id));
+    const revisions = listRevisions(db, req.userId, idOf(req.params.id));
     if (revisions === null) throw new HttpError(404, 'not_found', 'note does not exist');
     res.json(revisions);
   });
 
   router.post('/:id/revisions/:revisionId/restore', (req, res) => {
-    const note = restoreRevision(db, idOf(req.params.id), idOf(req.params.revisionId));
+    const note = restoreRevision(db, req.userId, idOf(req.params.id), idOf(req.params.revisionId));
     if (!note) throw new HttpError(404, 'not_found', 'note does not exist');
     res.json(note);
   });

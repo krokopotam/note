@@ -12,6 +12,7 @@ import type {
   SortOrderSchema,
   StickyPageSchema,
   StickySchema,
+  UserSchema,
 } from '@note/shared/schemas';
 
 /**
@@ -29,3 +30,4 @@ export type DesktopItems = z.infer<typeof DesktopItemsSchema>;
 export type Favorites = z.infer<typeof FavoritesSchema>;
 export type NotepadSession = z.infer<typeof NotepadSessionSchema>;
 export type SortOrder = z.infer<typeof SortOrderSchema>;
+export type AuthUser = z.infer<typeof UserSchema>;

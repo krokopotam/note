@@ -21,6 +21,29 @@ export const DESKTOP_KINDS = ['app', 'folder'];
 /** Slots the shell renders shortcuts into. */
 export const FAVORITE_SLOTS = ['dock', 'launcher'];
 
+// --- accounts ---------------------------------------------------------------
+
+/**
+ * Lowercase ASCII handle (3–32 chars): no look-alike accounts, no unicode tricks.
+ * Runtime data, because the login form validates against it before sending.
+ */
+export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+export const USERNAME_HINT = '3–32 znaki, małe litery, cyfry, kropka, myślnik, podkreślenie';
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 128;
+
+/** "Zapamiętaj mnie na 10 dni"; without it a session still lives SESSION_HOURS. */
+export const REMEMBER_DAYS = 10;
+export const SESSION_HOURS = 12;
+
+/**
+ * Trim + lowercase, so 'Wincyj' and 'wincyj ' are the same account.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export const normalizeUsername = (value) => String(value ?? '').trim().toLowerCase();
+
 /** Every ordering the list endpoints accept; each maps to one fixed ORDER BY. */
 export const SORT_ORDERS = [
   'updated_desc',

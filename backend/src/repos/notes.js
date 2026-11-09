@@ -1,40 +1,51 @@
 import { HttpError } from '../domain/errors.js';
 import { keywordFilter, orderBySql } from '../domain/query.js';
 import { deriveTitle } from '../domain/noteTitle.js';
+import { assertUserId } from '../domain/scope.js';
 import { NOTE_TITLE_MAX } from '@note/shared';
 
 const nowIso = () => new Date().toISOString();
 
 /**
- * Notes table access. Every function takes the open database as its first
- * argument and returns plain row objects shaped like NoteSchema, so the HTTP
- * layer adds no translation step.
+ * Notes table access — always scoped to one account.
+ *
+ * Every function takes the open database and the owning user id, and every
+ * statement filters by that id, so "note 7" on another account is simply not
+ * found (404, not 403: the API does not confirm that somebody else's id exists).
  */
 
-export function listNotes(db, { q, sort = 'updated_desc', limit = 50, offset = 0 } = {}) {
+/** @returns {{items: object[], total: number}} */
+export function listNotes(db, userId, { q, sort = 'updated_desc', limit = 50, offset = 0 } = {}) {
+  const owner = assertUserId(userId);
   const { clause, params } = keywordFilter(q, ['title', 'body']);
-  const where = clause ? `WHERE ${clause}` : '';
+  const where = clause ? `WHERE user_id = @userId AND ${clause}` : 'WHERE user_id = @userId';
+  const all = { ...params, userId: owner };
 
   const items = db
     .prepare(
       `SELECT * FROM notes ${where} ORDER BY ${orderBySql(sort)} LIMIT @limit OFFSET @offset`,
     )
-    .all({ ...params, limit, offset });
-  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM notes ${where}`).get(params);
+    .all({ ...all, limit, offset });
+  const { total } = db.prepare(`SELECT COUNT(*) AS total FROM notes ${where}`).get(all);
 
   return { items, total };
 }
 
-export function getNote(db, id) {
-  return db.prepare('SELECT * FROM notes WHERE id = ?').get(id);
+export function getNote(db, userId, id) {
+  return db
+    .prepare('SELECT * FROM notes WHERE id = ? AND user_id = ?')
+    .get(id, assertUserId(userId));
 }
 
-export function createNote(db, { title, body = '', now = nowIso() } = {}) {
+export function createNote(db, userId, { title, body = '', now = nowIso() } = {}) {
   const finalTitle = title && title.trim() ? title.trim() : deriveTitle(body, NOTE_TITLE_MAX);
   const info = db
-    .prepare('INSERT INTO notes (title, body, created_at, updated_at) VALUES (@t, @b, @c, @u)')
-    .run({ t: finalTitle, b: body, c: now, u: now });
-  return getNote(db, info.lastInsertRowid);
+    .prepare(
+      `INSERT INTO notes (user_id, title, body, created_at, updated_at)
+       VALUES (@user, @t, @b, @c, @u)`,
+    )
+    .run({ user: assertUserId(userId), t: finalTitle, b: body, c: now, u: now });
+  return getNote(db, userId, info.lastInsertRowid);
 }
 
 /**
@@ -43,10 +54,10 @@ export function createNote(db, { title, body = '', now = nowIso() } = {}) {
  * History is written only when content actually changed, so an autosave firing
  * on an untouched note cannot add noise to the revision list.
  *
- * @returns {object|null} updated row, or null when the id is unknown
+ * @returns {object|null} updated row, or null when the id is not this user's
  */
-export function updateNote(db, id, { title, body, now = nowIso() }) {
-  const current = getNote(db, id);
+export function updateNote(db, userId, id, { title, body, now = nowIso() }) {
+  const current = getNote(db, userId, id);
   if (!current) return null;
 
   const nextTitle = title !== undefined ? title.trim() : current.title;
@@ -60,22 +71,22 @@ export function updateNote(db, id, { title, body, now = nowIso() }) {
       `INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (@id, @t, @b, @at)`,
     ).run({ id, t: current.title, b: current.body, at: current.updated_at });
 
-    db.prepare('UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id').run({
-      id,
-      t: nextTitle,
-      b: nextBody,
-      u: now,
-    });
-    return getNote(db, id);
+    db.prepare(
+      'UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id AND user_id = @user',
+    ).run({ id, user: current.user_id, t: nextTitle, b: nextBody, u: now });
+    return getNote(db, userId, id);
   })();
 }
 
-export function deleteNote(db, id) {
-  return db.prepare('DELETE FROM notes WHERE id = ?').run(id).changes > 0;
+export function deleteNote(db, userId, id) {
+  return (
+    db.prepare('DELETE FROM notes WHERE id = ? AND user_id = ?').run(id, assertUserId(userId))
+      .changes > 0
+  );
 }
 
-export function listRevisions(db, noteId, { limit = 50 } = {}) {
-  if (!getNote(db, noteId)) return null;
+export function listRevisions(db, userId, noteId, { limit = 50 } = {}) {
+  if (!getNote(db, userId, noteId)) return null;
   return db
     .prepare('SELECT * FROM note_revisions WHERE note_id = @noteId ORDER BY id DESC LIMIT @limit')
     .all({ noteId, limit });
@@ -85,8 +96,8 @@ export function listRevisions(db, noteId, { limit = 50 } = {}) {
  * Roll a note back to one of its revisions. The version being replaced is
  * snapshotted first, so a restore is itself undoable.
  */
-export function restoreRevision(db, noteId, revisionId, now = nowIso()) {
-  const note = getNote(db, noteId);
+export function restoreRevision(db, userId, noteId, revisionId, now = nowIso()) {
+  const note = getNote(db, userId, noteId);
   if (!note) return null;
 
   const revision = db
@@ -99,12 +110,9 @@ export function restoreRevision(db, noteId, revisionId, now = nowIso()) {
       `INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (@id, @t, @b, @at)`,
     ).run({ id: noteId, t: note.title, b: note.body, at: note.updated_at });
 
-    db.prepare('UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id').run({
-      id: noteId,
-      t: revision.title,
-      b: revision.body,
-      u: now,
-    });
-    return getNote(db, noteId);
+    db.prepare(
+      'UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id AND user_id = @user',
+    ).run({ id: noteId, user: note.user_id, t: revision.title, b: revision.body, u: now });
+    return getNote(db, userId, noteId);
   })();
 }

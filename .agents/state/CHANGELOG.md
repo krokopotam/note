@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 2026-11-10 — konta: każdy widzi tylko swoje
+
+- **Rejestracja jest otwarta**: login + hasło wpisane dwa razy; logowanie — hasło raz,
+  z opcją „Zaloguj na 10 dni”. Sesję trzyma ciasteczko `note_session` (HttpOnly, SameSite=Lax,
+  `Secure` tylko gdy żądanie przyszło po HTTPS — inaczej lokalny Vite by je odrzucił).
+- **Własna przestrzeń**: `user_id` w `notes`, `stickies`, `desktop_items`, `favorites`,
+  `notepad_tabs`, `notepad_state`. Każde zapytanie w repo ma filtr po właścicielu,
+  `assertUserId` odrzuca wywołanie bez konta. Cudzy identyfikator daje 404, nie 403.
+- **Migracja `002_users.sql`**: dane sprzed kontów idą do konta `wincyj` (hash `!locked`);
+  przejmuje je `npm run cli -- set-password wincyj <hasło>`. Stare `favorites` i
+  `notepad_*` przebudowane z kluczem głównym per konto — dane przeniesione w całości
+  (test na kopii prawdziwej bazy).
+- Bezpieczeństwo: scrypt + sól, `timingSafeEqual`, pozorowana weryfikacja, gdy login nie istnieje,
+  w bazie tylko hash tokenu sesji, limit prób logowania w procesie + `limit_req` w nginx.
+- **nginx bez `auth_basic`** — bramką jest ekran logowania; dawnego użytkownika `test`
+  już nie ma (plik htpasswd został na dysku, nic go nie używa).
+- Nowe: `backend/src/{domain/passwords,domain/tokens,domain/scope,http/cookies,http/auth}.js`,
+  `repos/{users,sessions}.js`, `http/routes/auth.js`, `cli/users.js`,
+  `frontend/src/{api/auth,shell/authStore,shell/LoginScreen}.*`.
+- Testy: backend 92 → 100, frontend 142 → 170, razem **270**.
+
 ## 2026-11-09 — karteczka tworzona przez pomyłkę nie zostaje na pulpicie
 - 'Nowa karteczka' klikana kilkakrotnie zostawiała puste karty; nowa karta dostaje kursor, a jeśli
   user kliknie obok nie wpisawszy nic — sama znika. Karta, do której coś wpisano, zostaje zawsze.
