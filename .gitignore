@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+__pycache__/
+.venv/
+venv/
+
+# builds / dist
+dist/
+build/
+*.tsbuildinfo
+
+# env / local config
+.env
+.env.*
+!.env.example
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
