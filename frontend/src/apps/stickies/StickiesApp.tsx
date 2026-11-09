@@ -89,11 +89,18 @@ function Card({ sticky }: { sticky: Sticky }) {
   const setColor = useStickies((state) => state.setColor);
   const togglePinned = useStickies((state) => state.togglePinned);
   const remove = useStickies((state) => state.remove);
+  const isPending = useStickies((state) => state.pendingEmptyId === sticky.id);
   const [text, setText] = useState(sticky.body);
+  const field = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setText(sticky.body);
   }, [sticky.body]);
+
+  // A card created from the toolbar is ready for typing straight away.
+  useEffect(() => {
+    if (isPending) field.current?.focus();
+  }, [isPending]);
 
   return (
     <article
@@ -101,6 +108,7 @@ function Card({ sticky }: { sticky: Sticky }) {
       data-testid={`sticky-${sticky.id}`}
     >
       <textarea
+        ref={field}
         className={styles.cardText}
         value={text}
         aria-label={`Treść karteczki ${sticky.id}`}

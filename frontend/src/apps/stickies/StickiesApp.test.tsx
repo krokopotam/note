@@ -134,6 +134,20 @@ describe('stickies board', () => {
     expect(screen.queryByTestId('sticky-1')).not.toBeInTheDocument();
   });
 
+  it('puts the caret straight into a card created from the toolbar', async () => {
+    renderBoard();
+    await screen.findByTestId('sticky-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nowa karteczka' }));
+
+    const card = await screen.findByTestId('sticky-3');
+    expect(card.querySelector('textarea')).toHaveFocus();
+
+    // Leaving it empty again must not leave a blank card on the board.
+    await userEvent.click(document.body);
+    await vi.waitFor(() => expect(screen.queryByTestId('sticky-3')).not.toBeInTheDocument());
+  });
+
   it('re-reads the board when a card is pushed into the payload', async () => {
     api.list.mockResolvedValue({ items: [sticky(1)], total: 1 });
     const { rerender } = render(<StickiesApp windowKey="stickies" appId="stickies" payload={{}} />);

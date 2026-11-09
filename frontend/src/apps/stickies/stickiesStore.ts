@@ -19,6 +19,12 @@ interface StickiesStore {
   onlyPinned: boolean;
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
+  /**
+   * A card created a moment ago that the user has not typed into yet. It gets the
+   * caret, and if it is still empty when they click away it disappears again —
+   * otherwise every stray click on "Nowa karteczka" would leave litter behind.
+   */
+  pendingEmptyId: number | null;
 
   load: () => Promise<void>;
   search: (query: string) => Promise<void>;
@@ -35,7 +41,14 @@ interface StickiesStore {
 /** Everything the store holds besides the actions — also its reset point. */
 export const stickiesDefaults: Pick<
   StickiesStore,
-  'stickies' | 'total' | 'query' | 'sort' | 'onlyPinned' | 'status' | 'error'
+  | 'stickies'
+  | 'total'
+  | 'query'
+  | 'sort'
+  | 'onlyPinned'
+  | 'status'
+  | 'error'
+  | 'pendingEmptyId'
 > = {
   stickies: [],
   total: 0,
@@ -44,6 +57,7 @@ export const stickiesDefaults: Pick<
   onlyPinned: false,
   status: 'idle',
   error: null,
+  pendingEmptyId: null,
 };
 
 export const useStickies = create<StickiesStore>((set, get) => ({
@@ -77,15 +91,27 @@ export const useStickies = create<StickiesStore>((set, get) => ({
   create: async (body = '') => {
     try {
       const created = await stickiesApi.create({ body });
-      set({ stickies: [created, ...get().stickies], total: get().total + 1 });
+      set({
+        stickies: [created, ...get().stickies],
+        total: get().total + 1,
+        pendingEmptyId: created.body.trim() === '' ? created.id : null,
+      });
     } catch (error) {
       set({ error: describe(error) });
     }
   },
 
   commitText: async (id, body) => {
+    // The card that was only opened to be typed into, and never was: drop it.
+    if (get().pendingEmptyId === id && body.trim() === '') {
+      set({ pendingEmptyId: null });
+      await get().remove(id);
+      return;
+    }
+
     const current = get().stickies.find((sticky) => sticky.id === id);
     if (!current || current.body === body) return;
+    if (get().pendingEmptyId === id) set({ pendingEmptyId: null });
     await patch(set, get, id, { body });
   },
 

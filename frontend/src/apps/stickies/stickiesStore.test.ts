@@ -102,6 +102,43 @@ describe('board actions', () => {
     expect(useStickies.getState().error).toBe('boom');
   });
 
+  it('drops a card that was created and never typed into', async () => {
+    api.create.mockResolvedValue(sticky(9, { body: '' }));
+    api.remove.mockResolvedValue(undefined);
+
+    await useStickies.getState().create();
+    expect(useStickies.getState().pendingEmptyId).toBe(9);
+
+    await useStickies.getState().commitText(9, '');
+
+    expect(api.remove).toHaveBeenCalledWith(9);
+    expect(useStickies.getState().stickies.map((entry) => entry.id)).not.toContain(9);
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps an older empty card that the user cleared on purpose', async () => {
+    useStickies.setState({ stickies: [sticky(1, { body: '' })] });
+
+    await useStickies.getState().commitText(1, '');
+
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(api.update).not.toHaveBeenCalled();
+    expect(useStickies.getState().stickies).toHaveLength(1);
+  });
+
+  it('stops treating a new card as disposable once it has text', async () => {
+    api.create.mockResolvedValue(sticky(9, { body: '' }));
+    api.update.mockResolvedValue(sticky(9, { body: 'jednak coś' }));
+
+    await useStickies.getState().create();
+    await useStickies.getState().commitText(9, 'jednak coś');
+
+    expect(useStickies.getState().pendingEmptyId).toBeNull();
+
+    await useStickies.getState().commitText(9, '');
+    expect(api.remove).not.toHaveBeenCalled();
+  });
+
   it('searching reloads the board with the new keywords', async () => {
     await useStickies.getState().search('mleko');
 
