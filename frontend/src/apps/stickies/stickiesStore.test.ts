@@ -102,41 +102,57 @@ describe('board actions', () => {
     expect(useStickies.getState().error).toBe('boom');
   });
 
-  it('drops a card that was created and never typed into', async () => {
+  it('sends the caret back to the waiting card instead of creating another', async () => {
     api.create.mockResolvedValue(sticky(9, { body: '' }));
-    api.remove.mockResolvedValue(undefined);
 
     await useStickies.getState().create();
+    expect(api.create).toHaveBeenCalledTimes(1);
     expect(useStickies.getState().pendingEmptyId).toBe(9);
 
-    await useStickies.getState().commitText(9, '');
+    // Rapid clicking of the same button must not stack blank cards on the board.
+    await useStickies.getState().create();
+    await useStickies.getState().create();
 
-    expect(api.remove).toHaveBeenCalledWith(9);
-    expect(useStickies.getState().stickies.map((entry) => entry.id)).not.toContain(9);
-    expect(api.update).not.toHaveBeenCalled();
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(useStickies.getState().stickies.map((entry) => entry.id)).toEqual([9]);
+    expect(useStickies.getState().pendingNonce).toBe(2);
   });
 
-  it('keeps an older empty card that the user cleared on purpose', async () => {
-    useStickies.setState({ stickies: [sticky(1, { body: '' })] });
+  it('creates a second card once the waiting one is no longer empty', async () => {
+    api.create
+      .mockResolvedValueOnce(sticky(9, { body: '' }))
+      .mockResolvedValueOnce(sticky(10, { body: '' }));
+    api.update.mockResolvedValue(sticky(9, { body: 'pierwsza myśl' }));
+
+    await useStickies.getState().create();
+    await useStickies.getState().commitText(9, 'pierwsza myśl');
+    await useStickies.getState().create();
+
+    expect(api.create).toHaveBeenCalledTimes(2);
+    expect(useStickies.getState().pendingEmptyId).toBe(10);
+  });
+
+  it('keeps a card the user cleared on purpose', async () => {
+    useStickies.setState({ stickies: [sticky(1, { body: 'było coś' })] });
+    api.update.mockResolvedValue(sticky(1, { body: '' }));
 
     await useStickies.getState().commitText(1, '');
 
     expect(api.remove).not.toHaveBeenCalled();
-    expect(api.update).not.toHaveBeenCalled();
+    expect(api.update).toHaveBeenCalledWith(1, { body: '' });
     expect(useStickies.getState().stickies).toHaveLength(1);
   });
 
-  it('stops treating a new card as disposable once it has text', async () => {
+  it('never deletes a brand new card that was left empty', async () => {
     api.create.mockResolvedValue(sticky(9, { body: '' }));
-    api.update.mockResolvedValue(sticky(9, { body: 'jednak coś' }));
 
     await useStickies.getState().create();
-    await useStickies.getState().commitText(9, 'jednak coś');
-
-    expect(useStickies.getState().pendingEmptyId).toBeNull();
-
+    // The user clicked on the window frame, the pin, another app — any blur.
     await useStickies.getState().commitText(9, '');
+
     expect(api.remove).not.toHaveBeenCalled();
+    expect(useStickies.getState().stickies.map((entry) => entry.id)).toEqual([9]);
   });
 
   it('searching reloads the board with the new keywords', async () => {

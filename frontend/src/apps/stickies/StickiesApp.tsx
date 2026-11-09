@@ -90,6 +90,8 @@ function Card({ sticky }: { sticky: Sticky }) {
   const togglePinned = useStickies((state) => state.togglePinned);
   const remove = useStickies((state) => state.remove);
   const isPending = useStickies((state) => state.pendingEmptyId === sticky.id);
+  // Bumped when "Nowa karteczka" is clicked while this card is still waiting.
+  const focusNonce = useStickies((state) => (state.pendingEmptyId === sticky.id ? state.pendingNonce : 0));
   const [text, setText] = useState(sticky.body);
   const field = useRef<HTMLTextAreaElement>(null);
 
@@ -100,7 +102,7 @@ function Card({ sticky }: { sticky: Sticky }) {
   // A card created from the toolbar is ready for typing straight away.
   useEffect(() => {
     if (isPending) field.current?.focus();
-  }, [isPending]);
+  }, [isPending, focusNonce]);
 
   return (
     <article

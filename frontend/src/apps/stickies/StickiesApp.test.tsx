@@ -143,9 +143,15 @@ describe('stickies board', () => {
     const card = await screen.findByTestId('sticky-3');
     expect(card.querySelector('textarea')).toHaveFocus();
 
-    // Leaving it empty again must not leave a blank card on the board.
+    // A blur must never destroy the card: clicking the window frame is a blur too.
     await userEvent.click(document.body);
-    await vi.waitFor(() => expect(screen.queryByTestId('sticky-3')).not.toBeInTheDocument());
+    expect(screen.getByTestId('sticky-3')).toBeInTheDocument();
+    expect(api.remove).not.toHaveBeenCalled();
+
+    // Clicking the button again points at the same waiting card instead of adding one.
+    await userEvent.click(screen.getByRole('button', { name: 'Nowa karteczka' }));
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('sticky-3').querySelector('textarea')).toHaveFocus();
   });
 
   it('re-reads the board when a card is pushed into the payload', async () => {

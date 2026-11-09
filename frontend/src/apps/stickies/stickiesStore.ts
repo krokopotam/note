@@ -20,11 +20,16 @@ interface StickiesStore {
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
   /**
-   * A card created a moment ago that the user has not typed into yet. It gets the
-   * caret, and if it is still empty when they click away it disappears again —
-   * otherwise every stray click on "Nowa karteczka" would leave litter behind.
+   * The card created a moment ago that is still waiting for its first words: it
+   * gets the caret, and another click on "Nowa karteczka" points at it instead of
+   * putting a second blank card on the board.
+   *
+   * Nothing here ever deletes a card — a blur is also a click on the window frame,
+   * the pin or another app, and a card that vanishes for one of those is lost work.
+   * `pendingNonce` bumps so the caret can be sent back to the same card.
    */
   pendingEmptyId: number | null;
+  pendingNonce: number;
 
   load: () => Promise<void>;
   search: (query: string) => Promise<void>;
@@ -49,6 +54,7 @@ export const stickiesDefaults: Pick<
   | 'status'
   | 'error'
   | 'pendingEmptyId'
+  | 'pendingNonce'
 > = {
   stickies: [],
   total: 0,
@@ -58,6 +64,7 @@ export const stickiesDefaults: Pick<
   status: 'idle',
   error: null,
   pendingEmptyId: null,
+  pendingNonce: 0,
 };
 
 export const useStickies = create<StickiesStore>((set, get) => ({
@@ -89,6 +96,16 @@ export const useStickies = create<StickiesStore>((set, get) => ({
   },
 
   create: async (body = '') => {
+    // A blank card is already waiting for words: send the caret back to it rather
+    // than stacking another empty one (that is how the board got littered).
+    if (body.trim() === '') {
+      const waiting = get().stickies.find((sticky) => sticky.id === get().pendingEmptyId);
+      if (waiting && waiting.body.trim() === '') {
+        set((state) => ({ pendingNonce: state.pendingNonce + 1, error: null }));
+        return;
+      }
+    }
+
     try {
       const created = await stickiesApi.create({ body });
       set({
@@ -102,13 +119,6 @@ export const useStickies = create<StickiesStore>((set, get) => ({
   },
 
   commitText: async (id, body) => {
-    // The card that was only opened to be typed into, and never was: drop it.
-    if (get().pendingEmptyId === id && body.trim() === '') {
-      set({ pendingEmptyId: null });
-      await get().remove(id);
-      return;
-    }
-
     const current = get().stickies.find((sticky) => sticky.id === id);
     if (!current || current.body === body) return;
     if (get().pendingEmptyId === id) set({ pendingEmptyId: null });
