@@ -50,6 +50,74 @@ describe('database bootstrap', () => {
     db.close();
   });
 
+  it('never hands out a number that was already shown to a browser', () => {
+    const db = openDb(':memory:');
+    const stamp = '2026-01-05T10:00:00.000Z';
+    const user = db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run('ala', 'x', stamp).lastInsertRowid;
+    const conversation = db.prepare('INSERT INTO conversations (created_at) VALUES (?)').run(stamp).lastInsertRowid;
+    db
+      .prepare('INSERT INTO conversation_members (conversation_id, user_id, last_read_at, created_at) VALUES (?, ?, ?, ?)')
+      .run(conversation, user, stamp, stamp);
+
+    const add = (name) =>
+      db
+        .prepare(
+          'INSERT INTO message_attachments (conversation_id, stored_name, file_name, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run(conversation, `${name}.uuid`, `${name}.png`, 'image/png', 10, stamp).lastInsertRowid;
+
+    const first = add('pierwsze');
+    const second = add('drugie');
+    db.prepare('DELETE FROM message_attachments WHERE id = ?').run(second);
+
+    // Rowid would happily give `second` back; a browser holding the old picture
+    // under that address would then paint it over the new one.
+    expect(add('trzecie')).toBeGreaterThan(second);
+    expect(db.prepare('SELECT COUNT(*) n FROM message_attachments').get().n).toBe(2);
+    db.close();
+  });
+
+  it('rebuilds the tables without losing rows or the disk names', () => {
+    // A database frozen at 009, with data and a deleted newest row: opened raw,
+    // so the migrations below are the only ones that have ever touched it.
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    const files = fs
+      .readdirSync(MIGRATIONS)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .filter((name) => name !== '010_no_reused_ids.sql');
+    files.forEach((name) => {
+      db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
+      db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(name, 'kiedyś');
+    });
+
+    const stamp = '2026-01-05T10:00:00.000Z';
+    const user = db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run('ala', 'x', stamp).lastInsertRowid;
+    const resource = db.prepare('INSERT INTO file_resources (owner_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(user, 'zdjęcia', stamp, stamp).lastInsertRowid;
+    const put = (name) =>
+      db
+        .prepare(
+          'INSERT INTO files (resource_id, name, stored_name, size, content_type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(resource, name, `${name}.uuid`, 10, 'image/png', user, stamp).lastInsertRowid;
+    put('a');
+    const last = put('b');
+    db.prepare('DELETE FROM files WHERE id = ?').run(last);
+
+    expect(migrate(db)).toEqual(['010_no_reused_ids.sql']);
+
+    const columns = db.prepare('PRAGMA table_info(files)').all().map((c) => c.name);
+    expect(columns).toEqual(
+      expect.arrayContaining(['resource_id', 'name', 'stored_name', 'size', 'content_type', 'created_by', 'created_at']),
+    );
+    expect(db.prepare('SELECT name, stored_name FROM files').all()).toEqual([{ name: 'a', stored_name: 'a.uuid' }]);
+    expect(put('c')).toBeGreaterThan(last);
+    // Index from the old definition still serves the listing query.
+    expect(db.prepare('SELECT id FROM files WHERE resource_id = ?').all(resource)).toHaveLength(2);
+    db.close();
+  });
+
   it('gives messages a tombstone and groups a title', () => {
     const db = openDb(':memory:');
     const columns = (table) =>
@@ -96,6 +164,7 @@ describe('database bootstrap', () => {
       { version: '007_drop_note_revisions.sql' },
       { version: '008_chat_sync.sql' },
       { version: '009_chat_media.sql' },
+      { version: '010_no_reused_ids.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -149,6 +218,7 @@ describe('upgrading a database that predates accounts', () => {
       '007_drop_note_revisions.sql',
       '008_chat_sync.sql',
       '009_chat_media.sql',
+      '010_no_reused_ids.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');

@@ -221,6 +221,22 @@ describe('sprzątanie zdjęć', () => {
     expect(db.prepare('SELECT id FROM message_attachments').all().map((row) => row.id)).toEqual([kept.body.id]);
   });
 
+  it('never gives an address that a browser already remembers back to a new picture', async () => {
+    const { ala, ola } = await twoAccounts();
+    const conv = await thread(ala.api, ola.user.id);
+    const first = await upload(ala.api, conv.id, 'pierwsze.png', PNG);
+    const message = await ala.api
+      .post(`/api/chat/conversations/${conv.id}/messages`)
+      .send({ attachment_ids: [first.body.id] });
+
+    await ala.api.delete(`/api/chat/messages/${message.body.id}`);
+    const second = await upload(ala.api, conv.id, 'nastepne.png', PNG);
+
+    // Same number under the same URL would mean: the browser shows the picture
+    // it cached for that address, which is the one that was just deleted.
+    expect(second.body.id).not.toBe(first.body.id);
+  });
+
   it('leaves a picture alone when the person who sent it is gone', async () => {
     const { ala, ola, db } = await twoAccounts();
     const conv = await thread(ala.api, ola.user.id);

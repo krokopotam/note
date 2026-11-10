@@ -80,7 +80,7 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | POST | `/api/chat/conversations/:id/members` | `{ user_id }` — dopisanie osoby do grupy |
 | GET | `/api/chat/conversations/:id/messages?since=` | wiadomości (od najstarszej; `since` = wszystko, co zmieniło się od tamtej chwili: nowe, poprawione, usunięte) |
 | POST | `/api/chat/conversations/:id/attachments` | wrzucenie zdjęcia do rozmowy — ciało to surowe bajty, nazwa w `?name=` |
-| GET | `/api/chat/attachments/:id` | pobranie zdjęcia (tylko dla osób z rozmowy) |
+| GET | `/api/chat/attachments/:id?v=` | pobranie zdjęcia (tylko dla osób z rozmowy); `v` to moment wrzucenia — adres nie może dwóch zdjęć znaczyć |
 | POST | `/api/chat/conversations/:id/messages` | `{ body, attachment_ids? }` — zapisanie wiadomości (tekst, zdjęcia albo jedno i drugie) |
 | PATCH/DELETE | `/api/chat/messages/:id` | zmiana (tylko 5 minut) / usunięcie własnej wiadomości |
 | GET/POST | `/api/files/resources` | lista zasobów / nowy zasób |

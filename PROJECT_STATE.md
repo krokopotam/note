@@ -23,8 +23,9 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 
 Testy: `npm test` → 476 przechodzi (backend 173, frontend 303). `npm run lint` → czysto.
 
-Migracja `009_chat_media.sql` (tabela `message_attachments`) dokłada tylko nową tabelę i indeks —
-żadnej zmiany w starych wierszach, więc weszła na serwer bez przygotowania kopii poza zwykłą.
+Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
+i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
+wiersze i `stored_name` bez zmian, liczniki przesunięte o 100, `integrity_check: ok`.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -32,6 +33,21 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (poprawka: „miniatura poprzedniego zdjęcia")
+
+- **Numer wiersza, który raz poszedł w świat, nie wraca** (`010_no_reused_ids.sql`: `AUTOINCREMENT`
+  na `files.id` i `message_attachments.id`). `INTEGER PRIMARY KEY` to rowid — po skasowaniu najnowszego
+  wiersza SQLite oddaje ten sam numer następnemu, a oba te adresy trzyma się w cache (pliki: rok,
+  zdjęcia: doba). Stąd objaw: kasujesz zdjęcie, wrzucasz następne, przeglądarka rysuje **poprzednie**,
+  choć serwer odpowiadał poprawnie. Przy kasowaniu przed migracją numery mogły być wyższe niż zostało
+  `MAX(id)`, więc liczniki są dodatkowo przesunięte o 100.
+- **Adres zdjęcia niesie moment wrzucenia**: `/api/chat/attachments/:id?v=<created_at>` (backend
+  ignoruje zapytanie). To poduszka dla cache'y, które już zdążyły zapamiętać numery wydane przed
+  migracją — bez niej musiałbyś czekać dobę albo czyścić pamięć przeglądarki.
+- **Miniatura pliku, którego jeszcze nie wysłano, jest robiona raz** (`PendingThumb`: adres obiektu
+  w `useEffect`, `revokeObjectURL` przy zniknięciu) i ma **własny klucz**, nie indeks. Wcześniejszy
+  kod robił nowy adres obiektu przy każdym renderze — a render leci z każdym odpytywaniem rozmowy.
 
 ## Decyzje (ostatnia runda: życie w czacie)
 

@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 2026-11-10 — „wylałem zdjęcie, a pojawiła się miniatura poprzedniego"
+
+Nie zniknęło nic po stronie danych: to przeglądarka pokazała stary obraz z własnej pamięci.
+
+- **Przyczyna**: `message_attachments.id` (i `files.id`) były zwykłym `INTEGER PRIMARY KEY`, czyli
+  rowidem. Po skasowaniu najnowszego wiersza numer wraca do obiegu i trafia do następnego zdjęcia,
+  a `/api/chat/attachments/:id` jest cache'owany (`private, max-age=86400`; pliki: `public`, rok).
+  Ten sam adres = stary obraz. Backend odpowiadał poprawnie — cache siedzi przed nim.
+- **`010_no_reused_ids.sql`**: odbudowa `files` i `message_attachments` z `AUTOINCREMENT`
+  (numery never reused), liczniki +100 za ewentualne skasowane wcześniej wyższe numery. Migracja
+  przećwiczona na kopii produkcyjnej przed wdrożeniem.
+- **`attachmentUrl(id, created_at)`** → `?v=<created_at>`: adres zdjęcia różni się między wrzuceniami,
+  więc cache'y z czasów przed migracją przestają dokuczać od razu.
+- **Miniatury przed wysłaniem**: adres obiektu robiony raz na plik w `useEffect` i `revokeObjectURL`
+  przy usuwieniu; każda miniatura ma własny klucz (nie indeks). Wcześniej każdy render (a leci z co
+  3 s z odpytywaniem) tworzył nowy adres obiektu — migotanie i wyciek.
+- Testy: backend 176 (+3: numer nigdy nie wraca, odbudowa tabel bez straty wierszy, lista migracji),
+  frontend 307 (+3: kursor za emotikonką, miniatura trzyma swój adres, tylko zdjęte znika).
+
 ## 2026-11-10 — 413 przy wrzucaniu png (naprawa na serwerze)
 
 Zgłoszone: wysłanie zdjęcia daje 413. W logach nic nie ma, bo **żądanie nie dochodziło do aplikacji** —

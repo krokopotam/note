@@ -64,7 +64,14 @@ export const chatApi = {
   remove: (messageId: number) => request<void>(`/chat/messages/${messageId}`, { method: 'DELETE' }),
 };
 
-/** Address a browser can put in an <img>: the backend streams the picture itself. */
-export function attachmentUrl(attachmentId: number): string {
-  return `/api/chat/attachments/${attachmentId}`;
+/**
+ * Address a browser can put in an <img>: the backend streams the picture itself.
+ *
+ * `createdAt` rides along as `?v=` on purpose. The picture is cached for a day, and
+ * a query string is the only way to make the address differ for *this* upload —
+ * otherwise a number that a database once handed out twice would paint an old,
+ * deleted picture over a new one.
+ */
+export function attachmentUrl(attachment: { id: number; created_at: string }): string {
+  return `/api/chat/attachments/${attachment.id}?v=${encodeURIComponent(attachment.created_at)}`;
 }

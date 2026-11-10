@@ -444,15 +444,28 @@ describe('emotikonki', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Wstaw emotikonkę' }));
     const panel = await screen.findByTestId('emoji-picker');
-    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😀' }));
 
     const field = screen.getByRole('textbox', { name: 'Treść wiadomości' });
-    expect(field).toHaveValue('😀');
-
-    await userEvent.type(field, ' cześć');
+    await userEvent.type(field, 'cześć');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😀' }));
     await userEvent.click(screen.getByRole('button', { name: 'Wyślij' }));
 
-    expect(api.send).toHaveBeenCalledWith(1, '😀 cześć', []);
+    // The emoji lands where the caret was — at the end of what was typed.
+    expect(api.send).toHaveBeenCalledWith(1, 'cześć😀', []);
+  });
+
+  it('leaves the caret right behind the emoji, so typing just continues', async () => {
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Wstaw emotikonkę' }));
+    const panel = await screen.findByTestId('emoji-picker');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😀' }));
+
+    const field = screen.getByRole('textbox', { name: 'Treść wiadomości' }) as HTMLTextAreaElement;
+    // '😀' is two code units, and the caret has to sit after both of them.
+    await vi.waitFor(() => expect(field.selectionStart).toBe(2));
+
+    await userEvent.type(field, '!');
+    expect(field).toHaveValue('😀!');
   });
 
   it('keeps the panel open after a pick, because nobody sends one alone', async () => {
@@ -502,7 +515,9 @@ describe('zdjęcia', () => {
     renderChat();
 
     const thumb = await screen.findByRole('img', { name: 'kot.png' });
-    expect(thumb).toHaveAttribute('src', '/api/chat/attachments/5');
+    // `?v=` carries the moment of the upload: the same address must never stand
+    // for two different pictures, however the database numbers them.
+    expect(thumb.getAttribute('src')).toMatch(/^\/api\/chat\/attachments\/5\?v=/);
   });
 
   it('shows a picture of its own, without an empty bubble next to it', async () => {
@@ -624,6 +639,52 @@ describe('zdjęcia', () => {
     expect(within(screen.getByTestId('pending-pictures')).getByRole('img', { name: 'kot.png' })).toBeInTheDocument();
   });
 
+  it('shows each picked picture once and forgets only the one taken away', async () => {
+    // jsdom has no object URLs, so they are made here from the file name: a
+    // thumbnail must be made once per file and revoked when that file leaves.
+    const urls = URL as unknown as { createObjectURL?: (file: File) => string; revokeObjectURL?: (url: string) => void };
+    const created = urls.createObjectURL;
+    const revoked = urls.revokeObjectURL;
+    let made = 0;
+    const dropped: string[] = [];
+    urls.createObjectURL = (file) => {
+      made += 1;
+      return `blob:${file.name}#${made}`;
+    };
+    urls.revokeObjectURL = (url) => void dropped.push(url);
+
+    try {
+      renderChat();
+      await screen.findByTestId('message-1');
+
+      fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), { target: { files: [picture()] } });
+      fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+        target: { files: [new File([new Uint8Array([9])], 'zachod.png', { type: 'image/jpeg' })] },
+      });
+
+      const pending = await screen.findByTestId('pending-pictures');
+      expect([...pending.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([
+        'blob:kot.png#1',
+        'blob:zachod.png#2',
+      ]);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Usuń kot.png' }));
+
+      // The picture that stayed kept its own address — a thumbnail remade on every
+      // render is a thumbnail that visibly blinks (and leaks an URL each time).
+      expect([...pending.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([
+        'blob:zachod.png#2',
+      ]);
+      expect(made).toBe(2);
+      expect(dropped).toEqual(['blob:kot.png#1']);
+    } finally {
+      if (created) urls.createObjectURL = created;
+      else delete urls.createObjectURL;
+      if (revoked) urls.revokeObjectURL = revoked;
+      else delete urls.revokeObjectURL;
+    }
+  });
+
   it('makes a picture bigger on a click and hides it again', async () => {
     api.messages.mockResolvedValue(
       page([message(1, { body: '', attachments: [{ id: 5, file_name: 'kot.png', mime: 'image/png', size: 3, created_at: MARK }] })]),
@@ -633,7 +694,9 @@ describe('zdjęcia', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Powiększ kot.png' }));
 
     const lightbox = await screen.findByTestId('lightbox');
-    expect(within(lightbox).getByRole('img', { name: 'kot.png' })).toHaveAttribute('src', '/api/chat/attachments/5');
+    expect(within(lightbox).getByRole('img', { name: 'kot.png' }).getAttribute('src')).toMatch(
+      /^\/api\/chat\/attachments\/5\?v=/,
+    );
 
     await userEvent.click(within(lightbox).getByRole('button', { name: 'Zamknij' }));
 

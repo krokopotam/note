@@ -404,11 +404,11 @@ function MessageRow({
                 type="button"
                 className={styles.thumbButton}
                 aria-label={`Powiększ ${attachment.file_name}`}
-                onClick={() => onZoom({ url: attachmentUrl(attachment.id), name: attachment.file_name })}
+                onClick={() => onZoom({ url: attachmentUrl(attachment), name: attachment.file_name })}
               >
                 <img
                   className={styles.thumb}
-                  src={attachmentUrl(attachment.id)}
+                  src={attachmentUrl(attachment)}
                   alt={attachment.file_name}
                   loading="lazy"
                 />
@@ -487,7 +487,8 @@ function Composer({ conversation }: { conversation: Conversation }) {
   const send = useChat((state) => state.send);
   const sending = useChat((state) => state.sending);
   const [draft, setDraft] = useState('');
-  const [pictures, setPictures] = useState<File[]>([]);
+  const [pictures, setPictures] = useState<Picked[]>([]);
+  const picked = useRef(0);
   const [refused, setRefused] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -532,12 +533,15 @@ function Composer({ conversation }: { conversation: Conversation }) {
         : null,
     );
     setPictures((current) =>
-      [...current, ...images.filter((file) => file.size <= limit)].slice(0, CHAT_ATTACHMENTS_PER_MESSAGE),
+      [...current, ...images.filter((file) => file.size <= limit).map((file) => ({ key: picked.current++, file }))].slice(
+        0,
+        CHAT_ATTACHMENTS_PER_MESSAGE,
+      ),
     );
   };
 
   const submit = async () => {
-    const ok = await send(draft, pictures);
+    const ok = await send(draft, pictures.map((entry) => entry.file));
     // Only a delivered message empties the field; a failed one keeps text and pictures.
     if (ok) {
       setDraft('');
@@ -558,13 +562,13 @@ function Composer({ conversation }: { conversation: Conversation }) {
 
       {pictures.length > 0 && (
         <ul className={styles.pending} data-testid="pending-pictures">
-          {pictures.map((file, index) => (
-            <li key={`${file.name}-${index}`} className={styles.pendingItem}>
-              <img className={styles.pendingThumb} src={previewUrl(file)} alt={file.name} />
+          {pictures.map((entry) => (
+            <li key={entry.key} className={styles.pendingItem}>
+              <PendingThumb file={entry.file} />
               <button
                 type="button"
-                aria-label={`Usuń ${file.name}`}
-                onClick={() => setPictures((current) => current.filter((_, position) => position !== index))}
+                aria-label={`Usuń ${entry.file.name}`}
+                onClick={() => setPictures((current) => current.filter((one) => one.key !== entry.key))}
               >
                 ✕
               </button>
@@ -650,9 +654,30 @@ function Composer({ conversation }: { conversation: Conversation }) {
   );
 }
 
-/** Thumbnails are made from the picked file; without the API (jsdom) they are just names. */
-function previewUrl(file: File): string {
-  return typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '';
+/** A picked file with a number of its own, so removing one leaves the others alone. */
+interface Picked {
+  key: number;
+  file: File;
+}
+
+/**
+ * Thumbnail of a file that has not been sent yet.
+ *
+ * The object URL is made once per file and revoked when the thumbnail goes away —
+ * made in an effect rather than during render, because a render happens on every
+ * poll and a fresh URL every second would make every picture blink.
+ */
+function PendingThumb({ file }: { file: File }) {
+  const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof URL.createObjectURL !== 'function') return undefined;
+    const made = URL.createObjectURL(file);
+    setUrl(made);
+    return () => URL.revokeObjectURL(made);
+  }, [file]);
+
+  return <img className={styles.pendingThumb} src={url} alt={file.name} />;
 }
 
 function SmileyIcon() {
