@@ -138,6 +138,47 @@ describe('users CLI', () => {
     process.exitCode = 0;
   });
 
+  it('keeps a conversation while the other person is still there', async () => {
+    const { db, api } = ctx;
+    const ola = await signInAnother(ctx, { username: 'ola' });
+    const conv = await api.post('/api/chat/conversations').send({ user_id: ola.user.id });
+    await api.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: 'zostanie' });
+
+    cli(db, 'remove', 'ala');
+
+    expect(db.prepare('SELECT COUNT(*) AS n FROM conversations').get().n).toBe(1);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM messages').get().n).toBe(1);
+    // Ola still reads it, only the author's name is gone.
+    const messages = await ola.api.get(`/api/chat/conversations/${conv.body.id}/messages`);
+    expect(messages.body.items).toMatchObject([{ body: 'zostanie', author_name: '—' }]);
+  });
+
+  it('removes a conversation once the last member leaves', async () => {
+    const { db, api } = ctx;
+    const ola = await signInAnother(ctx, { username: 'ola' });
+    const conv = await api.post('/api/chat/conversations').send({ user_id: ola.user.id });
+    await api.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: 'nikt tego nie przeczyta' });
+
+    cli(db, 'remove', 'ala');
+    const second = cli(db, 'remove', 'ola');
+
+    expect(second).toContain('osierocone=1');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM conversations').get().n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM messages').get().n).toBe(0);
+  });
+
+  it('sweeps orphaned conversations on demand', async () => {
+    const { db, api } = ctx;
+    const ola = await signInAnother(ctx, { username: 'ola' });
+    const conv = await api.post('/api/chat/conversations').send({ user_id: ola.user.id });
+    db.prepare('DELETE FROM conversation_members WHERE conversation_id = ?').run(conv.body.id);
+
+    const output = cli(db, 'prune');
+
+    expect(output).toContain('usunięte: 1');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM conversations').get().n).toBe(0);
+  });
+
   it('moves resources to the account that takes the data over', async () => {
     const { db, api } = ctx;
     const created = await api.post('/api/files/resources').send({ name: 'Dokumenty' });

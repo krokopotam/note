@@ -19,6 +19,7 @@ import { APPS } from '@note/shared';
 import { openDb } from '../db/index.js';
 import { LOCKED_HASH, hashPassword } from '../domain/passwords.js';
 import { createFileStore } from '../files/store.js';
+import { pruneEmptyConversations } from '../repos/chat.js';
 import { ownedResourceIds } from '../repos/files.js';
 import { seedUser } from '../repos/seed.js';
 import { destroyAllForUser, listSessions } from '../repos/sessions.js';
@@ -42,6 +43,7 @@ const USAGE = `użycie: npm run cli -- <polecenie> [argumenty]
   set-password <login> [hasło]     (albo NOTE_PASSWORD=...)
   lock <login>
   remove <login>                    (usuwa też jego dane)
+  prune                             (porządzi rozmowy bez żadnego członka)
   adopt <z-czyje> <na-kogo>
   seed <login>
   sessions <login>`;
@@ -115,12 +117,20 @@ export function run(db, args, { files = createFileStore(path.join(PROJECT_ROOT, 
       const folders = ownedResourceIds(db, account.id);
       const removed = deleteUser(db, account.id);
       folders.forEach((id) => files.removeResource(id));
+      // Czyjeś rozmowy przeżyją jego konto — ale nie te, z których odszedł ostatni.
+      const orphans = pruneEmptyConversations(db);
       console.log(
         `usunięto konto ${username} wraz z:`,
-        [...Object.entries(removed), ['foldery', folders.length]]
+        [...Object.entries(removed), ['foldery', folders.length], ['osierocone', orphans]]
           .map(([what, n]) => `${what}=${n}`)
           .join(' '),
       );
+      return;
+    }
+
+    case 'prune': {
+      const orphans = pruneEmptyConversations(db);
+      console.log(`rozmowy bez członków usunięte: ${orphans}`);
       return;
     }
 

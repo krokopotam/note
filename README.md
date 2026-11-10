@@ -103,7 +103,9 @@ minął (licznik sekund odświeża się co sekundę). Usunąć własną wiadomo�
 
 Nowe wiadomości przychodzą przez **odpytywanie co 3 s**, dopóki okno jest otwarte i widoczne w karcie —
 aplikacja nie ma procesów w tle ani gniazd websocket, więc da się ją zrestartować w każdej chwili.
-Samo pobranie rozmowy zeruje licznik nieprzeczytanych w liście po lewej.
+Samo pobranie rozmowy zeruje licznik nieprzeczytanych w liście po lewej. Rozmowa przeżywa odejście
+jednej osoby (wiadomości zostają, autor wyświetla się jako „—"), a znika dopiero wtedy, gdy odejdzie
+ostatnia — `npm run cli -- prune` sprząta takie przypadki.
 
 ## Pliki i zasoby
 
@@ -137,6 +139,7 @@ npm run cli -- remove ala                     # usuń konto, jego dane i foldery
 npm run cli -- adopt ala ola                 # przenieś CAŁE dane między kontami
 npm run cli -- seed ala                      # daj kontu startowy pulpit
 npm run cli -- sessions ala                  # otwarte sesje
+npm run cli -- prune                         # posprzątaj rozmowy, z których odszedł ostatni członek
 ```
 
 Konto `wincyj` tworzy migracja `002` i przejmuje wszystko, co powstało przed kontami.

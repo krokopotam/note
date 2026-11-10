@@ -17,9 +17,12 @@
   `can_edit: false` nigdy nie docierałaby do ekranu.
 - Błąd widoczny dla człowieka: `403 edit_window_closed` nie może być przełknięty przez odświeżenie,
   które czyści `error` — inaczej „Popraw" znika bez słowa.
+- Rozmowa przeżywa odejście jednego rozmówcy (wiadomości zostają, autor jako „—"), ale gdy odejdzie
+  ostatni, znika razem z nimi — `pruneEmptyConversations` przy `remove` i nowe `npm run cli -- prune`.
+  Wcześniejsze zachowanie zostawiało w bazie wątki, których już nic nie mogło wyświetlić.
 - Migracja `006_chat_icon.sql` dokłada ikonę „Czaty" do istniejących pulpitów i slot w obu paskach.
-- Testy: 145 backend (+15 czatu: okno edycji, wyścig pary, izolacja, odejście konta) +
-  238 frontend (+30) = 383. Migracje sprawdzone na kopii produkcyjnej bazy.
+- Testy: 148 backend (+18 czatu: okno edycji, wyścig pary, izolacja, odejście konta, sieroty) +
+  238 frontend (+30) = 386. Migracje sprawdzone na kopii produkcyjnej bazy.
 
 ## 2026-11-10 — aplikacja Pliki: zasoby, wysyłanie, współdzielenie
 

@@ -263,6 +263,25 @@ function messageWithMembership(db, userId, messageId) {
     .get({ user: userId, id: messageId });
 }
 
+/**
+ * Threads nobody can reach any more.
+ *
+ * When the last member is gone the conversation goes too (its messages follow by
+ * cascade): rows that no screen can ever list again are not history, they are litter.
+ *
+ * @returns {number} how many conversations were removed
+ */
+export function pruneEmptyConversations(db) {
+  return db
+    .prepare(
+      `DELETE FROM conversations
+        WHERE NOT EXISTS (
+          SELECT 1 FROM conversation_members m WHERE m.conversation_id = conversations.id
+        )`,
+    )
+    .run().changes;
+}
+
 /** Ids of conversations an account takes part in (for the CLI: which rows to move). */
 export function membershipIdsOf(db, userId) {
   return db

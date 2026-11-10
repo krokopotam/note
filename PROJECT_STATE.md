@@ -15,11 +15,11 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomo�
 | Notatnik (zakładki, autosave, historia, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
-| Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, czeka na wdrożenie |
+| Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, działa |
 | Build produkcyjny (`frontend/dist`, 211 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 383 przechodzi (backend 145, frontend 238). `npm run lint` → czysto.
+Testy: `npm test` → 386 przechodzi (backend 148, frontend 238). `npm run lint` → czysto.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
