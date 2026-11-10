@@ -68,6 +68,20 @@ export function FolderIcon({ size = 48 }: IconProps) {
   );
 }
 
+export function ChatIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path
+        d="M6 10a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H17l-8 7v-7H10a4 4 0 0 1-4-4z"
+        fill="#4bb3a5"
+      />
+      <circle cx="15" cy="17" r="2.2" fill="#0e1726" />
+      <circle cx="23" cy="17" r="2.2" fill="#0e1726" />
+      <circle cx="31" cy="17" r="2.2" fill="#0e1726" />
+    </svg>
+  );
+}
+
 export function FilesIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

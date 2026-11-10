@@ -17,6 +17,7 @@ import {
   FILE_PERMISSIONS,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  MESSAGE_MAX_LENGTH,
   RESOURCE_NAME_MAX,
   SORT_ORDERS,
   STICKY_BODY_MAX,
@@ -283,6 +284,54 @@ export const ResourceDetailSchema = z.object({
 export const ShareableUsersSchema = z.object({
   items: z.array(z.object({ id: z.number().int(), username: z.string() })),
 });
+
+// --- czaty ------------------------------------------------------------------
+
+/** The other person of a conversation; null when their account was removed. */
+export const ChatPeerSchema = z.object({ id: z.number().int(), username: z.string() });
+
+/**
+ * One row of the conversation list: who, what was said last and how much of it
+ * is still unread. Everything the sidebar needs in a single query.
+ */
+export const ConversationSchema = z.object({
+  id: z.number().int(),
+  peer: ChatPeerSchema.nullable(),
+  last_body: z.string().nullable(),
+  last_at: z.string().nullable(),
+  last_from_me: z.boolean(),
+  unread: z.number().int(),
+  created_at: z.string(),
+});
+
+export const ConversationListSchema = z.object({ items: z.array(ConversationSchema) });
+
+export const ConversationCreateSchema = z.object({ user_id: z.number().int() });
+
+export const MessageSchema = z.object({
+  id: z.number().int(),
+  conversation_id: z.number().int(),
+  /** null when the author's account is gone — the message itself stays. */
+  author_id: z.number().int().nullable(),
+  author_name: z.string(),
+  body: z.string(),
+  created_at: z.string(),
+  edited_at: z.string().nullable(),
+  /** When editing stops being possible; null for somebody else's message. */
+  editable_until: z.string().nullable(),
+  /** Decided by the server — the client only draws what it is told. */
+  can_edit: z.boolean(),
+});
+
+export const MessagePageSchema = z.object({ items: z.array(MessageSchema) });
+
+/** Send and edit share one rule: a message is non-empty text with a ceiling. */
+const MessageBodySchema = z.object({
+  body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
+});
+
+export const MessageCreateSchema = MessageBodySchema;
+export const MessagePatchSchema = MessageBodySchema;
 
 /**
  * Validate inbound data or throw an error the middleware turns into the uniform

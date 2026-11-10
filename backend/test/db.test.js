@@ -23,11 +23,14 @@ describe('database bootstrap', () => {
   it('creates every table the API relies on', () => {
     expect(tables(openDb(':memory:'))).toEqual(
       expect.arrayContaining([
+        'conversation_members',
+        'conversations',
         'desktop_items',
         'favorites',
         'file_resources',
         'file_resource_members',
         'files',
+        'messages',
         'note_revisions',
         'notes',
         'notepad_state',
@@ -62,6 +65,8 @@ describe('database bootstrap', () => {
       { version: '002_users.sql' },
       { version: '003_files.sql' },
       { version: '004_files_icon.sql' },
+      { version: '005_chat.sql' },
+      { version: '006_chat_icon.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -106,7 +111,13 @@ describe('upgrading a database that predates accounts', () => {
   it('hands every existing row to the owner account', () => {
     const db = legacyDb();
 
-    expect(migrate(db)).toEqual(['002_users.sql', '003_files.sql', '004_files_icon.sql']);
+    expect(migrate(db)).toEqual([
+      '002_users.sql',
+      '003_files.sql',
+      '004_files_icon.sql',
+      '005_chat.sql',
+      '006_chat_icon.sql',
+    ]);
 
     const owner = findByUsername(db, 'wincyj');
     expect(owner.id).toBe(1);
@@ -127,22 +138,25 @@ describe('upgrading a database that predates accounts', () => {
     });
   });
 
-  it('gives an old desktop the icon of an app that arrived later', () => {
+  it('gives an old desktop the icons of apps that arrived later', () => {
     const db = legacyDb();
 
     migrate(db);
 
-    // Without an icon there is no way to open Pliki: the desktop is the only door.
-    const icon = db
-      .prepare("SELECT * FROM desktop_items WHERE user_id = 1 AND app_id = 'files'")
-      .get();
-    expect(icon).toMatchObject({ kind: 'app', name: 'Pliki', parent_id: null, x: 0, y: 1 });
+    // Without an icon there is no way to open Pliki or Czaty: the desktop is the only door.
+    const icons = db
+      .prepare("SELECT app_id, name, x, y FROM desktop_items WHERE user_id = 1 AND app_id IN ('files','chat') ORDER BY y")
+      .all();
+    expect(icons).toEqual([
+      { app_id: 'files', name: 'Pliki', x: 0, y: 1 },
+      { app_id: 'chat', name: 'Czaty', x: 0, y: 2 },
+    ]);
 
     const dock = db
       .prepare("SELECT app_id FROM favorites WHERE user_id = 1 AND slot = 'dock' ORDER BY position")
       .all()
       .map((row) => row.app_id);
-    expect(dock).toEqual(['calculator', 'files']);
+    expect(dock).toEqual(['calculator', 'files', 'chat']);
   });
 
   it('does not hand an icon to an account that has no desktop yet', () => {
@@ -151,7 +165,9 @@ describe('upgrading a database that predates accounts', () => {
     const fresh = createUser(db, { username: 'swiezy', passwordHash: LOCKED_HASH }).id;
 
     expect(
-      db.prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id = 'files'").get(fresh).n,
+      db
+        .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id IN ('files','chat')")
+        .get(fresh).n,
     ).toBe(0);
   });
 
@@ -175,6 +191,18 @@ describe('upgrading a database that predates accounts', () => {
       `INSERT INTO files (id, resource_id, name, stored_name, size, content_type, created_by, created_at)
        VALUES (1, 1, 'a.txt', 'x.txt', 1, 'text/plain', 1, 'a')`,
     ).run();
+    // A conversation the two accounts share, with one message from the owner.
+    db.prepare(`INSERT INTO conversations (id, pair_key, created_at) VALUES (1, '1:2', 'a')`).run();
+    db
+      .prepare(
+        `INSERT INTO conversation_members (conversation_id, user_id, last_read_at, created_at)
+         VALUES (1, 1, 'a', 'a'), (1, ?, 'a', 'a')`,
+      )
+      .run(other);
+    db.prepare(
+      `INSERT INTO messages (id, conversation_id, author_id, body, created_at)
+       VALUES (1, 1, 1, 'byłem', 'a')`,
+    ).run();
 
     db.prepare('DELETE FROM users WHERE id = 1').run();
 
@@ -189,6 +217,11 @@ describe('upgrading a database that predates accounts', () => {
     expect(count('SELECT COUNT(*) AS n FROM files')).toBe(0);
     // The friend's member row pointed at a resource that no longer exists.
     expect(count('SELECT COUNT(*) AS n FROM file_resource_members')).toBe(0);
+
+    // Rozmowa zostaje przy tym, kto został; autorstwo wiadomości gaśnie do NULL.
+    expect(count('SELECT COUNT(*) AS n FROM conversation_members')).toBe(1);
+    expect(count('SELECT COUNT(*) AS n FROM messages')).toBe(1);
+    expect(db.prepare('SELECT author_id FROM messages WHERE id = 1').get().author_id).toBeNull();
     expect(findByUsername(db, 'drugi')).toBeTruthy();
   });
 });

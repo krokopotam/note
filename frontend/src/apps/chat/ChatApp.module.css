@@ -1,0 +1,306 @@
+.app {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  height: 100%;
+  background: #151b26;
+}
+
+/* --- rozmowy --------------------------------------------------------------- */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 0;
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.row,
+.rowOn {
+  display: block;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #e7eefb;
+  font: inherit;
+  text-align: left;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rowOn {
+  background: rgba(88, 148, 246, 0.18);
+  border-color: rgba(88, 148, 246, 0.4);
+}
+
+.rowTop,
+.rowBottom {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.peer {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rowBottom {
+  margin-top: 2px;
+}
+
+.preview {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #93a1b8;
+  font-size: 12px;
+}
+
+.badge {
+  min-width: 18px;
+  border-radius: 9px;
+  background: #5894f6;
+  color: #0b111c;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 1px 5px;
+}
+
+.newChat {
+  margin: 6px;
+}
+
+/* --- wątek ----------------------------------------------------------------- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.thread {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.message {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: #101724;
+  padding: 7px 10px;
+}
+
+.gone {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.author {
+  font-size: 12px;
+  color: #a9c4f2;
+}
+
+.stamp {
+  color: #7e8ba3;
+  font-size: 11px;
+}
+
+.edited {
+  color: #7e8ba3;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.body {
+  margin: 4px 0 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.actions button {
+  font-size: 11px;
+  padding: 3px 7px;
+}
+
+.left {
+  color: #7e8ba3;
+  font-size: 11px;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.editBox {
+  min-height: 62px;
+  resize: vertical;
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
+}
+
+/* --- pisanie --------------------------------------------------------------- */
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-height: 46px;
+  resize: vertical;
+}
+
+.send {
+  white-space: nowrap;
+}
+
+/* --- nowy czat ------------------------------------------------------------- */
+
+.newPanel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #101724;
+  padding: 8px 10px;
+}
+
+.newHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.filter {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.personName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- wspólne --------------------------------------------------------------- */
+
+.empty {
+  color: #7e8ba3;
+  font-size: 12px;
+  list-style: none;
+  padding: 6px 2px;
+}
+
+.error {
+  margin: 0;
+  border-left: 3px solid #ff8f8f;
+  color: #ffb4b4;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+input,
+textarea,
+button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: #0d1420;
+  color: #e7eefb;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: rgba(88, 148, 246, 0.6);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

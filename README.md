@@ -1,7 +1,8 @@
 # note
 
-Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami i historią, karteczki
-oraz pliki — wrzucane drag & drop do zasobów, które można współdzielić z innymi kontami.
+Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami i historią, karteczki,
+pliki (drag & drop do zasobów, współdzielonych z innymi kontami) oraz czaty — rozmowy z innymi
+kontami, ze zmianą wiadomości przez 5 minut od jej napisania.
 Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki, pliki i układ pulpitu.
 Backend Node + SQLite w pliku, jeden proces, jeden port.
 
@@ -13,6 +14,7 @@ przeglądarka
           backend (Express, 127.0.0.1:8120) │
               ├── /api/auth/* → sesja       │
               ├── /api/*      → repos → SQLite  data/note.db  (plik w folderze aplikacji)
+              ├── /api/chat/* → rozmowy i wiadomości (API ankiety, bez gniazd)
               ├── /api/files/*→ strumień na dysk  data/files/<zasób>/<uuid>
               └── /           → frontend/dist  ┘
 ```
@@ -44,7 +46,7 @@ Tryb deweloperski z przeładowaniem: `npm run dev` (backend 8120, Vite 5173 z pr
 ## Testy
 
 ```bash
-npm test                  # backend (130) + frontend (208)
+npm test                  # backend (145) + frontend (238)
 npm run lint              # tsc --noEmit dla frontendu
 ```
 
@@ -67,6 +69,11 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | GET/POST/PATCH/DELETE | `/api/stickies[/:id]` | karteczki, `?pinned=true`, `q`, `sort` |
 | GET/POST/PATCH/DELETE | `/api/desktop/items[/:id]` | ikony i foldery wraz z pozycjami w siatce |
 | GET/PUT | `/api/desktop/favorites` | co stoi w doku i w launcherze |
+| GET | `/api/chat/people` | do kogo można napisać |
+| GET/POST | `/api/chat/conversations` | moje rozmowy / otwarcie rozmowy z `{ user_id }` |
+| GET | `/api/chat/conversations/:id/messages?after=` | wiadomości (od najstarszej; `after` = tylko nowsze) |
+| POST | `/api/chat/conversations/:id/messages` | `{ body }` — zapisanie wiadomości |
+| PATCH/DELETE | `/api/chat/messages/:id` | zmiana (tylko 5 minut) / usunięcie własnej wiadomości |
 | GET/POST | `/api/files/resources` | lista zasobów / nowy zasób |
 | GET/PATCH/DELETE | `/api/files/resources/:id` | zagląd (z listą osób), zmiana nazwy, usunięcie |
 | GET | `/api/files/resources/:id/files?q=` | pliki w zasobie, szukanie po nazwie |
@@ -83,6 +90,20 @@ Wszystko poza `/api/health` i `/api/auth/*` wymaga ciasteczka sesji — bez nieg
 Hasła: scrypt z solą (`scrypt$N$r$p$sól$hash`), porównanie stałoczasowe; w bazie nie ma
 hasła w jakiejkolwiek postaci. Sesja to losowy token w ciasteczku, a w bazie jego SHA-256.
 Logowanie i rejestracja mają limit prób (w procesie + `limit_req` w nginx).
+
+## Czaty
+
+Rozmowy są jeden-na-jeden z dowolnym kontem w serwisie. Para ma jeden wątek (unikalny klucz
+`pair_key`), więc kliknięcie „nowy czat" dwa razy nie rozdwaja rozmowy.
+
+**Wiadomość można zmienić przez 5 minut od jej napisania** (`MESSAGE_EDIT_MINUTES`). Okno liczy się od
+chwili wysłania, więc poprawka w czwartej minucie nie dokłada kolejnych pięciu. Po upływie czasu
+serwer odpowiada `403 edit_window_closed`; interfejs pokazuje przycisk „Popraw" tylko dopóki czas nie
+minął (licznik sekund odświeża się co sekundę). Usunąć własną wiadomość można zawsze.
+
+Nowe wiadomości przychodzą przez **odpytywanie co 3 s**, dopóki okno jest otwarte i widoczne w karcie —
+aplikacja nie ma procesów w tle ani gniazd websocket, więc da się ją zrestartować w każdej chwili.
+Samo pobranie rozmowy zeruje licznik nieprzeczytanych w liście po lewej.
 
 ## Pliki i zasoby
 

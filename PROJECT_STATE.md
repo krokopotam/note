@@ -1,8 +1,8 @@
 # PROJECT_STATE
 
 Projekt: **note** — pulpit w przeglądarce (okna, dock, launcher) z aplikacjami: kalkulator,
-notatnik (wiele zakładek + historia + wyszukiwarka), karteczki i pliki (wrzucanie, pobieranie,
-współdzielenie zasobów między kontami).
+notatnik (wiele zakładek + historia + wyszukiwarka), karteczki, pliki (wrzucanie, pobieranie,
+współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomości do 5 minut).
 
 ## Stan
 
@@ -14,15 +14,16 @@ współdzielenie zasobów między kontami).
 | Kalkulator | gotowy (logika jako czyste funkcje + klawiatura) |
 | Notatnik (zakładki, autosave, historia, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
-| Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, czeka na wdrożenie |
-| Build produkcyjny (`frontend/dist`, 201 kB / 65 kB gzip) | przechodzi |
+| Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
+| Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, czeka na wdrożenie |
+| Build produkcyjny (`frontend/dist`, 211 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 338 przechodzi (backend 130, frontend 208). `npm run lint` → czysto.
+Testy: `npm test` → 383 przechodzi (backend 145, frontend 238). `npm run lint` → czysto.
 
-Migracje `003_files.sql` + `004_files_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
-(`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każdy pulpit
-dostał ikonę „Pliki", oba paski dostały slot.
+Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
+(`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
+dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
@@ -67,7 +68,19 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - **Plik należy do zasobu, nie do autora**: `files.created_by ON DELETE SET NULL` (pozostaje „—"),
   bo skasowanie konta nie może niszczyć czyichś dokumentów. Zasoby idą za właścicielem kaskadowo.
 - **Nowa aplikacja = migracja z ikoną.** Pulpit jest jedynym wejściem do aplikacji, więc `004_files_icon.sql`
-  dokłada „Pliki" pod ostatnią ikonę każdego istniejącego pulpitu i na koniec obu pasków.
+  dokłada „Pliki" pod ostatnią ikonę każdego istniejącego pulpitu i na koniec obu pasków (004 jest na
+  ikonę plików, a `006_chat_icon.sql` na ikonę czatu — ten sam zabieg).
+- **Czat: para ma jeden wątek.** `conversations.pair_key` (`minId:maxId`, UNIQUE) rozstrzyga wyścig
+  „dwoje kliknęło jednocześnie" bez sprawdzania wprzód; druga strona po prostu wczyta ten sam wątek.
+- **Wiadomość należy do rozmowy, nie do autora** (`messages.author_id ON DELETE SET NULL`) — skasowanie
+  konta nie wymazuje tego, co ktoś powiedział komuś innemu; znika tylko jego członkostwo w rozmowie.
+- **Okno edycji liczy się od `created_at`, nie od ostatniej poprawki** (`domain/chat.js`: `isEditable`,
+  `editable_until`). Serwer decyduje i wysyła `can_edit`; przeglądarka tylko to rysuje i odlicza sekundy
+  do tej samej chwili.
+- **Czat bez websocketów: odpytywanie co 3 s** (`CHAT_POLL_MS`), dopóki okno jest otwarte i widoczne.
+  Jeden proces, jedno żądanie, nic do odtworzenia po restarcie; `?after=<id>` niesie tylko to, co nowe.
+- **Przeczytane = pobrane.** Znacznik `conversation_members.last_read_at` aktualizuje się przy odczycie
+  wiadomości, więc licznik nieprzeczytanych jest liczony w bazie i drugi okienko widzi to samo.
 
 ## Konwencje
 
@@ -89,3 +102,7 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   (liczy się tylko rozmiar pojedynczego pliku) — każdy może założyć dowolną liczbę zasobów.
 - Usunięcie zasobu kasuje folder z dysku od razu; nie ma kosza ani odzyskiwania plików.
 - Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).
+- Czaty są tylko 1:1 — nie ma grup ani kanałów; nie ma też szukania w wiadomościach ani powiadomień,
+  gdy okno jest zamknięte (odpytywanie żyje razem z oknem).
+- Usunięta wiadomość znika bez powrotu (brak kosza), a edytowana nie zachowuje poprzedniej wersji —
+  w przeciwieństwie do notatek, czat nie ma historii.

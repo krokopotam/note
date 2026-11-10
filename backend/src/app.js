@@ -4,6 +4,7 @@ import express from 'express';
 import { APPS, MAX_UPLOAD_MB } from '@note/shared';
 import { createFileStore } from './files/store.js';
 import { accountRouter, authRouter } from './http/routes/auth.js';
+import { chatRouter } from './http/routes/chat.js';
 import { filesRouter } from './http/routes/files.js';
 import { notesRouter } from './http/routes/notes.js';
 import { stickiesRouter } from './http/routes/stickies.js';
@@ -63,6 +64,7 @@ export function createApp({
   // Everything below belongs to somebody.
   app.use('/api', requireAuth(db));
   app.use('/api', accountRouter(db));
+  app.use('/api/chat', chatRouter(db));
   app.use('/api/files', filesRouter(db, { store: createFileStore(filesDir), maxUploadBytes }));
   app.use('/api/notes', notesRouter(db));
   app.use('/api/stickies', stickiesRouter(db));

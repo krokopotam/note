@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 2026-11-10 — aplikacja Czaty: rozmowy i pięć minut na poprawkę
+
+- Nowa aplikacja **Czaty**: rozmowy jeden-na-jeden z dowolnym kontem, lista rozmów z podglądem
+  ostatniej wiadomości i licznikiem nieprzeczytanych, pisanie Enterem (Shift+Enter = nowa linia).
+- **Edycja wiadomości do 5 minut** (`MESSAGE_EDIT_MINUTES`) — okno liczone od napisania, więc poprawka
+  nie przedłuża sobie czasu. Po upływie: `403 edit_window_closed`. Własną wiadomość można usunąć zawsze.
+  Serwer decyduje (`can_edit`), interfejs tylko rysuje i odlicza sekundy do tej samej chwili.
+- Rozmowa dla pary jest jedna: `conversations.pair_key` (`minId:maxId`, UNIQUE) rozstrzyga wyścig bez
+  sprawdzania wprzód — druga strona wczytuje ten sam wątek.
+- Wiadomość należy do rozmowy, nie do autora (`author_id ON DELETE SET NULL`): skasowanie konta nie
+  wymazuje tego, co zostało komuś powiedziane; znika tylko członkostwo.
+- Brak websocketów: okno odpytuje co 3 s (`?after=<id>` niesie tylko nowości), dopóki jest widoczne.
+  Przeczytanie = pobranie, stąd licznik nieprzeczytanych liczony jest w bazie.
+- `merge()` w store **zastępuje** znane id zamiast je wyrzucać — inaczej odświeżona wiadomość z
+  `can_edit: false` nigdy nie docierałaby do ekranu.
+- Błąd widoczny dla człowieka: `403 edit_window_closed` nie może być przełknięty przez odświeżenie,
+  które czyści `error` — inaczej „Popraw" znika bez słowa.
+- Migracja `006_chat_icon.sql` dokłada ikonę „Czaty" do istniejących pulpitów i slot w obu paskach.
+- Testy: 145 backend (+15 czatu: okno edycji, wyścig pary, izolacja, odejście konta) +
+  238 frontend (+30) = 383. Migracje sprawdzone na kopii produkcyjnej bazy.
+
 ## 2026-11-10 — aplikacja Pliki: zasoby, wysyłanie, współdzielenie
 
 - Nowa aplikacja **Pliki**: zasoby (nazwane foldery) tworzone bez limitu i ze zmienną nazwą,

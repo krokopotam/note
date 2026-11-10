@@ -67,6 +67,7 @@ export const APPS = [
   { id: 'notepad', title: 'Notatnik', width: 960, height: 640 },
   { id: 'stickies', title: 'Karteczki', width: 820, height: 600 },
   { id: 'files', title: 'Pliki', width: 900, height: 620 },
+  { id: 'chat', title: 'Czaty', width: 900, height: 640 },
 ];
 
 // --- pliki ------------------------------------------------------------------
@@ -81,6 +82,21 @@ export const RESOURCE_NAME_MAX = 80;
 
 /** `read` = view and download, `edit` = also upload, rename and delete. */
 export const FILE_PERMISSIONS = ['read', 'edit'];
+
+// --- czaty ------------------------------------------------------------------
+
+/** One message, counted in characters (a wall of text is not a chat message). */
+export const MESSAGE_MAX_LENGTH = 2000;
+
+/**
+ * How long a message stays editable, counted from the moment it was written.
+ * Editing does not restart the clock: five minutes after sending, what people
+ * read is what was said.
+ */
+export const MESSAGE_EDIT_MINUTES = 5;
+
+/** How often an open chat window asks for new messages. */
+export const CHAT_POLL_MS = 3000;
 
 /** @param {string} id @returns {(typeof APPS)[number] | null} */
 export const appById = (id) => APPS.find((app) => app.id === id) ?? null;

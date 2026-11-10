@@ -82,6 +82,7 @@ export function deleteUser(db, userId) {
     notes: count('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?'),
     stickies: count('SELECT COUNT(*) AS n FROM stickies WHERE user_id = ?'),
     desktop_items: count('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?'),
+    conversations: count('SELECT COUNT(*) AS n FROM conversation_members WHERE user_id = ?'),
     file_resources: count('SELECT COUNT(*) AS n FROM file_resources WHERE owner_id = ?'),
     files: count(
       `SELECT COUNT(*) AS n FROM files f
@@ -136,6 +137,20 @@ export function adoptDataFrom(db, fromUserId, toUserId) {
       .prepare('UPDATE file_resources SET owner_id = ? WHERE owner_id = ?')
       .run(toUserId, fromUserId).changes;
     counts.file_resource_members = move('file_resource_members').run(toUserId, fromUserId).changes;
+
+    // Czaty: gdy oboje byli w tej samej rozmowie, wpis dawcy poszedłby z niczym
+    // przy kluczu głównym — znika, a rozmowa zostaje z odbiorcą.
+    counts.chat_membership_conflicts_dropped = db
+      .prepare(
+        `DELETE FROM conversation_members
+          WHERE user_id = @from
+            AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE user_id = @to)`,
+      )
+      .run({ to: toUserId, from: fromUserId }).changes;
+    counts.conversation_members = move('conversation_members').run(toUserId, fromUserId).changes;
+    counts.messages = db
+      .prepare('UPDATE messages SET author_id = ? WHERE author_id = ?')
+      .run(toUserId, fromUserId).changes;
     // Only one row may hold the active note per user, so the giver's is dropped.
     db.prepare('DELETE FROM notepad_state WHERE user_id = ?').run(fromUserId);
     const noteIds = db

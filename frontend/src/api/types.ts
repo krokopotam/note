@@ -2,12 +2,17 @@
 // zod with them) never reach the browser bundle.
 import type { z } from 'zod';
 import type {
+  ChatPeerSchema,
+  ConversationListSchema,
+  ConversationSchema,
   DesktopItemSchema,
   DesktopItemsSchema,
   FilePageSchema,
   FileResourceSchema,
   FileSchema,
   FavoritesSchema,
+  MessagePageSchema,
+  MessageSchema,
   NotePageSchema,
   NoteRevisionSchema,
   NotepadSessionSchema,
@@ -46,3 +51,8 @@ export type ShareableUsers = z.infer<typeof ShareableUsersSchema>;
 
 /** 'owner' — theirs; 'edit' — may upload/rename/delete; 'read' — may only take. */
 export type ResourceRole = FileResource['role'];
+export type ChatPeer = z.infer<typeof ChatPeerSchema>;
+export type Conversation = z.infer<typeof ConversationSchema>;
+export type ConversationList = z.infer<typeof ConversationListSchema>;
+export type Message = z.infer<typeof MessageSchema>;
+export type MessagePage = z.infer<typeof MessagePageSchema>;
