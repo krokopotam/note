@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { APPS } from '@note/shared/manifest';
 import { GridIcon } from './icons';
 import { appTitle, AppGlyph } from './registry';
+import { badgeCount, useBadges } from './badgeStore';
+import { IconBadge, iconLabel } from './IconBadge';
 import { useDesktop } from './desktopStore';
 import { openApp } from './openApp';
 import { useWindows } from './windowStore';
@@ -14,6 +16,7 @@ import styles from './Launcher.module.css';
 export function Launcher() {
   const favorites = useDesktop((state) => state.favorites.launcher);
   const windows = useWindows((state) => state.windows);
+  const counts = useBadges((state) => state.counts);
   const [showAll, setShowAll] = useState(false);
 
   return (
@@ -29,20 +32,24 @@ export function Launcher() {
         >
           <GridIcon />
         </button>
-        {favorites.map((appId) => (
-          <button
-            key={appId}
-            type="button"
-            className={styles.item}
-            title={appTitle(appId)}
-            aria-label={appTitle(appId)}
-            onClick={() => openApp(appId)}
-            data-testid={`launcher-${appId}`}
-          >
-            <AppGlyph appId={appId} size={34} />
-            {windows.some((win) => win.appId === appId) && <span className={styles.running} />}
-          </button>
-        ))}
+        {favorites.map((appId) => {
+          const waiting = badgeCount(counts, appId);
+          return (
+            <button
+              key={appId}
+              type="button"
+              className={styles.item}
+              title={appTitle(appId)}
+              aria-label={iconLabel(appTitle(appId), waiting)}
+              onClick={() => openApp(appId)}
+              data-testid={`launcher-${appId}`}
+            >
+              <AppGlyph appId={appId} size={34} />
+              <IconBadge count={waiting} testId={`launcher-${appId}`} />
+              {windows.some((win) => win.appId === appId) && <span className={styles.running} />}
+            </button>
+          );
+        })}
       </nav>
 
       {showAll && (
@@ -53,13 +60,17 @@ export function Launcher() {
                 <button
                   type="button"
                   className={styles.bigItem}
+                  aria-label={iconLabel(app.title, badgeCount(counts, app.id))}
                   onClick={() => {
                     openApp(app.id);
                     setShowAll(false);
                   }}
                   data-testid={`appgrid-${app.id}`}
                 >
-                  <AppGlyph appId={app.id} size={56} />
+                  <span className={styles.bigGlyph}>
+                    <AppGlyph appId={app.id} size={56} />
+                    <IconBadge count={badgeCount(counts, app.id)} testId={`appgrid-${app.id}`} />
+                  </span>
                   <span>{app.title}</span>
                 </button>
               </li>

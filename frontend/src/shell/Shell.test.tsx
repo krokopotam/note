@@ -26,6 +26,9 @@ let table: DesktopItem[] = [];
 /** Whether the fake server recognises the (imaginary) cookie of this test run. */
 let signedIn = true;
 
+/** How many messages the fake server says are waiting in the chat. */
+let chatWaiting = 0;
+
 const item = (overrides: Partial<DesktopItem> & { id: number }): DesktopItem => ({
   kind: 'app',
   name: 'item',
@@ -69,11 +72,12 @@ function fakeBackend() {
         updated_at: stamp,
       };
     }
+    if (path === '/chat/unread') return { total: chatWaiting };
     if (path === '/desktop/favorites') {
       return {
         slots: [
-          { slot: 'dock', app_ids: ['calculator', 'notepad', 'stickies'] },
-          { slot: 'launcher', app_ids: ['calculator', 'notepad', 'stickies'] },
+          { slot: 'dock', app_ids: ['calculator', 'notepad', 'stickies', 'chat'] },
+          { slot: 'launcher', app_ids: ['calculator', 'notepad', 'stickies', 'chat'] },
         ],
       };
     }
@@ -113,6 +117,7 @@ beforeEach(() => {
   useDesktop.setState(desktopDefaults);
   useWindows.setState(windowDefaults);
   signedIn = true;
+  chatWaiting = 0;
   useAuth.setState({ status: 'signed-in', user, busy: false, error: null });
   vi.resetAllMocks();
   table = [
@@ -121,8 +126,39 @@ beforeEach(() => {
     item({ id: 3, name: 'Schron', kind: 'folder', x: 3, y: 0 }),
     item({ id: 4, name: 'Kalkulator w schronie', app_id: 'calculator', parent_id: 3, x: 0, y: 0 }),
     item({ id: 5, name: 'Widmo', app_id: 'ghost', x: 4, y: 0 }),
+    item({ id: 6, name: 'Czaty', app_id: 'chat', x: 5, y: 0 }),
   ];
   fakeBackend();
+});
+
+describe('znak na ikonie czatu', () => {
+  it('counts on the icons what waits inside a closed window', async () => {
+    chatWaiting = 3;
+
+    render(<Shell />);
+
+    expect(await screen.findByTestId('badge-dock-chat')).toHaveTextContent('3');
+    expect(screen.getByTestId('badge-launcher-chat')).toHaveTextContent('3');
+    expect(screen.getByTestId('badge-icon-6')).toHaveTextContent('3');
+  });
+
+  it('says in the name of the icon what is waiting', async () => {
+    chatWaiting = 2;
+
+    render(<Shell />);
+
+    expect(await screen.findByTestId('dock-chat')).toHaveAccessibleName(
+      'Czaty, 2 nieprzeczytane wiadomości',
+    );
+  });
+
+  it('leaves the icons alone when nothing waits', async () => {
+    render(<Shell />);
+    await screen.findByTestId('dock-chat');
+
+    expect(screen.queryByTestId('badge-dock-chat')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dock-chat')).toHaveAccessibleName('Czaty');
+  });
 });
 
 describe('desktop shell', () => {

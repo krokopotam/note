@@ -1,6 +1,6 @@
 /**
  * The chat window, driven like a person: read the list, answer, fix a typo inside
- * the five minutes, start a new thread.
+ * the five minutes, start a thread with one person or with several.
  */
 import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
@@ -16,7 +16,11 @@ vi.mock('./chatApi', () => ({
   chatApi: {
     people: vi.fn(),
     conversations: vi.fn(),
+    detail: vi.fn(),
     start: vi.fn(),
+    createGroup: vi.fn(),
+    addMember: vi.fn(),
+    unread: vi.fn(),
     messages: vi.fn(),
     send: vi.fn(),
     edit: vi.fn(),
@@ -28,13 +32,17 @@ const api = vi.mocked(chatApi);
 
 /** Still inside the window: the client hides the buttons once this moment passes. */
 const stillEditable = new Date(Date.now() + 180_000).toISOString();
+const MARK = '2026-01-05T09:30:00.000Z';
 
 const conversation = (id: number, overrides: Partial<Conversation> = {}): Conversation => ({
   id,
   peer: { id: id + 10, username: id === 1 ? 'ola' : 'ivo' },
+  title: id === 1 ? 'ola' : 'ivo',
+  is_group: false,
   last_body: 'co słychać',
   last_at: '2026-01-05T10:00:00.000Z',
   last_from_me: false,
+  last_deleted: false,
   unread: 0,
   created_at: '2026-01-01T00:00:00.000Z',
   ...overrides,
@@ -51,8 +59,11 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   from_me: true,
   editable_until: stillEditable,
   can_edit: true,
+  deleted: false,
   ...overrides,
 });
+
+const page = (items: Message[], watermark = MARK) => ({ items, watermark });
 
 function renderChat() {
   return render(<ChatApp windowKey="chat" appId="chat" payload={{}} />);
@@ -62,9 +73,23 @@ beforeEach(() => {
   useChat.setState(chatDefaults);
   vi.resetAllMocks();
   api.conversations.mockResolvedValue({ items: [conversation(1)] });
-  api.messages.mockResolvedValue({ items: [message(1), message(2, { author_id: 11, author_name: 'ola', can_edit: false, from_me: false })] });
+  api.detail.mockResolvedValue({ ...conversation(1), members: [{ id: 11, username: 'ola' }] });
+  api.messages.mockResolvedValue(
+    page([message(1), message(2, { author_id: 11, author_name: 'ola', can_edit: false, from_me: false })]),
+  );
   api.people.mockResolvedValue({ items: [{ id: 5, username: 'ola' }, { id: 6, username: 'ivo' }] });
-  api.start.mockResolvedValue(conversation(3, { peer: { id: 5, username: 'ola' } }));
+  api.start.mockResolvedValue({
+    ...conversation(3, { peer: { id: 5, username: 'ola' } }),
+    members: [{ id: 5, username: 'ola' }],
+  });
+  api.createGroup.mockResolvedValue({
+    ...conversation(7, { is_group: true, title: 'Remont', peer: null }),
+    members: [{ id: 5, username: 'ola' }, { id: 6, username: 'ivo' }],
+  });
+  api.addMember.mockResolvedValue({
+    ...conversation(1),
+    members: [{ id: 11, username: 'ola' }, { id: 6, username: 'ivo' }],
+  });
   api.send.mockResolvedValue(message(9, { body: 'cześć' }));
   api.edit.mockImplementation(async (id, body) => message(id, { body, edited_at: '2026-01-05T10:02:00.000Z' }));
   api.remove.mockResolvedValue(undefined);
@@ -83,6 +108,16 @@ describe('reading', () => {
     expect(row).toHaveTextContent('co słychać');
     expect(within(row).getByText('2')).toBeInTheDocument();
     expect(screen.getByTestId('conversation-2')).toHaveTextContent('ty: co słychać');
+  });
+
+  it('says in the list that the last message is gone', async () => {
+    api.conversations.mockResolvedValue({
+      items: [conversation(1, { last_body: '', last_deleted: true })],
+    });
+
+    renderChat();
+
+    expect(await screen.findByTestId('conversation-1')).toHaveTextContent('wiadomość usunięta');
   });
 
   it('opens the first conversation and lists its messages', async () => {
@@ -104,11 +139,25 @@ describe('reading', () => {
   });
 
   it('marks edited messages as edited', async () => {
-    api.messages.mockResolvedValue({ items: [message(1, { edited_at: '2026-01-05T10:02:00.000Z' })] });
+    api.messages.mockResolvedValue({ items: [message(1, { edited_at: '2026-01-05T10:02:00.000Z' })], watermark: MARK });
 
     renderChat();
 
     expect(await screen.findByTestId('message-1')).toHaveTextContent('edytowane');
+  });
+
+  it('shows a deleted message as deleted instead of quoting it', async () => {
+    api.messages.mockResolvedValue({
+      items: [message(1, { body: '', deleted: true, can_edit: false })],
+      watermark: MARK,
+    });
+
+    renderChat();
+    const row = await screen.findByTestId('message-1');
+
+    expect(row).toHaveTextContent('wiadomość usunięta');
+    // Nothing left to do with it — no dots, no edit.
+    expect(within(row).queryByRole('button', { name: 'Czynności wiadomości 1' })).not.toBeInTheDocument();
   });
 });
 
@@ -120,6 +169,7 @@ describe('kształt wątku', () => {
         message(2, { body: 'o której wracają?' }),
         message(3, { author_id: 11, author_name: 'ola', from_me: false, can_edit: false, body: 'Ok, potem obiad' }),
       ],
+      watermark: MARK,
     });
 
     renderChat();
@@ -136,6 +186,7 @@ describe('kształt wątku', () => {
         message(1, { created_at: '2026-01-05T10:00:00.000Z' }),
         message(2, { created_at: '2026-01-05T12:30:00.000Z' }),
       ],
+      watermark: MARK,
     });
 
     renderChat();
@@ -257,6 +308,7 @@ describe('fixing a message inside five minutes', () => {
   it('hides the buttons once the five minutes are past', async () => {
     api.messages.mockResolvedValue({
       items: [message(1, { can_edit: false, editable_until: null })],
+      watermark: MARK,
     });
 
     renderChat();
@@ -265,28 +317,97 @@ describe('fixing a message inside five minutes', () => {
     expect(within(row).queryByRole('button', { name: 'Czynności wiadomości 1' })).not.toBeInTheDocument();
   });
 
-  it('deletes a message of one\'s own', async () => {
+  it('leaves a tombstone where its own message was', async () => {
     renderChat();
     const row = await screen.findByTestId('message-1');
 
     await pickRowAction(row, 'Czynności wiadomości 1', 'Usuń');
 
     expect(api.remove).toHaveBeenCalledWith(1);
-    expect(screen.queryByTestId('message-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('message-1')).toHaveTextContent('wiadomość usunięta');
   });
 });
 
-describe('a new conversation', () => {
-  it('opens the person picker and starts the thread', async () => {
+describe('rozmowa z kilkoma osobami', () => {
+  it('shows who is in a group and offers to add somebody', async () => {
+    api.conversations.mockResolvedValue({
+      items: [conversation(1, { is_group: true, title: 'Remont', peer: null })],
+    });
+    api.detail.mockResolvedValue({
+      ...conversation(1),
+      members: [{ id: 1, username: 'ala' }, { id: 11, username: 'ola' }],
+    });
+
+    renderChat();
+
+    expect(await screen.findByRole('heading', { name: 'Remont' })).toBeInTheDocument();
+    expect(screen.getByText('ala, ola')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dodaj osobę' })).toBeInTheDocument();
+  });
+
+  it('does not offer to grow a 1:1 thread', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    expect(screen.queryByRole('button', { name: 'Dodaj osobę' })).not.toBeInTheDocument();
+  });
+
+  it('adds a person from the panel, without listing those already inside', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nowy czat' }));
+    await screen.findByTestId('new-chat');
+    await userEvent.click(screen.getByRole('button', { name: 'Zamknij' }));
+
+    // Opening the add-member panel through the header of a group.
+    api.conversations.mockResolvedValue({
+      items: [conversation(1, { is_group: true, title: 'Remont', peer: null })],
+    });
+    // The member ids are the ids from the people list — otherwise "already inside"
+    // would be decided on a made-up number.
+    api.detail.mockResolvedValue({ ...conversation(1), members: [{ id: 5, username: 'ola' }] });
+    await useChat.getState().load();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dodaj osobę' }));
+    const panel = await screen.findByTestId('add-member');
+
+    expect(within(panel).getByRole('button', { name: 'Dodaj ivo' })).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: 'Dodaj ola' })).not.toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole('button', { name: 'Dodaj ivo' }));
+
+    expect(api.addMember).toHaveBeenCalledWith(1, 6);
+  });
+
+  it('starts a thread with one person from the picker', async () => {
     renderChat();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Nowy czat' }));
     const panel = await screen.findByTestId('new-chat');
 
-    await userEvent.click(within(panel).getByRole('button', { name: 'Napisz do ola' }));
+    await userEvent.click(within(panel).getByRole('checkbox', { name: 'Wybierz ola' }));
+    await userEvent.click(within(panel).getByRole('button', { name: 'Utwórz rozmowę' }));
 
     expect(api.start).toHaveBeenCalledWith(5);
     expect(screen.queryByTestId('new-chat')).not.toBeInTheDocument();
+  });
+
+  it('makes a group out of two picked people and their name', async () => {
+    const group = conversation(7, { is_group: true, title: 'Remont', peer: null });
+    api.conversations.mockResolvedValue({ items: [group, conversation(1)] });
+    renderChat();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nowy czat' }));
+    const panel = await screen.findByTestId('new-chat');
+
+    await userEvent.click(within(panel).getByRole('checkbox', { name: 'Wybierz ola' }));
+    await userEvent.click(within(panel).getByRole('checkbox', { name: 'Wybierz ivo' }));
+    await userEvent.type(within(panel).getByRole('textbox', { name: 'Nazwa rozmowy' }), 'Remont');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Utwórz grupę' }));
+
+    expect(api.createGroup).toHaveBeenCalledWith({ title: 'Remont', member_ids: [5, 6] });
+    expect(await screen.findByRole('heading', { name: 'Remont' })).toBeInTheDocument();
   });
 
   it('filters the list of people', async () => {
@@ -298,5 +419,13 @@ describe('a new conversation', () => {
 
     expect(within(panel).getByText('ivo')).toBeInTheDocument();
     expect(within(panel).queryByText('ola')).not.toBeInTheDocument();
+  });
+
+  it('cannot create anything without picking anybody', async () => {
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Nowy czat' }));
+    const panel = await screen.findByTestId('new-chat');
+
+    expect(within(panel).getByRole('button', { name: 'Utwórz rozmowę' })).toBeDisabled();
   });
 });

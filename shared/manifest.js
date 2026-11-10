@@ -98,5 +98,15 @@ export const MESSAGE_EDIT_MINUTES = 5;
 /** How often an open chat window asks for new messages. */
 export const CHAT_POLL_MS = 3000;
 
+/**
+ * How often the desktop asks whether anything arrived while no chat window is
+ * open — it is one cheap count, and it is what lights the badge on the icon.
+ */
+export const BADGE_POLL_MS = 5000;
+
+/** A group conversation: a name it may be shown under, and a ceiling of people. */
+export const CONVERSATION_TITLE_MAX = 60;
+export const GROUP_MEMBERS_MAX = 32;
+
 /** @param {string} id @returns {(typeof APPS)[number] | null} */
 export const appById = (id) => APPS.find((app) => app.id === id) ?? null;

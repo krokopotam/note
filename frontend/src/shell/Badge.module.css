@@ -1,0 +1,17 @@
+/* Corner number on an icon. The icon itself is the positioning context. */
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #ff5f57;
+  color: #1b0d0c;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}

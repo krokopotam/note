@@ -73,8 +73,12 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | GET/POST/PATCH/DELETE | `/api/desktop/items[/:id]` | ikony i foldery wraz z pozycjami w siatce |
 | GET/PUT | `/api/desktop/favorites` | co stoi w doku i w launcherze |
 | GET | `/api/chat/people` | do kogo można napisać |
-| GET/POST | `/api/chat/conversations` | moje rozmowy / otwarcie rozmowy z `{ user_id }` |
-| GET | `/api/chat/conversations/:id/messages?after=` | wiadomości (od najstarszej; `after` = tylko nowsze) |
+| GET | `/api/chat/unread` | ile czeka we wszystkich rozmowach (znak na ikonie) |
+| GET/POST | `/api/chat/conversations` | moje rozmowy / otwarcie rozmowy 1:1 z `{ user_id }` |
+| POST | `/api/chat/conversations/group` | `{ title?, member_ids[] }` — rozmowa z kilkoma osobami |
+| GET | `/api/chat/conversations/:id` | rozmowa razem z listą członków |
+| POST | `/api/chat/conversations/:id/members` | `{ user_id }` — dopisanie osoby do grupy |
+| GET | `/api/chat/conversations/:id/messages?since=` | wiadomości (od najstarszej; `since` = wszystko, co zmieniło się od tamtej chwili: nowe, poprawione, usunięte) |
 | POST | `/api/chat/conversations/:id/messages` | `{ body }` — zapisanie wiadomości |
 | PATCH/DELETE | `/api/chat/messages/:id` | zmiana (tylko 5 minut) / usunięcie własnej wiadomości |
 | GET/POST | `/api/files/resources` | lista zasobów / nowy zasób |
@@ -96,8 +100,20 @@ Logowanie i rejestracja mają limit prób (w procesie + `limit_req` w nginx).
 
 ## Czaty
 
-Rozmowy są jeden-na-jeden z dowolnym kontem w serwisie. Para ma jeden wątek (unikalny klucz
-`pair_key`), więc kliknięcie „nowy czat" dwa razy nie rozdwaja rozmowy.
+Rozmowa może być **jeden-na-jeden albo z kilkoma osobami**. Para 1:1 ma jeden wątek (unikalny klucz
+`pair_key`), więc kliknięcie „nowy czat" dwa razy nie rozdwaja rozmowy. Grupa `pair_key` nie ma —
+dzięki temu dwie osoby mogą mieć i swój osobny wątek, i grupę o czymś innym; grupę widać po nazwie
+(brak nazwy = lista osób w środku) i można do niej dopisywać kolejne osoby. W drugą stronę się nie da:
+rozmowy dwie-osoby nie da się „rozrostem" zamienić w grupę, bo jej klucz nadal twierdziłby, że to para.
+
+**Każda zmiana dociera do drugiego okna.** Odpytywanie pyta „co się zmieniło od chwili X", a nie „co jest
+nowsze niż wiadomość 12": wraca więc to, że ktoś **poprawił** swoją wcześniejszą wiadomość i to, że ją
+**usunął**. Usunięcie zostawia w bazie nagrobek (`deleted_at`, pusta treść), a rozmówca widzi
+“wiadomość usunięta" — inaczej nie miałby jak się dowiedzieć, że czegoś już nie ma.
+
+**Znak na ikonie czatu** liczy nieprzeczytane we wszystkich rozmowach (`GET /api/chat/unread`) i zapala
+się na ikonie w doku, na launcherze i na pulpicie, nawet przy zamkniętym oknie czatu — pulpit pyta co
+5 s, dopóki karta jest widoczna. Otwarcie rozmowy zeruje licznik po stronie serwera.
 
 **Wiadomość można zmienić przez 5 minut od jej napisania** (`MESSAGE_EDIT_MINUTES`). Okno liczy się od
 chwili wysłania, więc poprawka w czwartej minucie nie dokłada kolejnych pięciu. Po upływie czasu

@@ -39,6 +39,16 @@ describe('database bootstrap', () => {
     );
   });
 
+  it('gives messages a tombstone and groups a title', () => {
+    const db = openDb(':memory:');
+    const columns = (table) =>
+      db.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name);
+
+    expect(columns('messages')).toContain('deleted_at');
+    expect(columns('conversations')).toContain('title');
+    db.close();
+  });
+
   it('drops the note history table', () => {
     // Historia notatek została wycofana (migracja 007); migracje wczesniej ją tworzyły,
     // więc sprawdzamy efekt na liscie tabel, nie na pliku migracji.
@@ -73,6 +83,7 @@ describe('database bootstrap', () => {
       { version: '005_chat.sql' },
       { version: '006_chat_icon.sql' },
       { version: '007_drop_note_revisions.sql' },
+      { version: '008_chat_sync.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -124,6 +135,7 @@ describe('upgrading a database that predates accounts', () => {
       '005_chat.sql',
       '006_chat_icon.sql',
       '007_drop_note_revisions.sql',
+      '008_chat_sync.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');

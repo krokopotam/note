@@ -3,8 +3,10 @@
 import type { z } from 'zod';
 import type {
   ChatPeerSchema,
+  ConversationDetailSchema,
   ConversationListSchema,
   ConversationSchema,
+  UnreadSchema,
   DesktopItemSchema,
   DesktopItemsSchema,
   FilePageSchema,
@@ -51,6 +53,8 @@ export type ShareableUsers = z.infer<typeof ShareableUsersSchema>;
 export type ResourceRole = FileResource['role'];
 export type ChatPeer = z.infer<typeof ChatPeerSchema>;
 export type Conversation = z.infer<typeof ConversationSchema>;
+export type ConversationDetail = z.infer<typeof ConversationDetailSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
+export type Unread = z.infer<typeof UnreadSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type MessagePage = z.infer<typeof MessagePageSchema>;

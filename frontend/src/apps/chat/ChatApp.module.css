@@ -134,6 +134,27 @@
   padding: 4px 9px;
 }
 
+.headText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Who is in a group — under its name, in the same breath. */
+.sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8d9cb6;
+  font-size: 11px;
+}
+
+.addMember {
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
 .thread {
   flex: 1;
   overflow-y: auto;
@@ -224,6 +245,14 @@
   background: transparent;
   border: 1px dashed rgba(255, 255, 255, 0.22);
   color: #8d9cb6;
+  font-style: italic;
+}
+
+/* A tombstone: the text is gone, the fact that something was said stays. */
+.tomb {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  color: #8695ad;
   font-style: italic;
 }
 
@@ -380,6 +409,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.titleInput {
+  width: 100%;
+  margin: 6px 0;
+}
+
+.create {
+  width: 100%;
+  background: rgba(88, 148, 246, 0.22);
+  border-color: rgba(88, 148, 246, 0.5);
 }
 
 /* --- wspólne --------------------------------------------------------------- */

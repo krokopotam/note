@@ -6,6 +6,7 @@ import { Desktop } from './Desktop';
 import { Dock } from './Dock';
 import { Launcher } from './Launcher';
 import { TopBar } from './TopBar';
+import { startBadgePoll } from './badgeStore';
 import { useDesktop } from './desktopStore';
 import { WindowFrame } from './WindowFrame';
 import { useWindows } from './windowStore';
@@ -38,6 +39,12 @@ export function Shell() {
   useEffect(() => {
     if (authStatus === 'signed-in') void load();
   }, [authStatus, load]);
+
+  useEffect(() => {
+    // Icons keep counting what arrives while no chat window is open.
+    if (authStatus !== 'signed-in') return undefined;
+    return startBadgePoll();
+  }, [authStatus]);
 
   if (authStatus === 'booting') {
     return (

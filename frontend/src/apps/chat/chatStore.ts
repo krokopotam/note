@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { ApiError } from '../../api/client';
 import { chatApi } from './chatApi';
-import type { ChatPeer, Conversation, Message } from '../../api/types';
+import type { ChatPeer, Conversation, ConversationDetail, Message } from '../../api/types';
 
 /**
  * Chat window state.
@@ -12,6 +12,10 @@ import type { ChatPeer, Conversation, Message } from '../../api/types';
  *
  * Whether a message may still be edited never comes from a local clock — the server
  * answers with `can_edit`, and the client only draws it.
+ *
+ * What a poll brings is decided by the server: new lines, corrected lines and
+ * tombstones of deleted ones. `watermark` is the moment the server handed over,
+ * and it goes straight back on the next call.
  */
 
 interface ChatStore {
@@ -21,19 +25,27 @@ interface ChatStore {
   conversations: Conversation[];
   activeId: number | null;
   messages: Message[];
-  /** Highest message id we have; a poll asks only for what is newer. */
-  watermark: number;
+  /** Who is in the open conversation (a group shows them in its header). */
+  members: ChatPeer[];
+  /** Moment the server last answered with — send it back to get what changed. */
+  watermark: string;
 
   people: ChatPeer[];
   newChatOpen: boolean;
+  addMemberOpen: boolean;
   sending: boolean;
 
   load: () => Promise<void>;
-  open: (id: number) => Promise<void>;
+  /** `known` is the conversation the server just handed back — no need to ask again. */
+  open: (id: number, known?: ConversationDetail) => Promise<void>;
   refresh: () => Promise<void>;
   start: (userId: number) => Promise<void>;
+  createGroup: (title: string, memberIds: number[]) => Promise<void>;
   openNewChat: () => Promise<void>;
   closeNewChat: () => void;
+  openAddMember: () => Promise<void>;
+  closeAddMember: () => void;
+  addMember: (userId: number) => Promise<void>;
   send: (body: string) => Promise<boolean>;
   edit: (id: number, body: string) => Promise<boolean>;
   remove: (id: number) => Promise<void>;
@@ -46,9 +58,11 @@ export const chatDefaults: Pick<
   | 'conversations'
   | 'activeId'
   | 'messages'
+  | 'members'
   | 'watermark'
   | 'people'
   | 'newChatOpen'
+  | 'addMemberOpen'
   | 'sending'
 > = {
   status: 'idle',
@@ -56,9 +70,11 @@ export const chatDefaults: Pick<
   conversations: [],
   activeId: null,
   messages: [],
-  watermark: 0,
+  members: [],
+  watermark: '',
   people: [],
   newChatOpen: false,
+  addMemberOpen: false,
   sending: false,
 };
 
@@ -75,40 +91,45 @@ export const useChat = create<ChatStore>((set, get) => ({
       const active = keep ?? items[0] ?? null;
       set({ conversations: items, status: 'ready' });
       if (active) await get().open(active.id);
-      else set({ activeId: null, messages: [], watermark: 0 });
+      else set({ activeId: null, messages: [], members: [], watermark: '' });
     } catch (error) {
       set({ status: 'error', error: describe(error) });
     }
   },
 
-  open: async (id) => {
-    set({ activeId: id, watermark: 0, newChatOpen: false });
+  open: async (id, known) => {
+    set({ activeId: id, watermark: '', newChatOpen: false, addMemberOpen: false });
     try {
-      const page = await chatApi.messages(id);
+      const [page, conversation] = await Promise.all([
+        chatApi.messages(id),
+        known ? Promise.resolve(known) : chatApi.detail(id),
+      ]);
       set({
         messages: page.items,
-        watermark: page.items.at(-1)?.id ?? 0,
+        watermark: page.watermark,
+        members: conversation.members,
       });
       // Reading moves the unread counter, so the sidebar has to be re-read too.
       const { items } = await chatApi.conversations();
       set({ conversations: items });
     } catch (error) {
-      set({ messages: [], watermark: 0, error: describe(error) });
+      set({ messages: [], watermark: '', members: [], error: describe(error) });
     }
   },
 
-  /** What the window calls every few seconds: new messages, updated counters. */
+  /**
+   * What the window calls every few seconds: what arrived, what was corrected,
+   * what was deleted, and the counters of the sidebar.
+   */
   refresh: async () => {
-    const { activeId, watermark } = get();
+    const { activeId } = get();
     try {
       if (activeId !== null) {
-        const page = await chatApi.messages(activeId, watermark || undefined);
-        if (page.items.length > 0) {
-          set({
-            messages: merge(get().messages, page.items),
-            watermark: page.items.at(-1)!.id,
-          });
-        }
+        const page = await chatApi.messages(activeId, get().watermark || undefined);
+        set({
+          messages: merge(get().messages, page.items),
+          watermark: page.watermark,
+        });
       }
       const { items } = await chatApi.conversations();
       set({ conversations: items, error: null });
@@ -122,10 +143,17 @@ export const useChat = create<ChatStore>((set, get) => ({
     try {
       const conversation = await chatApi.start(userId);
       set({ newChatOpen: false });
-      if (!get().conversations.some((entry) => entry.id === conversation.id)) {
-        set({ conversations: [conversation, ...get().conversations] });
-      }
-      await get().open(conversation.id);
+      await get().open(conversation.id, conversation);
+    } catch (error) {
+      set({ error: describe(error) });
+    }
+  },
+
+  createGroup: async (title, memberIds) => {
+    try {
+      const conversation = await chatApi.createGroup({ title: title.trim(), member_ids: memberIds });
+      set({ newChatOpen: false });
+      await get().open(conversation.id, conversation);
     } catch (error) {
       set({ error: describe(error) });
     }
@@ -143,6 +171,31 @@ export const useChat = create<ChatStore>((set, get) => ({
 
   closeNewChat: () => set({ newChatOpen: false }),
 
+  openAddMember: async () => {
+    set({ addMemberOpen: true, error: null });
+    try {
+      const { items } = await chatApi.people();
+      set({ people: items });
+    } catch (error) {
+      set({ addMemberOpen: false, error: describe(error) });
+    }
+  },
+
+  closeAddMember: () => set({ addMemberOpen: false }),
+
+  addMember: async (userId) => {
+    const activeId = get().activeId;
+    if (activeId === null) return;
+    try {
+      const conversation = await chatApi.addMember(activeId, userId);
+      set({ addMemberOpen: false, members: conversation.members });
+      const { items } = await chatApi.conversations();
+      set({ conversations: items });
+    } catch (error) {
+      set({ error: describe(error) });
+    }
+  },
+
   send: async (body) => {
     const trimmed = body.trim();
     const activeId = get().activeId;
@@ -152,8 +205,7 @@ export const useChat = create<ChatStore>((set, get) => ({
     try {
       const message = await chatApi.send(activeId, trimmed);
       set({
-        messages: [...get().messages, message],
-        watermark: Math.max(get().watermark, message.id),
+        messages: merge(get().messages, [message]),
         sending: false,
       });
       // My own message moves the ordering of the sidebar as well.
@@ -189,9 +241,15 @@ export const useChat = create<ChatStore>((set, get) => ({
     }
   },
 
+  /** A deleted message stays on screen as "usunięta" — the other person has to
+   * learn about the deletion, so it is not a message any more, it is a fact. */
   remove: async (id) => {
     const before = get();
-    set({ messages: before.messages.filter((message) => message.id !== id) });
+    set({
+      messages: before.messages.map((message) =>
+        message.id === id ? { ...message, body: '', deleted: true, can_edit: false } : message,
+      ),
+    });
     try {
       await chatApi.remove(id);
       const { items } = await chatApi.conversations();
@@ -204,8 +262,8 @@ export const useChat = create<ChatStore>((set, get) => ({
 
 /**
  * Fold a poll into what is on screen: new ids go to the end, ids we already have
- * are *replaced* rather than dropped — the server may be saying something new about
- * a message it sent before (it stopped being editable, its text was corrected).
+ * are *replaced* rather than dropped — the server is telling us something new about
+ * a message we saw before (it was corrected, it stopped being editable, it is gone).
  */
 function merge(current: Message[], incoming: Message[]): Message[] {
   const byId = new Map(current.map((message) => [message.id, message]));

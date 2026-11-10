@@ -16,6 +16,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   from_me: true,
   editable_until: null,
   can_edit: false,
+  deleted: false,
   ...overrides,
 });
 

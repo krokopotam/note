@@ -78,6 +78,11 @@
   gap: 8px;
 }
 
+.bigGlyph {
+  position: relative;
+  display: inline-flex;
+}
+
 .bigItem:hover {
   background: rgba(255, 255, 255, 0.1);
 }

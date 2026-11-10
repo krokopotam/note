@@ -107,8 +107,8 @@ describe('messages', () => {
     expect((await say(ala.api, conv.id, 'x'.repeat(5000))).status).toBe(400);
   });
 
-  it('reads them oldest first and can ask only for what is new', async () => {
-    const { ala, ola } = await twoAccounts();
+  it('reads them oldest first and carries a watermark to ask with', async () => {
+    const { ala, ola, db } = await twoAccounts();
     const conv = await thread(ala.api, ola.user.id);
     const first = await say(ala.api, conv.id, 'pierwsza');
     await say(ola.api, conv.id, 'druga');
@@ -117,10 +117,47 @@ describe('messages', () => {
     const all = await ala.api.get(`/api/chat/conversations/${conv.id}/messages`);
     expect(all.body.items.map((m) => m.body)).toEqual(['pierwsza', 'druga', 'trzecia']);
 
+    // 'pierwsza' is two minutes old, so "everything since the watermark" cannot
+    // accidentally include it because both lines landed in the same millisecond.
+    age(db, first.body.id, 2);
+    const seen = await ala.api.get(`/api/chat/conversations/${conv.id}/messages`);
+    await say(ala.api, conv.id, 'czwarta');
+
     const fresh = await ala.api.get(
-      `/api/chat/conversations/${conv.id}/messages?after=${first.body.id}`,
+      `/api/chat/conversations/${conv.id}/messages?since=${seen.body.watermark}`,
     );
-    expect(fresh.body.items.map((m) => m.body)).toEqual(['druga', 'trzecia']);
+    // The boundary itself comes back once more ('trzecia' is exactly the watermark):
+    // asking ">= that moment" is what makes a message written in the same
+    // millisecond impossible to lose, and a window merges what it already has.
+    expect(fresh.body.items.map((m) => m.body)).toEqual(['trzecia', 'czwarta']);
+  });
+
+  /**
+   * The point of the whole polling design: a window that is already open learns
+   * about a correction and about a deletion, not only about new lines.
+   */
+  it('a poll brings what arrived, what was corrected and what was deleted', async () => {
+    const { ala, ola, db } = await twoAccounts();
+    const conv = await thread(ala.api, ola.user.id);
+    const mine = await say(ala.api, conv.id, 'pierwsza');
+    await say(ola.api, conv.id, 'druga');
+    age(db, mine.body.id, 2);
+
+    const url = `/api/chat/conversations/${conv.id}/messages`;
+    const seen = await ola.api.get(url);
+    expect(seen.body.items.map((m) => m.body)).toEqual(['pierwsza', 'druga']);
+
+    await say(ala.api, conv.id, 'trzecia');
+    await ola.api.patch(`/api/chat/messages/${seen.body.items[1].id}`).send({ body: 'druga, poprawiona' });
+    await ala.api.delete(`/api/chat/messages/${seen.body.items[0].id}`);
+
+    const poll = await ola.api.get(`${url}?since=${seen.body.watermark}`);
+    const changed = poll.body.items.map((m) => (m.deleted ? '(usunięta)' : m.body));
+
+    expect(changed).toContain('trzecia');
+    expect(changed).toContain('druga, poprawiona');
+    expect(changed).toContain('(usunięta)');
+    expect(changed).not.toContain('druga');
   });
 
   it('keeps a stranger out of the conversation', async () => {
@@ -215,7 +252,21 @@ describe('the five minutes', () => {
 
     expect((await ala.api.delete(`/api/chat/messages/${mine.body.id}`)).status).toBe(204);
     expect((await ala.api.delete(`/api/chat/messages/${theirs.body.id}`)).status).toBe(403);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM messages').get().n).toBe(1);
+
+    // The row stays behind as a tombstone — the other window learns it is gone
+    // precisely by being told so, and the text itself is emptied on the way.
+    expect(db.prepare('SELECT COUNT(*) AS n FROM messages').get().n).toBe(2);
+    const read = await ola.api.get(`/api/chat/conversations/${conv.id}/messages`);
+    expect(read.body.items).toMatchObject([
+      { body: '', deleted: true },
+      { body: 'tego nie skasujesz', deleted: false },
+    ]);
+
+    // Nothing to fix in a message that is already gone.
+    const resurrect = await ala.api
+      .patch(`/api/chat/messages/${mine.body.id}`)
+      .send({ body: 'a jedak' });
+    expect(resurrect.status).toBe(410);
   });
 });
 
@@ -232,5 +283,122 @@ describe('leaving the account', () => {
 
     const list = await ola.api.get('/api/chat/conversations');
     expect(list.body.items[0]).toMatchObject({ peer: null, last_body: 'zostań po mnie' });
+  });
+});
+
+describe('rozmowa z kilkoma osobami', () => {
+  it('opens a group under a name and everybody reads the same thread', async () => {
+    const { ala, ola } = await twoAccounts();
+    const ivo = await signInAnother(ala, { username: 'ivo' });
+
+    const group = await ala.api
+      .post('/api/chat/conversations/group')
+      .send({ title: 'Remont', member_ids: [ola.user.id, ivo.user.id] });
+
+    expect(group.status).toBe(201);
+    expect(group.body).toMatchObject({ title: 'Remont', is_group: true, peer: null });
+    expect(group.body.members.map((m) => m.username)).toEqual(['ala', 'ivo', 'ola']);
+
+    await say(ala.api, group.body.id, 'ile kafli?');
+
+    const forOla = await ola.api.get(`/api/chat/conversations/${group.body.id}/messages`);
+    expect(forOla.body.items).toMatchObject([{ body: 'ile kafli?', from_me: false, author_name: 'ala' }]);
+
+    const forIvo = await ivo.api.get('/api/chat/conversations');
+    expect(forIvo.body.items[0]).toMatchObject({ id: group.body.id, title: 'Remont', is_group: true });
+  });
+
+  it('an unnamed group says who is in it', async () => {
+    const { ala, ola } = await twoAccounts();
+    const ivo = await signInAnother(ala, { username: 'ivo' });
+
+    const group = await ala.api
+      .post('/api/chat/conversations/group')
+      .send({ member_ids: [ola.user.id, ivo.user.id] });
+
+    const forOla = await ola.api.get('/api/chat/conversations');
+    expect(forOla.body.items[0].title).toBe('ala, ivo');
+  });
+
+  it('a 1:1 thread keeps the peer as its title', async () => {
+    const { ala, ola } = await twoAccounts();
+    const conv = await thread(ala.api, ola.user.id);
+
+    expect(conv).toMatchObject({ title: 'ola', is_group: false, peer: { username: 'ola' } });
+    expect(conv.members.map((m) => m.username)).toEqual(['ala', 'ola']);
+  });
+
+  it('lets a group grow and refuses to grow a 1:1 thread', async () => {
+    const { ala, ola } = await twoAccounts();
+    const ivo = await signInAnother(ala, { username: 'ivo' });
+    const group = await ala.api.post('/api/chat/conversations/group').send({ member_ids: [ola.user.id] });
+
+    const added = await ola.api
+      .post(`/api/chat/conversations/${group.body.id}/members`)
+      .send({ user_id: ivo.user.id });
+    expect(added.status).toBe(200);
+    expect(added.body.members.map((m) => m.username)).toEqual(['ala', 'ivo', 'ola']);
+
+    // Adding a third person to a pair thread would stop it being that pair.
+    const direct = await thread(ala.api, ola.user.id);
+    const refused = await ala.api.post(`/api/chat/conversations/${direct.id}/members`).send({ user_id: ivo.user.id });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('direct_conversation');
+  });
+
+  it('a stranger is not in it, and cannot join from the outside', async () => {
+    const { ala, ola } = await twoAccounts();
+    const ivo = await signInAnother(ala, { username: 'ivo' });
+    const group = await ala.api.post('/api/chat/conversations/group').send({ member_ids: [ola.user.id] });
+    await say(ala.api, group.body.id, 'między nami trzema');
+
+    expect((await ivo.api.get(`/api/chat/conversations/${group.body.id}`)).status).toBe(404);
+    expect((await ivo.api.get(`/api/chat/conversations/${group.body.id}/messages`)).status).toBe(404);
+    expect((await ivo.api.post(`/api/chat/conversations/${group.body.id}/messages`).send({ body: 'hej' })).status).toBe(404);
+    expect((await ivo.api.post(`/api/chat/conversations/${group.body.id}/members`).send({ user_id: ola.user.id })).status).toBe(404);
+  });
+
+  it('refuses a group without anybody to talk to', async () => {
+    const { ala } = await twoAccounts();
+
+    expect((await ala.api.post('/api/chat/conversations/group').send({ member_ids: [] })).status).toBe(400);
+    // Oneself is not a conversation partner.
+    expect(
+      (await ala.api.post('/api/chat/conversations/group').send({ member_ids: [ala.user.id] })).status,
+    ).toBe(400);
+  });
+});
+
+describe('znak na ikonie czatu', () => {
+  it('counts what waits across every conversation', async () => {
+    const { ala, ola } = await twoAccounts();
+    expect((await ola.api.get('/api/chat/unread')).body).toEqual({ total: 0 });
+
+    const conv = await thread(ala.api, ola.user.id);
+    await say(ala.api, conv.id, 'hej');
+    await say(ala.api, conv.id, 'hej dwa');
+    expect((await ola.api.get('/api/chat/unread')).body.total).toBe(2);
+
+    // Reading the thread clears it, and what one wrote oneself never waited.
+    await ola.api.get(`/api/chat/conversations/${conv.id}/messages`);
+    expect((await ola.api.get('/api/chat/unread')).body.total).toBe(0);
+
+    await say(ola.api, conv.id, 'słucham');
+    expect((await ola.api.get('/api/chat/unread')).body.total).toBe(0);
+    expect((await ala.api.get('/api/chat/unread')).body.total).toBe(1);
+  });
+
+  it('does not count a message that was deleted before it was read', async () => {
+    const { ala, ola } = await twoAccounts();
+    const conv = await thread(ala.api, ola.user.id);
+    const sent = await say(ala.api, conv.id, 'kasuję to zanim przeczytasz');
+
+    await ala.api.delete(`/api/chat/messages/${sent.body.id}`);
+
+    expect((await ola.api.get('/api/chat/unread')).body.total).toBe(0);
+    expect((await ola.api.get('/api/chat/conversations')).body.items[0]).toMatchObject({
+      unread: 0,
+      last_deleted: true,
+    });
   });
 });

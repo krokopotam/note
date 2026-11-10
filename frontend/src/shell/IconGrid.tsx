@@ -3,6 +3,8 @@ import type { DesktopItem } from '../api/types';
 import { useDesktop } from './desktopStore';
 import { CELL, cellFromPoint, findFreeCell, nextFreeCell } from './grid';
 import { AppGlyph } from './registry';
+import { badgeCount, useBadges } from './badgeStore';
+import { IconBadge } from './IconBadge';
 import { useContextMenu } from './contextMenuStore';
 import { usePointerDrag } from './usePointerDrag';
 import styles from './IconGrid.module.css';
@@ -105,6 +107,7 @@ function Icon({ item, renaming, onOpen, onRename, onDrop, onMenu }: IconProps) {
   });
 
   const appId = item.kind === 'folder' ? 'folder' : (item.app_id ?? 'folder');
+  const waiting = useBadges((state) => badgeCount(state.counts, appId));
 
   return (
     <button
@@ -124,6 +127,7 @@ function Icon({ item, renaming, onOpen, onRename, onDrop, onMenu }: IconProps) {
     >
       <span className={styles.glyph}>
         <AppGlyph appId={appId} />
+        <IconBadge count={waiting} testId={`icon-${item.id}`} />
       </span>
       {renaming ? (
         <RenameField initial={item.name} onDone={onRename} />

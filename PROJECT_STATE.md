@@ -2,7 +2,7 @@
 
 Projekt: **note** — pulpit w przeglądarce (okna, dock, launcher) z aplikacjami: kalkulator,
 notatnik (wiele zakładek + wyszukiwarka), karteczki, pliki (wrzucanie, pobieranie,
-współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomości do 5 minut).
+współdzielenie zasobów między kontami) i czaty (rozmowy 1:1 i grupy, edycja wiadomości do 5 minut, znak na ikonie).
 
 ## Stan
 
@@ -15,11 +15,11 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomo�
 | Notatnik (zakładki, autosave, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
-| Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, działa |
+| Czaty (1:1 i grupy, wiadomości, okno edycji 5 min, nieprzeczytane, znak na ikonie) | gotowy, działa |
 | Build produkcyjny (`frontend/dist`, 213 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 407 przechodzi (backend 147, frontend 260). `npm run lint` → czysto.
+Testy: `npm test` → 440 przechodzi (backend 157, frontend 283). `npm run lint` → czysto.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -88,6 +88,20 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   „rysować imię tutaj?" i ma to testowane bez renderowania.
 - **Wąskie okno: lista rozmów za przyciskiem** (`@media (max-width: 620px)`, `data-side` na kontenerze).
   jsdom nie ma `matchMedia`, więc komponent pyta o niego przez `typeof` i bez niego przyjmuje „jest szeroko".
+- **Stan czatu rozchodzi się po chwili `since`, nie po id wiadomości.** Odpytywanie pyta „co się zmieniło
+  od tamtej chwili" i dostaje nowe + poprawione + usunięte, a w odpowiedzi `watermark`, które oddaje
+  następny raz. Granica jest `>=`, więc wiersz graniczny przychodzi dwa razy — to cena za to, żeby
+  wiadomość napisana w tej samej milisekundzie co znacznik nie zginęła; okno scala po `id`.
+- **Usunięcie wiadomości to nagrobek** (`messages.deleted_at`, treść czyszczona). Wcześniejsze
+  `DELETE FROM messages` znaczyło, że druga strona czytała wiadomość, której już nie ma, i nie miała jak
+  się o tym dowiedzieć. `unread` nagrobków nie liczy.
+- **Rozmowa wieloosobowa bez `pair_key`.** Grupa ma `title` (może być pusty — wtedy lista osób) i żadnych
+  ograniczeń pary; `pair_key` zostaje tylko dla 1:1, więc unikalność pary dalej działa, a grupa niczego
+  nie łamie (SQLite i na `ADD COLUMN`, i na wielokrotne NULL w UNIQUE). Dodanie osoby do rozmowy 1:1 to
+  `409 direct_conversation` — klucz mówiłby dalej, że to para.
+- **Znaki nieprzeczytanych należą do pulpitu** (`shell/badgeStore.ts`, `GET /chat/unread`,
+  `BADGE_POLL_MS = 5 s`). Pulpit nie może importować aplikacji, więc sam pyta i sam rysuje liczbę w rogu
+  ikony (dok, launcher, pulpit); aplikacja czatu o istnieniu znaku nie wie.
 - **Notatnik nie ma historii** (migracja `007_drop_note_revisions.sql` kasuje tabelę `note_revisions`).
   Historia była zgadywanką: autozapis co 500 ms, każdy skuteczny zapis dodawał wpis, a lista „Historia”
   zapełniała się wersjami, których nikt nie otwierał. Notatka to teraz dokładnie to, co w polu tekstowym —
@@ -118,7 +132,8 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   (liczy się tylko rozmiar pojedynczego pliku) — każdy może założyć dowolną liczbę zasobów.
 - Usunięcie zasobu kasuje folder z dysku od razu; nie ma kosza ani odzyskiwania plików.
 - Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).
-- Czaty są tylko 1:1 — nie ma grup ani kanałów; nie ma też szukania w wiadomościach ani powiadomień,
-  gdy okno jest zamknięte (odpytywanie żyje razem z oknem).
+- Grupy istnieją, ale nie ma z nich wyjścia (tylko autor może dopisywać, nikt się nie wypisuje) ani
+  szukania w wiadomościach; powiadomienie to liczba na ikonie, nie komunikat systemowy. Znak znika do
+  5 s po przeczytaniu, bo pulpit pyta własnym rytmem — okno czatu mu o tym nie mówi.
 - Usunięta wiadomość znika bez powrotu (brak kosza), a edytowana nie zachowuje poprzedniej wersji.
   Notatki też nie mają historii — patrz decyzja poniżej.

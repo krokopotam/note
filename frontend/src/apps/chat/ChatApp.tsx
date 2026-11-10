@@ -67,6 +67,7 @@ export function ChatApp(_props: AppProps) {
 
       <section className={styles.main}>
         {state.newChatOpen && <NewChat />}
+        {state.addMemberOpen && <AddMember />}
 
         {active === null ? (
           <p className={styles.empty}>
@@ -84,8 +85,22 @@ export function ChatApp(_props: AppProps) {
               >
                 Rozmowy
               </button>
-              <Avatar name={active.peer?.username ?? '?'} size={30} />
-              <h2 className={styles.title}>{active.peer?.username ?? 'konto usunięte'}</h2>
+              <Avatar name={active.title} size={30} />
+              <div className={styles.headText}>
+                <h2 className={styles.title}>{active.title}</h2>
+                {active.is_group && (
+                  <span className={styles.sub}>{state.members.map((member) => member.username).join(', ')}</span>
+                )}
+              </div>
+              {active.is_group && (
+                <button
+                  type="button"
+                  className={styles.addMember}
+                  onClick={() => void state.openAddMember()}
+                >
+                  Dodaj osobę
+                </button>
+              )}
             </header>
 
             <div className={styles.thread} ref={thread} data-testid="thread">
@@ -140,8 +155,6 @@ function ConversationRow({
 }) {
   const activeId = useChat((state) => state.activeId);
   const on = conversation.id === activeId;
-  const peer = conversation.peer?.username ?? '?';
-
   return (
     <button
       type="button"
@@ -150,17 +163,19 @@ function ConversationRow({
       onClick={onOpen}
       data-testid={`conversation-${conversation.id}`}
     >
-      <Avatar name={peer} />
+      <Avatar name={conversation.title} />
       <span className={styles.rowText}>
         <span className={styles.rowTop}>
-          <span className={styles.peer}>{conversation.peer?.username ?? 'konto usunięte'}</span>
+          <span className={styles.peer}>{conversation.title}</span>
           {conversation.last_at && <span className={styles.stamp}>{formatStamp(conversation.last_at)}</span>}
         </span>
         <span className={styles.rowBottom}>
           <span className={styles.preview}>
             {conversation.last_body === null
               ? 'bez wiadomości'
-              : `${conversation.last_from_me ? 'ty: ' : ''}${conversation.last_body}`}
+              : conversation.last_deleted
+                ? 'wiadomość usunięta'
+                : `${conversation.last_from_me ? 'ty: ' : ''}${conversation.last_body}`}
           </span>
           {conversation.unread > 0 && (
             <span className={styles.badge} aria-label={`${conversation.unread} nieprzeczytanych`}>
@@ -173,21 +188,37 @@ function ConversationRow({
   );
 }
 
-/** Pick a person to write to; the list is short enough to filter locally. */
+/**
+ * Start a conversation: tick one person for a plain 1:1 thread, tick two or more
+ * (or give it a name) and it becomes a group that can grow later.
+ */
 function NewChat() {
   const people = useChat((state) => state.people);
   const start = useChat((state) => state.start);
+  const createGroup = useChat((state) => state.createGroup);
   const close = useChat((state) => state.closeNewChat);
   const [filter, setFilter] = useState('');
+  const [title, setTitle] = useState('');
+  const [picked, setPicked] = useState<number[]>([]);
 
   const shown = people.filter((person) =>
     person.username.includes(filter.trim().toLowerCase()),
   );
 
+  const toggle = (id: number) =>
+    setPicked((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+
+  // One person, no name: that is the pair thread, with all its "only one ever" rule.
+  const submit = () => {
+    if (picked.length === 0) return;
+    if (picked.length === 1 && title.trim() === '') void start(picked[0]);
+    else void createGroup(title, picked);
+  };
+
   return (
     <div className={styles.newPanel} data-testid="new-chat">
       <div className={styles.newHead}>
-        <strong>Napisz do kogoś</strong>
+        <strong>Nowa rozmowa</strong>
         <button type="button" onClick={close}>
           Zamknij
         </button>
@@ -203,14 +234,68 @@ function NewChat() {
       <ul className={styles.people}>
         {shown.map((person) => (
           <li key={person.id} className={styles.person}>
-            <Avatar name={person.username} size={22} />
-            <span className={styles.personName}>{person.username}</span>
-            <button type="button" aria-label={`Napisz do ${person.username}`} onClick={() => void start(person.id)}>
-              Napisz
-            </button>
+            <label className={styles.pick}>
+              <input
+                type="checkbox"
+                checked={picked.includes(person.id)}
+                onChange={() => toggle(person.id)}
+                aria-label={`Wybierz ${person.username}`}
+              />
+              <Avatar name={person.username} size={22} />
+              <span className={styles.personName}>{person.username}</span>
+            </label>
           </li>
         ))}
         {shown.length === 0 && <li className={styles.empty}>Nie ma takiej osoby.</li>}
+      </ul>
+      <input
+        className={styles.titleInput}
+        type="text"
+        placeholder="Nazwa rozmowy (opcjonalnie)"
+        aria-label="Nazwa rozmowy"
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <button
+        type="button"
+        className={styles.create}
+        disabled={picked.length === 0}
+        onClick={submit}
+      >
+        {picked.length > 1 ? 'Utwórz grupę' : 'Utwórz rozmowę'}
+      </button>
+    </div>
+  );
+}
+
+/** Who else can join this group. Everybody already in it is not offered twice. */
+function AddMember() {
+  const people = useChat((state) => state.people);
+  const members = useChat((state) => state.members);
+  const add = useChat((state) => state.addMember);
+  const close = useChat((state) => state.closeAddMember);
+
+  const shown = people.filter((person) => !members.some((member) => member.id === person.id));
+
+  return (
+    <div className={styles.newPanel} data-testid="add-member">
+      <div className={styles.newHead}>
+        <strong>Dopisz osobę</strong>
+        <button type="button" onClick={close}>
+          Zamknij
+        </button>
+      </div>
+      <ul className={styles.people}>
+        {shown.map((person) => (
+          <li key={person.id} className={styles.person}>
+            <Avatar name={person.username} size={22} />
+            <span className={styles.personName}>{person.username}</span>
+            <button type="button" aria-label={`Dodaj ${person.username}`} onClick={() => void add(person.id)}>
+              Dodaj
+            </button>
+          </li>
+        ))}
+        {shown.length === 0 && <li className={styles.empty}>Wszyscy są już w środku.</li>}
       </ul>
     </div>
   );
@@ -304,6 +389,11 @@ function MessageRow({ message, grouped }: { message: Message; grouped: boolean }
               </button>
             </span>
           </div>
+        ) : message.deleted ? (
+          <p className={`${styles.bubble} ${styles.tomb}`}>
+            {grouped && <span className={styles.srOnly}>{message.author_name}</span>}
+            wiadomość usunięta
+          </p>
         ) : (
           <p className={styles.bubble} title={formatStamp(message.created_at)}>
             {grouped && <span className={styles.srOnly}>{message.author_name}</span>}
@@ -367,7 +457,7 @@ function Composer({ conversation }: { conversation: Conversation }) {
           ref={input}
           className={styles.input}
           value={draft}
-          placeholder={`Do: ${conversation.peer?.username ?? 'konto usunięte'}`}
+          placeholder={`Do: ${conversation.title}`}
           aria-label="Treść wiadomości"
           maxLength={MESSAGE_MAX_LENGTH}
           rows={1}

@@ -11,6 +11,8 @@ import {
   DESKTOP_KINDS,
   DESKTOP_NAME_MAX,
   FAVORITE_SLOTS,
+  CONVERSATION_TITLE_MAX,
+  GROUP_MEMBERS_MAX,
   NOTE_BODY_MAX,
   NOTE_TITLE_MAX,
   FILE_NAME_MAX,
@@ -288,17 +290,45 @@ export const ChatPeerSchema = z.object({ id: z.number().int(), username: z.strin
  */
 export const ConversationSchema = z.object({
   id: z.number().int(),
+  /** The other person of a 1:1 thread; null in a group, where `title` speaks. */
   peer: ChatPeerSchema.nullable(),
+  /** What the list and the window header show: the title, the peer or the names. */
+  title: z.string(),
+  is_group: z.boolean(),
   last_body: z.string().nullable(),
   last_at: z.string().nullable(),
   last_from_me: z.boolean(),
+  /** The last message was deleted — the preview says so instead of quoting it. */
+  last_deleted: z.boolean(),
   unread: z.number().int(),
   created_at: z.string(),
 });
 
 export const ConversationListSchema = z.object({ items: z.array(ConversationSchema) });
 
+/** Opening the thread with one person — the pair keeps one thread, always. */
 export const ConversationCreateSchema = z.object({ user_id: z.number().int() });
+
+/**
+ * A group: at least one person besides the author. Two people picked here is a
+ * group, not a 1:1 thread — it keeps its own name and can grow later.
+ */
+export const ConversationGroupCreateSchema = z
+  .object({
+    title: z.string().trim().max(CONVERSATION_TITLE_MAX).optional().default(''),
+    member_ids: z.array(z.number().int()).min(1).max(GROUP_MEMBERS_MAX),
+  })
+  .transform((value) => ({ ...value, member_ids: [...new Set(value.member_ids)] }));
+
+/** Adding a person to a group that already exists. */
+export const ConversationMemberSchema = z.object({ user_id: z.number().int() });
+
+export const ConversationDetailSchema = ConversationSchema.extend({
+  members: z.array(ChatPeerSchema),
+});
+
+/** What the desktop reads for the badge on the chat icon. */
+export const UnreadSchema = z.object({ total: z.number().int() });
 
 export const MessageSchema = z.object({
   id: z.number().int(),
@@ -315,9 +345,15 @@ export const MessageSchema = z.object({
   editable_until: z.string().nullable(),
   /** Decided by the server — the client only draws what it is told. */
   can_edit: z.boolean(),
+  /** A tombstone: the message is gone, the fact that it was here is not. */
+  deleted: z.boolean(),
 });
 
-export const MessagePageSchema = z.object({ items: z.array(MessageSchema) });
+export const MessagePageSchema = z.object({
+  items: z.array(MessageSchema),
+  /** Send this back on the next poll: everything up to this moment is already seen. */
+  watermark: z.string(),
+});
 
 /** Send and edit share one rule: a message is non-empty text with a ceiling. */
 const MessageBodySchema = z.object({

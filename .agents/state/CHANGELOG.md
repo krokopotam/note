@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## 2026-11-10 — czat: stan rozchodzi się, rozmowa ma kilkoro ludzi, ikona pokazuje ile czeka
+
+Trzy rzeczy naraz, bo były o siebie oparte:
+
+- **Poprawka dociera do rozmówcy.** Odpytywanie pytało `?after=<id wiadomości>`, więc zmiana
+  istniejącego wiersza nigdy nie wracała — okno rozmówcy pokazywało stary tekst, dopóki ktoś nie
+  otworzył czatu od nowa. Teraz `?since=<watermark>`: serwer odpowiada tym, co **napisane, poprawione
+  albo usunięte** od tamtej chwili, i zwraca `watermark` do odesłania. Granica `>=` (wiersz graniczny
+  przychodzi dwa razy, okno scala po `id`) — po to, żeby wiadomość z tej samej milisekundy nie zginęła.
+- **Usunięcie zostawia nagrobek.** `messages.deleted_at` (migracja `008_chat_sync.sql`) + pusta treść;
+  rozmówca dostaje `deleted: true` i widzi „wiadomość usunięta", a nie wiersz, który zapadł się pod
+  ziemię. `unread` nagrobków nie liczy, edycja nagrobka to `410 message_gone`.
+- **Rozmowa z kilkoma osobami.** `conversations.title` + grupy bez `pair_key` (unikalność pary zostaje
+  przy 1:1,SQLite lubi wielokrotne NULL w UNIQUE, więc zero przebudowy tabeli). `POST
+  /conversations/group { title?, member_ids[] }`, `POST /conversations/:id/members`, `GET
+  /conversations/:id` z listą członków. Dopisanie osoby do rozmowy 1:1 → `409 direct_conversation`.
+  Zapytania o rozmowę bez mnożenia wierszy: same podzapytania skalarne zamiast JOIN-a „innego
+  uczestnika", który przy trzeciej osobie duplikował listę.
+- **Znak na ikonie** — `GET /api/chat/unread` + `shell/badgeStore.ts` (pulpit pyta co `BADGE_POLL_MS`,
+  tylko gdy karta jest widoczna; błąd sieci nie gasi znaku, tylko zostawia ostatnią liczbę). Liczba w
+  rogu ikony w doku, na launcherze, w „wszystkie aplikacje" i na pulpicie; nazwa ikony dla czytnika
+  ekranu to „Czaty, 3 nieprzeczytane wiadomości". Pulpit nie importuje aplikacji, więc pyta sam.
+- Naprawione przy okazji: `merge()` w store czatu sortował po `a.id - a.id`, czyli wcale.
+- Testy: 440 (backend 157, frontend 283). Backend: sync poprawki/usunięcia za pomocą prawdziwego zegara
+  (wiersz „postarzany" o 2 minuty, żeby granica nie zdecydowała za test), grupy, `unread`. Frontend:
+  6 testów `badgeStore`, 3 znaku na ikonie w pulpicie, grup w oknie czatu.
+
 ## 2026-11-10 — czat przestaje być sztywny: bańki, awatary, luźny pasek pisania
 
 - Wiadomości to teraz bańki, nie karty: swoje niebieskie (`.me`), obce szare (`.them`), usunięte —
