@@ -8,6 +8,7 @@
 import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { pickRowAction } from '../../test/rowMenu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { filesApi, uploadFile } from './filesApi';
 import { FilesApp } from './FilesApp';
@@ -103,7 +104,7 @@ describe('browse', () => {
     renderFiles();
     await screen.findByText('Zdjęcia');
 
-    await userEvent.click(screen.getByRole('button', { name: /Zdjęcia/ }));
+    await userEvent.click(screen.getByTestId('resource-2'));
 
     expect(api.listFiles).toHaveBeenLastCalledWith(2, undefined);
   });
@@ -187,7 +188,7 @@ describe('renaming', () => {
     renderFiles();
     const row = await screen.findByTestId('file-10');
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Zmień nazwę' }));
+    await pickRowAction(row, 'Czynności pliku rachunek-10.pdf', 'Zmień nazwę');
     const field = await screen.findByRole('textbox', { name: 'Nowa nazwa pliku rachunek-10.pdf' });
     await userEvent.clear(field);
     await userEvent.type(field, 'faktura-2026.pdf');
@@ -197,14 +198,17 @@ describe('renaming', () => {
     expect(await screen.findByRole('link', { name: 'faktura-2026.pdf' })).toBeInTheDocument();
   });
 
-  it('renames the resource', async () => {
-    renderFiles();
-    const field = await screen.findByRole('textbox', { name: 'Nowa nazwa zasobu' });
+  it('renames the resource from its own row', async () => {
+    const sidebar = await (await renderFiles()).findByRole('navigation', { name: 'Zasoby' });
 
+    await pickRowAction(sidebar, 'Czynności zasobu Zasób 1', 'Zmień nazwę');
+    const field = await screen.findByRole('textbox', { name: 'Nowa nazwa zasobu Zasób 1' });
+    await userEvent.clear(field);
     await userEvent.type(field, 'Paragony');
-    await userEvent.click(screen.getByRole('button', { name: 'Zmień nazwę zasobu' }));
+    await userEvent.keyboard('{Enter}');
 
     expect(api.renameResource).toHaveBeenCalledWith(1, 'Paragony');
+    expect(within(sidebar).getByText('Paragony')).toBeInTheDocument();
   });
 
   it('creates a resource from the sidebar', async () => {
@@ -225,7 +229,8 @@ describe('sharing', () => {
     renderFiles();
     await screen.findByTestId('file-10');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Udostępnij' }));
+    const sidebar = await screen.findByRole('navigation', { name: 'Zasoby' });
+    await pickRowAction(sidebar, 'Czynności zasobu Zasób 1', 'Udostępnij');
     const panel = await screen.findByTestId('sharing');
     const choice = within(panel).getByRole('combobox', { name: 'Dostęp dla ola' });
 
@@ -244,16 +249,15 @@ describe('sharing', () => {
 
     expect(screen.queryByLabelText('Wybierz pliki do wysłania')).not.toBeInTheDocument();
     expect(screen.getByText(/tylko do odczytu/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zmień nazwę' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Usuń plik rachunek-10.pdf' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Udostępnij' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Czynności pliku rachunek-10.pdf' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Czynności zasobu Wspólne' })).not.toBeInTheDocument();
   });
 
   it('deletes a file when asked', async () => {
     renderFiles();
     const row = await screen.findByTestId('file-10');
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Usuń plik rachunek-10.pdf' }));
+    await pickRowAction(row, 'Czynności pliku rachunek-10.pdf', 'Usuń');
 
     expect(api.removeFile).toHaveBeenCalledWith(10);
     expect(screen.queryByTestId('file-10')).not.toBeInTheDocument();

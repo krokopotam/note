@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { pickRowAction } from '../../test/rowMenu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { stickiesApi } from './stickiesApi';
 import { StickiesApp } from './StickiesApp';
@@ -116,9 +117,9 @@ describe('stickies board', () => {
 
   it('pins a card and re-reads the board so it moves to the front', async () => {
     renderBoard();
-    const pin = await screen.findByTestId('pin-1');
+    const card = await screen.findByTestId('sticky-1');
 
-    await userEvent.click(pin);
+    await pickRowAction(card, 'Czynności karteczki 1', 'Przypnij');
 
     expect(api.update).toHaveBeenCalledWith(1, { pinned: true });
     expect(api.list).toHaveBeenCalledTimes(2);
@@ -128,7 +129,7 @@ describe('stickies board', () => {
     renderBoard();
     await screen.findByTestId('sticky-1');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Usuń karteczkę 1' }));
+    await pickRowAction(await screen.findByTestId('sticky-1'), 'Czynności karteczki 1', 'Usuń');
 
     await vi.waitFor(() => expect(api.remove).toHaveBeenCalledWith(1));
     expect(screen.queryByTestId('sticky-1')).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { STICKY_COLORS } from '@note/shared/manifest';
 import { formatStamp } from '../../shared/format';
+import { RowMenu } from '../../shared/RowMenu';
 import { useStickies, type StickyColor } from './stickiesStore';
 import type { Sticky } from '../../api/types';
 import type { AppProps } from '../../shell/registry';
@@ -131,25 +132,19 @@ function Card({ sticky }: { sticky: Sticky }) {
             />
           ))}
         </span>
-        <button
-          type="button"
-          className={styles.pin}
-          aria-pressed={sticky.pinned}
-          onClick={() => void togglePinned(sticky.id)}
-          data-testid={`pin-${sticky.id}`}
-        >
-          {sticky.pinned ? 'Przypięta' : 'Przypnij'}
-        </button>
-        <button
-          type="button"
-          className={styles.delete}
-          aria-label={`Usuń karteczkę ${sticky.id}`}
-          onClick={() => void remove(sticky.id)}
-        >
-          Usuń
-        </button>
+        <RowMenu
+          label={`Czynności karteczki ${sticky.id}`}
+          items={[
+            {
+              label: sticky.pinned ? 'Odepnij' : 'Przypnij',
+              onSelect: () => void togglePinned(sticky.id),
+            },
+            { label: 'Usuń', onSelect: () => void remove(sticky.id), danger: true },
+          ]}
+        />
       </div>
       <span className={styles.stamp}>{formatStamp(sticky.updated_at)}</span>
+      {sticky.pinned && <span className={styles.pinnedTag}>przypięta</span>}
     </article>
   );
 }

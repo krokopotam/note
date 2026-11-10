@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_UPLOAD_MB } from '@note/shared/manifest';
 import { formatSize, formatStamp } from '../../shared/format';
+import { RowMenu } from '../../shared/RowMenu';
 import { downloadUrl } from './filesApi';
 import { useFiles } from './filesStore';
 import type { FileEntry, FileResource } from '../../api/types';
@@ -63,41 +64,9 @@ export function FilesApp(_props: AppProps) {
             <header className={styles.head}>
               <h2 className={styles.title}>{active.name}</h2>
               <span className={styles.role}>{ROLE_LABEL[active.role]}</span>
-              {active.role === 'owner' && (
-                <span className={styles.headActions}>
-                  <button type="button" onClick={() => void state.openSharing()}>
-                    Udostępnij
-                  </button>
-                  <button type="button" onClick={() => void state.removeResource(active.id)}>
-                    Usuń zasób
-                  </button>
-                </span>
-              )}
             </header>
 
             {state.sharingOpen && <Sharing resource={active} />}
-
-            <form
-              className={styles.renameForm}
-              onSubmit={(event) => {
-                event.preventDefault();
-                const field = event.currentTarget.elements.namedItem('resource') as HTMLInputElement;
-                if (field.value.trim() && field.value !== active.name) {
-                  void state.renameResource(active.id, field.value.trim());
-                }
-                field.value = '';
-              }}
-            >
-              <input
-                name="resource"
-                className={styles.renameInput}
-                type="text"
-                placeholder={`Nowa nazwa zasobu „${active.name}”`}
-                aria-label="Nowa nazwa zasobu"
-                maxLength={80}
-              />
-              <button type="submit">Zmień nazwę zasobu</button>
-            </form>
 
             {state.members.length > 0 && !state.sharingOpen && (
               <p className={styles.sharedNote}>
@@ -183,22 +152,77 @@ function ResourceList() {
   const activeId = useFiles((state) => state.activeId);
   const select = useFiles((state) => state.select);
   const create = useFiles((state) => state.createResource);
+  const rename = useFiles((state) => state.renameResource);
+  const removeResource = useFiles((state) => state.removeResource);
+  const openSharing = useFiles((state) => state.openSharing);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renamingId !== null) field.current?.focus();
+  }, [renamingId]);
+
+  // The sharing panel belongs to the open resource, so pick it first.
+  const share = async (id: number) => {
+    if (activeId !== id) await select(id);
+    await openSharing();
+  };
 
   return (
     <>
       <ul className={styles.resourceList}>
         {resources.map((resource) => (
-          <li key={resource.id}>
-            <button
-              type="button"
-              className={resource.id === activeId ? styles.resourceOn : styles.resource}
-              aria-current={resource.id === activeId}
-              onClick={() => void select(resource.id)}
-            >
-              <span className={styles.resourceName}>{resource.name}</span>
-              <span className={styles.resourceCount}>{resource.file_count}</span>
-              {resource.role !== 'owner' && <span className={styles.sharedMark}>od</span>}
-            </button>
+          <li key={resource.id} className={styles.resourceRow}>
+            {renamingId === resource.id ? (
+              <form
+                className={styles.renameRow}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const value = field.current?.value.trim() ?? '';
+                  setRenamingId(null);
+                  if (value && value !== resource.name) void rename(resource.id, value);
+                }}
+              >
+                <input
+                  ref={field}
+                  className={styles.renameField}
+                  type="text"
+                  aria-label={`Nowa nazwa zasobu ${resource.name}`}
+                  defaultValue={resource.name}
+                  maxLength={80}
+                  onBlur={() => setRenamingId(null)}
+                />
+                <button type="submit">Zapisz</button>
+              </form>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  data-testid={`resource-${resource.id}`}
+                  className={resource.id === activeId ? styles.resourceOn : styles.resource}
+                  aria-current={resource.id === activeId}
+                  onClick={() => void select(resource.id)}
+                >
+                  <span className={styles.resourceName}>{resource.name}</span>
+                  <span className={styles.resourceCount}>{resource.file_count}</span>
+                  {resource.role !== 'owner' && <span className={styles.sharedMark}>od</span>}
+                </button>
+                {resource.role === 'owner' && (
+                  <RowMenu
+                    label={`Czynności zasobu ${resource.name}`}
+                    items={[
+                      { label: 'Zmień nazwę', onSelect: () => setRenamingId(resource.id) },
+                      { label: 'Udostępnij', onSelect: () => void share(resource.id) },
+                      {
+                        label: 'Usuń zasób',
+                        onSelect: () => void removeResource(resource.id),
+                        danger: true,
+                      },
+                    ]}
+                  />
+                )}
+              </>
+            )}
           </li>
         ))}
         {resources.length === 0 && <li className={styles.empty}>Brak zasobów.</li>}
@@ -294,11 +318,6 @@ function FileRow({ file, canEdit }: { file: FileEntry; canEdit: boolean }) {
         {file.created_by_name} · {formatStamp(file.created_at)}
       </span>
 
-      {canEdit && !editing && (
-        <button type="button" className={styles.fileAction} onClick={() => setEditing(true)}>
-          Zmień nazwę
-        </button>
-      )}
       {canEdit && editing && (
         <form
           className={styles.inlineForm}
@@ -321,15 +340,14 @@ function FileRow({ file, canEdit }: { file: FileEntry; canEdit: boolean }) {
           <button type="submit">Zapisz</button>
         </form>
       )}
-      {canEdit && (
-        <button
-          type="button"
-          className={styles.fileAction}
-          onClick={() => void remove(file.id)}
-          aria-label={`Usuń plik ${file.name}`}
-        >
-          Usuń
-        </button>
+      {canEdit && !editing && (
+        <RowMenu
+          label={`Czynności pliku ${file.name}`}
+          items={[
+            { label: 'Zmień nazwę', onSelect: () => setEditing(true) },
+            { label: 'Usuń', onSelect: () => void remove(file.id), danger: true },
+          ]}
+        />
       )}
     </li>
   );

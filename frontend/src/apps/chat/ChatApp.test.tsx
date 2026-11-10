@@ -5,6 +5,7 @@
 import { screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { pickRowAction } from '../../test/rowMenu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { chatApi } from './chatApi';
 import { ChatApp } from './ChatApp';
@@ -157,7 +158,7 @@ describe('fixing a message inside five minutes', () => {
     renderChat();
     const row = await screen.findByTestId('message-1');
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Popraw' }));
+    await pickRowAction(row, 'Czynności wiadomości 1', 'Popraw');
     const editor = await screen.findByRole('textbox', { name: 'Treść wiadomości 1' });
     await userEvent.clear(editor);
     await userEvent.type(editor, 'kupić baterie');
@@ -171,7 +172,7 @@ describe('fixing a message inside five minutes', () => {
     renderChat();
     const row = await screen.findByTestId('message-1');
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Popraw' }));
+    await pickRowAction(row, 'Czynności wiadomości 1', 'Popraw');
     const editor = await screen.findByRole('textbox', { name: 'Treść wiadomości 1' });
     await userEvent.clear(editor);
     await userEvent.type(editor, 'nie, jednak nie');
@@ -185,8 +186,8 @@ describe('fixing a message inside five minutes', () => {
     renderChat();
     const row = await screen.findByTestId('message-2');
 
-    expect(within(row).queryByRole('button', { name: 'Popraw' })).not.toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: 'Usuń wiadomość 2' })).not.toBeInTheDocument();
+    // No dots at all: nothing to do with somebody else's message.
+    expect(within(row).queryByRole('button', { name: 'Czynności wiadomości 2' })).not.toBeInTheDocument();
   });
 
   it('hides the buttons once the five minutes are past', async () => {
@@ -197,14 +198,14 @@ describe('fixing a message inside five minutes', () => {
     renderChat();
     const row = await screen.findByTestId('message-1');
 
-    expect(within(row).queryByRole('button', { name: 'Popraw' })).not.toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Czynności wiadomości 1' })).not.toBeInTheDocument();
   });
 
   it('deletes a message of one\'s own', async () => {
     renderChat();
     const row = await screen.findByTestId('message-1');
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Usuń wiadomość 1' }));
+    await pickRowAction(row, 'Czynności wiadomości 1', 'Usuń');
 
     expect(api.remove).toHaveBeenCalledWith(1);
     expect(screen.queryByTestId('message-1')).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHAT_POLL_MS, MESSAGE_EDIT_MINUTES, MESSAGE_MAX_LENGTH } from '@note/shared/manifest';
-import { formatStamp } from '../../shared/format';
+import { formatCountdown, formatStamp } from '../../shared/format';
+import { RowMenu } from '../../shared/RowMenu';
 import { useChat } from './chatStore';
 import type { Conversation, Message } from '../../api/types';
 import type { AppProps } from '../../shell/registry';
@@ -202,6 +203,28 @@ function MessageRow({ message }: { message: Message }) {
         <strong className={styles.author}>{message.author_name}</strong>
         <span className={styles.stamp}>{formatStamp(message.created_at)}</span>
         {message.edited_at && <span className={styles.edited}>edytowane</span>}
+        {stillOpen && (
+          <span className={styles.tail}>
+            <span className={styles.left}>
+              {formatCountdown(Date.parse(message.editable_until!) - now)}
+            </span>
+            {!editing && (
+              <RowMenu
+                label={`Czynności wiadomości ${message.id}`}
+                items={[
+                  {
+                    label: 'Popraw',
+                    onSelect: () => {
+                      setText(message.body);
+                      setEditing(true);
+                    },
+                  },
+                  { label: 'Usuń', onSelect: () => void remove(message.id), danger: true },
+                ]}
+              />
+            )}
+          </span>
+        )}
       </header>
 
       {editing ? (
@@ -239,27 +262,6 @@ function MessageRow({ message }: { message: Message }) {
         <p className={styles.body}>{message.body}</p>
       )}
 
-      {stillOpen && !editing && (
-        <span className={styles.actions}>
-          <button
-            type="button"
-            onClick={() => {
-              setText(message.body);
-              setEditing(true);
-            }}
-          >
-            Popraw
-          </button>
-          <button
-            type="button"
-            onClick={() => void remove(message.id)}
-            aria-label={`Usuń wiadomość ${message.id}`}
-          >
-            Usuń
-          </button>
-          <span className={styles.left}>{secondsLeft(message.editable_until!, now)} s</span>
-        </span>
-      )}
     </article>
   );
 }
@@ -306,5 +308,3 @@ function Composer({ conversation }: { conversation: Conversation }) {
   );
 }
 
-const secondsLeft = (untilIso: string, now: number) =>
-  Math.max(0, Math.round((Date.parse(untilIso) - now) / 1000));

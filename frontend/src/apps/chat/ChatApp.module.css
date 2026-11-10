@@ -164,16 +164,12 @@
   overflow-wrap: anywhere;
 }
 
-.actions {
+/* Right end of a message header: how much time is left, then the dots. */
+.tail {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
-}
-
-.actions button {
-  font-size: 11px;
-  padding: 3px 7px;
+  margin-left: auto;
 }
 
 .left {

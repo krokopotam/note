@@ -10,6 +10,16 @@ export function formatStamp(iso: string): string {
   return `${DAY.format(date)} ${TIME.format(date)}`;
 }
 
+/**
+ * `m:ss` of the time a five-minute edit window has left. A raw "187 s" makes people
+ * do arithmetic while the clock is running.
+ */
+export function formatCountdown(msLeft: number): string {
+  if (!Number.isFinite(msLeft) || msLeft <= 0) return '0:00';
+  const seconds = Math.ceil(msLeft / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 const UNITS = ['B', 'kB', 'MB', 'GB', 'TB'];
 
 /**

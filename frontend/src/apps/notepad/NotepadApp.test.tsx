@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { pickRowAction } from '../../test/rowMenu';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notesApi } from './notesApi';
 import { NotepadApp } from './NotepadApp';
@@ -175,7 +176,7 @@ describe('notepad window', () => {
     renderNotepad();
     await screen.findByTestId('editor');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Usuń notatkę' }));
+    await pickRowAction(await screen.findByTestId('note-footer'), /Czynności notatki/, 'Usuń notatkę');
 
     expect(api.remove).toHaveBeenCalledWith(1);
     expect(await screen.findByText('Wybierz notatkę z listy albo utwórz nową.')).toBeInTheDocument();

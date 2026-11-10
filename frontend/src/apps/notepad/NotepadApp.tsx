@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatStamp, preview } from '../../shared/format';
+import { RowMenu } from '../../shared/RowMenu';
 import { cancelAutosave, useNotepad } from './notepadStore';
 import type { AppProps } from '../../shell/registry';
 import styles from './NotepadApp.module.css';
@@ -128,17 +129,16 @@ export function NotepadApp({ payload }: AppProps) {
               onChange={(event) => state.edit(event.target.value)}
               data-testid="editor"
             />
-            <footer className={styles.footer}>
+            <footer className={styles.footer} data-testid="note-footer">
               <span className={styles.status} data-testid="save-status">
                 {state.saving ? 'Zapisywanie…' : state.dirty ? 'Zmiany do zapisania' : 'Zapisano'}
               </span>
-              <button
-                type="button"
-                className={styles.danger}
-                onClick={() => void state.removeNote(active.id)}
-              >
-                Usuń notatkę
-              </button>
+              <RowMenu
+                label={`Czynności notatki ${active.title}`}
+                items={[
+                  { label: 'Usuń notatkę', onSelect: () => void state.removeNote(active.id), danger: true },
+                ]}
+              />
             </footer>
           </>
         ) : (

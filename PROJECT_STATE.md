@@ -16,10 +16,10 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomo�
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
 | Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, działa |
-| Build produkcyjny (`frontend/dist`, 211 kB / 68 kB gzip) | przechodzi |
+| Build produkcyjny (`frontend/dist`, 213 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 386 przechodzi (backend 148, frontend 238). `npm run lint` → czysto.
+Testy: `npm test` → 396 przechodzi (backend 148, frontend 248). `npm run lint` → czysto.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -87,6 +87,10 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - Zależności jednokierunkowe: `http → repos → domain`, `shell → registry → apps → shared`.
 - Logika poza komponentami: komponent React renderuje i przekazuje zdarzenia, reszta to czyste funkcje.
 - Testy frontendu pytają o role i etykiety (`getByRole('button', { name: 'dodaj' })`), nie o klasy CSS.
+- **Akcje wiersza idą pod trzy kropki** (`shared/RowMenu.tsx`): menu otwiera się przy krawędzi wiersza,
+  pozycjonowane `fixed`, bo wiersze żyją w przewijanych panelach. Testy otwierają je przez
+  `test/rowMenu.ts` (`pickRowAction`), więc wszędzie tak samo. Tworzenie ("Nowa notatka") zostaje
+  widoczne — kropki są na to, co grozi zmianą albo stratą.
 - Każde okno aplikacji ma jeden klucz (`appId`), foldery `folder:<id>` — stąd aplikacje są singletonami,
   a foldery można otworzyć wiele razy.
 

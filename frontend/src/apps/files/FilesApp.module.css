@@ -22,6 +22,27 @@
   overflow-y: auto;
 }
 
+/* One line of the sidebar: the resource itself, then its three dots. */
+.resourceRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.renameRow {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.renameField {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
 .resource,
 .resourceOn {
   display: flex;
@@ -118,22 +139,6 @@
   padding: 2px 8px;
 }
 
-.headActions {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.renameForm {
-  display: flex;
-  gap: 6px;
-}
-
-.renameInput {
-  flex: 1;
-  min-width: 0;
-  max-width: 320px;
-}
 
 .sharedNote {
   margin: 0;
@@ -261,11 +266,6 @@
   color: #93a1b8;
   font-size: 11px;
   white-space: nowrap;
-}
-
-.fileAction {
-  font-size: 11px;
-  padding: 3px 7px;
 }
 
 .inlineForm {

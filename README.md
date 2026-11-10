@@ -30,6 +30,11 @@ frontend/    React + Vite; src/shell (pulpit, okna, dock, launcher), src/apps/<a
 deploy/      systemd + nginx + podstawowy install
 ```
 
+Akcje wiersza — „Popraw", „Usuń", „Udostępnij" — chowają się pod **trzema kropkami** po prawej stronie
+wiersza: wspólny `frontend/src/shared/RowMenu.tsx`, więc w pliku, karteczce, wiadomości i zasobie gest
+jest ten sam. Na wierzchu zostaje tworzenie („Nowa notatka", „Dodaj zasób", „Nowy czat") i kolory
+karteczek, czyli to, co wybiera się często.
+
 Zależności idą w jednym kierunku: `http → repos → domain`, `shell → registry → apps → shared`.
 Aplikacje nie importują shella, shell nie importuje aplikacji (tylko rejestr).
 

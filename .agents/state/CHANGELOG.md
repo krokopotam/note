@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 2026-11-10 — akcje wiersza chowają się pod trzy kropki
+
+- Nowy `frontend/src/shared/RowMenu.tsx`: akcje wiersza po prawej stronie, pod przyciskiem z trzema
+  kropkami (`aria-haspopup="menu"`, `role="menu"`, Escape i klik obok zamykają). Menu jest `position:
+  fixed` prostokąta przycisku — jako dziecko wiersza zostałoby obcięte na krawędzi przewijanego panelu.
+- Zastosowane wszędzie, gdzie wiersz miał kilka przycisków: **wiadomości czatu** (Popraw, Usuń),
+  **pliki** (Zmień nazwę, Usuń), **zasoby** na pasku bocznym (Zmień nazwę, Udostępnij, Usuń zasób —
+  nazwa edytowana teraz w miejscu, bez osobnego formularza w nagłówku), **karteczki** (Przypnij/Odepnij,
+  Usuń — kolory zostały na wierzchu), **notatnik** (ze stopki zniknął czerwony „Usuń notatkę”).
+- Karteczka pokazuje napis „przypięta\": jej stan nie może zależeć tylko od etykiety przycisku,
+  którego już nie ma.
+- Pozostało jawne: tworzenie (Nowa notatka / Dodaj zasób / Nowy czat) i pojedyncze akcje wiersza
+  (Otwórz, Przywróć, Zamknij zakładkę) — kropki na jedną pozycję byłyby gorzej, nie lepiej.
+- Licznik czasu na poprawkę przesunięty do nagłówka wiadomości jako `m:ss` (`formatCountdown`).
+- Testy: 396 przechodzi (backend 148, frontend 248 — +10 `RowMenu`, +4 `formatSize`/`formatCountdown`).
+  Wsparcie: `frontend/src/test/rowMenu.ts` (`openRowMenu`, `pickRowAction`).
+
 ## 2026-11-10 — aplikacja Czaty: rozmowy i pięć minut na poprawkę
 
 - Nowa aplikacja **Czaty**: rozmowy jeden-na-jeden z dowolnym kontem, lista rozmów z podglądem
