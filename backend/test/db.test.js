@@ -25,6 +25,9 @@ describe('database bootstrap', () => {
       expect.arrayContaining([
         'desktop_items',
         'favorites',
+        'file_resources',
+        'file_resource_members',
+        'files',
         'note_revisions',
         'notes',
         'notepad_state',
@@ -53,10 +56,12 @@ describe('database bootstrap', () => {
     first.close();
 
     const second = openDb(target);
-    // 001_init.sql + 002_users.sql, and nothing re-runs.
+    // Every migration once, and nothing re-runs on the next boot.
     expect(second.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([
       { version: '001_init.sql' },
       { version: '002_users.sql' },
+      { version: '003_files.sql' },
+      { version: '004_files_icon.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -101,7 +106,7 @@ describe('upgrading a database that predates accounts', () => {
   it('hands every existing row to the owner account', () => {
     const db = legacyDb();
 
-    expect(migrate(db)).toEqual(['002_users.sql']);
+    expect(migrate(db)).toEqual(['002_users.sql', '003_files.sql', '004_files_icon.sql']);
 
     const owner = findByUsername(db, 'wincyj');
     expect(owner.id).toBe(1);
@@ -111,20 +116,64 @@ describe('upgrading a database that predates accounts', () => {
     const count = (sql) => db.prepare(sql).get().n;
     expect(count('SELECT COUNT(*) AS n FROM notes WHERE user_id = 1')).toBe(1);
     expect(count('SELECT COUNT(*) AS n FROM stickies WHERE user_id = 1')).toBe(1);
-    expect(count('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = 1')).toBe(1);
-    expect(count("SELECT COUNT(*) AS n FROM favorites WHERE user_id = 1 AND slot = 'dock'")).toBe(1);
+    // Two icons today: the legacy one that was claimed, plus Pliki added by 004.
+    expect(count("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = 1 AND app_id = 'calculator'")).toBe(1);
+    expect(
+      count("SELECT COUNT(*) AS n FROM favorites WHERE user_id = 1 AND slot = 'dock' AND app_id = 'calculator'"),
+    ).toBe(1);
     expect(count('SELECT COUNT(*) AS n FROM notepad_tabs WHERE user_id = 1')).toBe(1);
     expect(db.prepare('SELECT active_note_id FROM notepad_state WHERE user_id = 1').get()).toEqual({
       active_note_id: 1,
     });
   });
 
-  it('deleting an account takes its content and sessions with it', () => {
+  it('gives an old desktop the icon of an app that arrived later', () => {
+    const db = legacyDb();
+
+    migrate(db);
+
+    // Without an icon there is no way to open Pliki: the desktop is the only door.
+    const icon = db
+      .prepare("SELECT * FROM desktop_items WHERE user_id = 1 AND app_id = 'files'")
+      .get();
+    expect(icon).toMatchObject({ kind: 'app', name: 'Pliki', parent_id: null, x: 0, y: 1 });
+
+    const dock = db
+      .prepare("SELECT app_id FROM favorites WHERE user_id = 1 AND slot = 'dock' ORDER BY position")
+      .all()
+      .map((row) => row.app_id);
+    expect(dock).toEqual(['calculator', 'files']);
+  });
+
+  it('does not hand an icon to an account that has no desktop yet', () => {
     const db = legacyDb();
     migrate(db);
+    const fresh = createUser(db, { username: 'swiezy', passwordHash: LOCKED_HASH }).id;
+
+    expect(
+      db.prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id = 'files'").get(fresh).n,
+    ).toBe(0);
+  });
+
+  it('deleting an account takes its content, shares and sessions with it', () => {
+    const db = legacyDb();
+    migrate(db);
+    const other = createUser(db, { username: 'drugi', passwordHash: LOCKED_HASH }).id;
     db.prepare(
       `INSERT INTO sessions (user_id, token_hash, created_at, expires_at)
        VALUES (1, 'hash', 'a', 'b')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO file_resources (id, owner_id, name, created_at, updated_at)
+       VALUES (1, 1, 'Wrzutki', 'a', 'a')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO file_resource_members (resource_id, user_id, permission, granted_by, created_at)
+       VALUES (1, ?, 'read', 1, 'a')`,
+    ).run(other);
+    db.prepare(
+      `INSERT INTO files (id, resource_id, name, stored_name, size, content_type, created_by, created_at)
+       VALUES (1, 1, 'a.txt', 'x.txt', 1, 'text/plain', 1, 'a')`,
     ).run();
 
     db.prepare('DELETE FROM users WHERE id = 1').run();
@@ -136,6 +185,11 @@ describe('upgrading a database that predates accounts', () => {
     expect(count('SELECT COUNT(*) AS n FROM favorites')).toBe(0);
     expect(count('SELECT COUNT(*) AS n FROM notepad_tabs')).toBe(0);
     expect(count('SELECT COUNT(*) AS n FROM sessions')).toBe(0);
+    expect(count('SELECT COUNT(*) AS n FROM file_resources')).toBe(0);
+    expect(count('SELECT COUNT(*) AS n FROM files')).toBe(0);
+    // The friend's member row pointed at a resource that no longer exists.
+    expect(count('SELECT COUNT(*) AS n FROM file_resource_members')).toBe(0);
+    expect(findByUsername(db, 'drugi')).toBeTruthy();
   });
 });
 

@@ -1,0 +1,359 @@
+.app {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  height: 100%;
+  background: #151b26;
+}
+
+/* --- zasoby ---------------------------------------------------------------- */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 0;
+}
+
+.resourceList {
+  flex: 1;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.resource,
+.resourceOn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #e7eefb;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resource:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.resourceOn {
+  background: rgba(88, 148, 246, 0.18);
+  border-color: rgba(88, 148, 246, 0.4);
+}
+
+.resourceName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resourceCount {
+  color: #93a1b8;
+  font-size: 11px;
+}
+
+.sharedMark {
+  border-radius: 4px;
+  background: rgba(240, 178, 80, 0.22);
+  color: #f0b250;
+  font-size: 10px;
+  padding: 1px 4px;
+}
+
+.createForm {
+  display: flex;
+  gap: 6px;
+  padding: 8px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.createInput {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- zawartość ------------------------------------------------------------- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+.main[data-dragging='true'] {
+  outline: 2px dashed rgba(88, 148, 246, 0.8);
+  outline-offset: -6px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.role {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #93a1b8;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.headActions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.renameForm {
+  display: flex;
+  gap: 6px;
+}
+
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.sharedNote {
+  margin: 0;
+  color: #93a1b8;
+  font-size: 12px;
+}
+
+.readOnly {
+  margin: 0;
+  border-left: 3px solid #f0b250;
+  color: #cbd5e8;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: #cbd5e8;
+  font-size: 13px;
+  padding: 18px 12px;
+  cursor: pointer;
+}
+
+.dropzone:hover {
+  border-color: rgba(88, 148, 246, 0.7);
+  background: rgba(88, 148, 246, 0.06);
+}
+
+.dropzone span {
+  color: #93a1b8;
+  font-size: 11px;
+}
+
+/* The input itself is only a target: the dashed box is what the eye sees. */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploads {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.uploadName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploadError {
+  color: #ff8f8f;
+}
+
+.bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: #5894f6;
+}
+
+.search {
+  max-width: 320px;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  padding: 7px 2px;
+}
+
+.fileName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #dce7fb;
+  text-decoration: none;
+}
+
+.fileName:hover {
+  text-decoration: underline;
+}
+
+.fileMeta {
+  color: #93a1b8;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.fileAction {
+  font-size: 11px;
+  padding: 3px 7px;
+}
+
+.inlineForm {
+  display: flex;
+  gap: 4px;
+}
+
+.inlineInput {
+  font-size: 12px;
+  padding: 3px 6px;
+  width: 220px;
+}
+
+/* --- udostępnianie --------------------------------------------------------- */
+
+.sharing {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #101724;
+  padding: 8px 10px;
+}
+
+.sharingHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.personName {
+  min-width: 120px;
+}
+
+/* --- wspólne --------------------------------------------------------------- */
+
+.empty {
+  color: #7e8ba3;
+  font-size: 12px;
+  list-style: none;
+  padding: 6px 2px;
+}
+
+.error {
+  margin: 0;
+  border-left: 3px solid #ff8f8f;
+  color: #ffb4b4;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.createButton {
+  white-space: nowrap;
+}
+
+input,
+select,
+button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: #101724;
+  color: #e7eefb;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: rgba(88, 148, 246, 0.6);
+}

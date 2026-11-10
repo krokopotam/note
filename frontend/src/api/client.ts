@@ -39,6 +39,14 @@ export function setUnauthorizedListener(listener: UnauthorizedListener | null): 
 }
 
 /**
+ * Same report for calls that cannot go through `request` (an XHR upload needs
+ * progress events, which fetch does not give).
+ */
+export function reportStatus(status: number): void {
+  if (status === 401) unauthorizedListener?.();
+}
+
+/**
  * The single place the frontend talks to the backend.
  *
  * Every non-2xx response becomes an ApiError, so callers never branch on

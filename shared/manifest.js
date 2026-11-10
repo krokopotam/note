@@ -66,7 +66,21 @@ export const APPS = [
   { id: 'calculator', title: 'Kalkulator', width: 320, height: 470 },
   { id: 'notepad', title: 'Notatnik', width: 960, height: 640 },
   { id: 'stickies', title: 'Karteczki', width: 820, height: 600 },
+  { id: 'files', title: 'Pliki', width: 900, height: 620 },
 ];
+
+// --- pliki ------------------------------------------------------------------
+
+/**
+ * What one upload may weigh. nginx has to agree (`client_max_body_size`),
+ * otherwise the request dies at the proxy with 413 before reaching the app.
+ */
+export const MAX_UPLOAD_MB = 100;
+export const FILE_NAME_MAX = 200;
+export const RESOURCE_NAME_MAX = 80;
+
+/** `read` = view and download, `edit` = also upload, rename and delete. */
+export const FILE_PERMISSIONS = ['read', 'edit'];
 
 /** @param {string} id @returns {(typeof APPS)[number] | null} */
 export const appById = (id) => APPS.find((app) => app.id === id) ?? null;

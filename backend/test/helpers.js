@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import request from 'supertest';
 import { APPS } from '@note/shared';
 import { createApp } from '../src/app.js';
@@ -18,9 +21,12 @@ export function makeDb() {
  * `seed` defaults to a no-op: most tests assert a resource in isolation and do not
  * want a starter desktop in the way. The registration seeding has its own test.
  */
-export function makeTestApp({ apps = APPS, seed = () => {}, throttle } = {}) {
+export function makeTestApp({ apps = APPS, seed = () => {}, throttle, maxUploadBytes } = {}) {
   const db = makeDb();
-  return { db, app: createApp({ db, apps, seed, throttle }) };
+  // Uploads go to a throwaway folder, never into the repository's data/files.
+  const filesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'note-files-'));
+  const app = createApp({ db, apps, seed, throttle, filesDir, maxUploadBytes });
+  return { db, app, filesDir };
 }
 
 /**

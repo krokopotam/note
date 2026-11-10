@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 2026-11-10 — aplikacja Pliki: zasoby, wysyłanie, współdzielenie
+
+- Nowa aplikacja **Pliki**: zasoby (nazwane foldery) tworzone bez limitu i ze zmienną nazwą,
+  pliki wrzucane drag & drop albo przyciskiem „wybierz z dysku", pobieranie, zmiana nazwy pliku.
+- Współdzielenie zasobu z wybranymi kontami: `read` (ogląda i pobiera) albo `edit` (także wrzuca,
+  nazywa, usuwa). Sam zasób zmienia nazwę, współdzieli i usuwa wyłącznie właściciel.
+  Rola liczona jest z bazy przy każdym żądaniu; cudzy zasób daje 404, nie 403.
+- Bity leżą w `data/files/<id zasobu>/<uuid>` — nazwa dyskowa generowana, ścieżka sprawdzana
+  `path.resolve`, więc `../../etc/passwd` nie zapisze się ani nie wyczyta poza zasobem.
+  Nazwa dla człowieka jest osobną kolumną i można ją zmieniać bez ruszania pliku.
+- Upload strumieniowo na dysk (`req.pipe`), limit 100 MB liczony w chunkach. `express.raw`
+  trzymałby cały plik w pamięci, a serwer nie ma swapu i dzieli RAM z innymi usługami.
+- `files.created_by` → `ON DELETE SET NULL`: usunięcie konta nie kasuje plików wrzuconych do
+  cudzego zasobu (zostaje autor „—"). `adopt` przenosi zasoby i współdzielenia, `remove`
+  czyści foldery na dysku.
+- Migracja `004_files_icon.sql` dokłada ikonę „Pliki" do **istniejących** pulpitów i slot w doku
+  oraz launcherze — bez niej nikt, kto już ma pulpit, nie miałby czym otworzyć nowej aplikacji.
+- nginx: osobny blok `/api/files/` z `client_max_body_size 105m` i `proxy_request_buffering off`.
+- Testy: 130 backend (+27: pliki, udostępnianie, izolacja, migracje, CLI) + 208 frontend (+34) = 338.
+- Migracje sprawdzone na kopii produkcyjnej bazy przed wdrożeniem.
+
 ## 2026-11-10 — okna i ikony nie wchodzą pod paski
 
 - Zmaksymalizowane okno brało `0,0` i `100vw`, a pasek górny ma `z-index: 960` — przykrywał

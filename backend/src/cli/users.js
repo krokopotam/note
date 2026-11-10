@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { APPS } from '@note/shared';
 import { openDb } from '../db/index.js';
 import { LOCKED_HASH, hashPassword } from '../domain/passwords.js';
+import { createFileStore } from '../files/store.js';
+import { ownedResourceIds } from '../repos/files.js';
 import { seedUser } from '../repos/seed.js';
 import { destroyAllForUser, listSessions } from '../repos/sessions.js';
 import {
@@ -27,6 +29,13 @@ import {
   listUsers,
   setPassword,
 } from '../repos/users.js';
+
+const PROJECT_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+);
 
 const USAGE = `użycie: npm run cli -- <polecenie> [argumenty]
   list
@@ -53,8 +62,9 @@ function mustFind(db, username) {
 /**
  * @param {import('better-sqlite3').Database} db
  * @param {string[]} args
+ * @param {{files?: object}} options - the disk side, injectable for tests
  */
-export function run(db, args) {
+export function run(db, args, { files = createFileStore(path.join(PROJECT_ROOT, 'data', 'files')) } = {}) {
   const [command, ...rest] = args;
 
   switch (command) {
@@ -100,10 +110,14 @@ export function run(db, args) {
       const account = mustFind(db, username);
       if (!account) return;
 
+      // Wiersze znikają kaskadowo, ale bajty na dysku są poza bazą — bez tego
+      // zostałyby foldery, do których nigdy już nikt nie trafi.
+      const folders = ownedResourceIds(db, account.id);
       const removed = deleteUser(db, account.id);
+      folders.forEach((id) => files.removeResource(id));
       console.log(
         `usunięto konto ${username} wraz z:`,
-        Object.entries(removed)
+        [...Object.entries(removed), ['foldery', folders.length]]
           .map(([what, n]) => `${what}=${n}`)
           .join(' '),
       );
@@ -162,8 +176,6 @@ export function run(db, args) {
 // Direct execution only (tests import run() and pass their own database).
 const invokedDirectly = process.argv[1]?.endsWith('cli/users.js');
 if (invokedDirectly) {
-  const HERE = path.dirname(fileURLToPath(import.meta.url));
-  const PROJECT_ROOT = path.resolve(HERE, '..', '..', '..');
   const dbFile = process.env.DB_FILE ?? path.join(PROJECT_ROOT, 'data', 'note.db');
   run(openDb(dbFile), process.argv.slice(2));
 }

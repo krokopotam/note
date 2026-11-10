@@ -68,6 +68,23 @@ export function FolderIcon({ size = 48 }: IconProps) {
   );
 }
 
+export function FilesIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M11 6h17l9 9v27a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z" fill="#4b8ef0" />
+      <path d="M28 6l9 9h-9z" fill="#a9caff" />
+      <path
+        d="M24 35V21m0 0l-5 5m5-5l5 5"
+        stroke="#0e1726"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 export function UnknownAppIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

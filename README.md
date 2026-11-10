@@ -1,7 +1,8 @@
 # note
 
-Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami i historią, karteczki.
-Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki i układ pulpitu.
+Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami i historią, karteczki
+oraz pliki — wrzucane drag & drop do zasobów, które można współdzielić z innymi kontami.
+Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki, pliki i układ pulpitu.
 Backend Node + SQLite w pliku, jeden proces, jeden port.
 
 ## Jak to działa
@@ -12,6 +13,7 @@ przeglądarka
           backend (Express, 127.0.0.1:8120) │
               ├── /api/auth/* → sesja       │
               ├── /api/*      → repos → SQLite  data/note.db  (plik w folderze aplikacji)
+              ├── /api/files/*→ strumień na dysk  data/files/<zasób>/<uuid>
               └── /           → frontend/dist  ┘
 ```
 
@@ -42,7 +44,7 @@ Tryb deweloperski z przeładowaniem: `npm run dev` (backend 8120, Vite 5173 z pr
 ## Testy
 
 ```bash
-npm test                  # backend (100) + frontend (170)
+npm test                  # backend (130) + frontend (208)
 npm run lint              # tsc --noEmit dla frontendu
 ```
 
@@ -65,6 +67,14 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | GET/POST/PATCH/DELETE | `/api/stickies[/:id]` | karteczki, `?pinned=true`, `q`, `sort` |
 | GET/POST/PATCH/DELETE | `/api/desktop/items[/:id]` | ikony i foldery wraz z pozycjami w siatce |
 | GET/PUT | `/api/desktop/favorites` | co stoi w doku i w launcherze |
+| GET/POST | `/api/files/resources` | lista zasobów / nowy zasób |
+| GET/PATCH/DELETE | `/api/files/resources/:id` | zagląd (z listą osób), zmiana nazwy, usunięcie |
+| GET | `/api/files/resources/:id/files?q=` | pliki w zasobie, szukanie po nazwie |
+| PUT | `/api/files/resources/:id/files/<nazwa>` | wysłanie pliku — ciało to surowe bajty |
+| GET | `/api/files/:id` | pobranie pliku |
+| PATCH/DELETE | `/api/files/:id` | zmiana nazwy / usunięcie pliku |
+| GET | `/api/files/users` | komu można współdzielić (tylko loginy) |
+| PUT | `/api/files/resources/:id/members` | `{ user_id, permission: "read" \| "edit" \| null }` |
 
 Błędy zawsze w jednym kształcie: `{ "error": { "code", "message", "details"? } }`.
 Wszystko poza `/api/health` i `/api/auth/*` wymaga ciasteczka sesji — bez niego 401
@@ -74,13 +84,35 @@ Hasła: scrypt z solą (`scrypt$N$r$p$sól$hash`), porównanie stałoczasowe; w 
 hasła w jakiejkolwiek postaci. Sesja to losowy token w ciasteczku, a w bazie jego SHA-256.
 Logowanie i rejestracja mają limit prób (w procesie + `limit_req` w nginx).
 
+## Pliki i zasoby
+
+Plik zawsze leży w **zasobie** (nazwany folder, np. „Paragony 2026”). Zasób ma właściciela i może być
+udostępniony innym kontom:
+
+| Rola | zobaczy i pobierze | wyśle, zmieni nazwę, usunie | zmieni nazwę zasobu, współdzieli, usunie zasób |
+|---|---|---|---|
+| właściciel | tak | tak | tak |
+| `edit` | tak | tak | nie |
+| `read` | tak | nie | nie |
+
+Rola jest liczona z bazy przy każdym żądaniu — nigdy z tego, co wyśle przeglądarka. Cudzy zasób
+daje 404 tak samo jak notatki.
+
+Bajty mieszkają w `data/files/<id zasobu>/<uuid>.<rozszerzenie>`: nazwa na dysku jest generowana,
+więc żadna nazwa z zewnątrz nie ma wpływu na ścieżkę (`../../etc/passwd` ląduje jako plik o nazwie
+`passwd` wewnątrz zasobu). Nazwa, którą widzi człowiek, jest tylko w bazie i można ją zmieniać.
+
+Limit pliku to 100 MB (`MAX_UPLOAD_MB`). Upload idzie strumieniowo na dysk — ciało żądania nie jest
+buforowane w pamięci procesu, więc kilka dużych wysłań naraz nie podnosi RAM-u. W nginx blok
+`/api/files/` ma osobno `client_max_body_size 105m` i `proxy_request_buffering off`.
+
 ## Konta
 
 ```bash
 npm run cli -- list                          # kto jest
 npm run cli -- set-password ala <hasło>      # reset (i odblokowanie) — wygasza sesje
 npm run cli -- lock ala                      # zablokuj konto i wszystkie sesje
-npm run cli -- remove ala                     # usuń konto razem z jego danymi (np. śmieciowe)
+npm run cli -- remove ala                     # usuń konto, jego dane i foldery plików na dysku
 npm run cli -- adopt ala ola                 # przenieś CAŁE dane między kontami
 npm run cli -- seed ala                      # daj kontu startowy pulpit
 npm run cli -- sessions ala                  # otwarte sesje
@@ -94,7 +126,9 @@ odzetnieć dawne notatki bez logowania się "w czyjeś konto".
 
 1. wpis w `shared/manifest.js` (`APPS`),
 2. folder `frontend/src/apps/<id>/` z komponentem i własnym `*.test.tsx`,
-3. jedna linia w `APP_VIEWS` w `frontend/src/shell/registry.tsx`.
+3. jedna linia w `APP_VIEWS` (i jedna w ikonie) w `frontend/src/shell/registry.tsx`,
+4. migracja dokładająca ikonę na **istniejące** pulpity — inaczej nikt, kto już sobie poukładał
+   pulpit, nie miałby czym otworzyć nowej aplikacji (patrz `004_files_icon.sql`).
 
 Ikona wskazująca na usuniętą aplikację nie wywali pulpitu — dostajesz okno z komunikatem.
 

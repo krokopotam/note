@@ -82,6 +82,12 @@ export function deleteUser(db, userId) {
     notes: count('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?'),
     stickies: count('SELECT COUNT(*) AS n FROM stickies WHERE user_id = ?'),
     desktop_items: count('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?'),
+    file_resources: count('SELECT COUNT(*) AS n FROM file_resources WHERE owner_id = ?'),
+    files: count(
+      `SELECT COUNT(*) AS n FROM files f
+         JOIN file_resources r ON r.id = f.resource_id
+        WHERE r.owner_id = ?`,
+    ),
   };
 
   const info = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
@@ -115,6 +121,21 @@ export function adoptDataFrom(db, fromUserId, toUserId) {
     for (const table of ['notes', 'stickies', 'desktop_items', 'favorites', 'notepad_tabs']) {
       counts[table] = move(table).run(toUserId, fromUserId).changes;
     }
+
+    // Zasoby: ich konta (owner) i wpisy osób, którym współdzielący je udostępniał.
+    // Własny wpis członka w zasobie, który właśnie przechodzi na odbiorcę, poszedłby
+    // z niczym przy kluczu głównym, więc znika — odbiorca będzie tam właścicielem.
+    counts.file_member_conflicts_dropped = db
+      .prepare(
+        `DELETE FROM file_resource_members
+          WHERE user_id = @to
+            AND resource_id IN (SELECT id FROM file_resources WHERE owner_id = @from)`,
+      )
+      .run({ to: toUserId, from: fromUserId }).changes;
+    counts.file_resources = db
+      .prepare('UPDATE file_resources SET owner_id = ? WHERE owner_id = ?')
+      .run(toUserId, fromUserId).changes;
+    counts.file_resource_members = move('file_resource_members').run(toUserId, fromUserId).changes;
     // Only one row may hold the active note per user, so the giver's is dropped.
     db.prepare('DELETE FROM notepad_state WHERE user_id = ?').run(fromUserId);
     const noteIds = db

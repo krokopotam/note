@@ -1,22 +1,28 @@
 # PROJECT_STATE
 
 Projekt: **note** — pulpit w przeglądarce (okna, dock, launcher) z aplikacjami: kalkulator,
-notatnik (wiele zakładek + historia + wyszukiwarka) i karteczki.
+notatnik (wiele zakładek + historia + wyszukiwarka), karteczki i pliki (wrzucanie, pobieranie,
+współdzielenie zasobów między kontami).
 
 ## Stan
 
 | Element | Status |
 |---|---|
-| Backend (Express + SQLite, migracje, API) | gotowy, 100 testów |
+| Backend (Express + SQLite, migracje, API) | gotowy, 130 testów |
 | Konta: rejestracja, logowanie, sesja 10 dni, dane oddzielone po `user_id` | gotowy, działa |
 | Shell pulpitu (siatka ikon, foldery, okna, dock, launcher, menu) | gotowy, testy jednostkowe i integracyjne |
 | Kalkulator | gotowy (logika jako czyste funkcje + klawiatura) |
 | Notatnik (zakładki, autosave, historia, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
-| Build produkcyjny (`frontend/dist`, 181 kB / 59 kB gzip) | przechodzi |
+| Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, czeka na wdrożenie |
+| Build produkcyjny (`frontend/dist`, 201 kB / 65 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 270 przechodzi (backend 100, frontend 170). `npm run lint` → czysto.
+Testy: `npm test` → 338 przechodzi (backend 130, frontend 208). `npm run lint` → czysto.
+
+Migracje `003_files.sql` + `004_files_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
+(`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każdy pulpit
+dostał ikonę „Pliki", oba paski dostały slot.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
@@ -49,6 +55,19 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   ustawi hasła przez `npm run cli` — jedyny uczciwy sposób na przejęcie cudzych starych danych.
 - **Limit prób logowania** w procesie (okno 10 min) + osobny `limit_req` dla `/api/auth/` w nginx —
   rejestracja jest publiczna, więc zgadywanie hasła musi być drogie.
+- **Pliki: bity na dysku, nazwy w bazie.** `data/files/<id zasobu>/<uuid>.<rozszerzenie>`; ścieżka jest
+  składana wyłącznie z wygenerowanej nazwy i sprawdzana `path.resolve`, więc nazwa z żądania nie ma
+  wpływu na to, gdzie zapisujemy. Nazwa dla człowieka jest osobną kolumną i zmienia się bez ruszania bajtów.
+- **Upload strumieniowo** (`req.pipe(writeStream)`) zamiast `express.raw`: limit (100 MB) jest liczony
+  w chunkach, a nie przez bufor parsera. Serwer dzieli RAM z innymi usługami i nie ma swapu — 100 MB
+  w pamięci na wysłanie to była dziura do wykorzystania przez każde nowo zarejestrowane konto.
+- **Właściciel / `edit` / `read`** — rola wyliczana z bazy w każdym zapytaniu (`roleFor`), nigdy z ciała
+  żądania. `edit` pozwala pracować na plikach, ale nie współdzielić ani nie ruszać samego zasobu;
+  współdzielenie i usunięcie zasobu ma wyłącznie właściciel.
+- **Plik należy do zasobu, nie do autora**: `files.created_by ON DELETE SET NULL` (pozostaje „—"),
+  bo skasowanie konta nie może niszczyć czyichś dokumentów. Zasoby idą za właścicielem kaskadowo.
+- **Nowa aplikacja = migracja z ikoną.** Pulpit jest jedynym wejściem do aplikacji, więc `004_files_icon.sql`
+  dokłada „Pliki" pod ostatnią ikonę każdego istniejącego pulpitu i na koniec obu pasków.
 
 ## Konwencje
 
@@ -66,3 +85,7 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - Brak odzyskiwania hasła (jest `npm run cli -- set-password`), brak zmiany hasła z poziomu
   interfejsu i brak widoku „ moje aktywne sesje”.
 - Limit prób logowania żyje w pamięci procesu — po restarcie licznik startuje od zera.
+- Pliki: brak pobierania wielu naraz (zip), brak podglądu w oknie, brak limitu miejsca na konto
+  (liczy się tylko rozmiar pojedynczego pliku) — każdy może założyć dowolną liczbę zasobów.
+- Usunięcie zasobu kasuje folder z dysku od razu; nie ma kosza ani odzyskiwania plików.
+- Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).

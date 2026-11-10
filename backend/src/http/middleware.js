@@ -27,6 +27,14 @@ export function errorHandler(err, req, res, next) {
       .json({ error: { code: 'invalid_json', message: 'request body is not valid JSON' } });
   }
 
+  // A JSON body over the parser limit (a huge note, say). Uploads report their own,
+  // friendlier 413 from the files route, so this one is about the request as such.
+  if (err.type === 'entity.too.large' || err.code === 'entity.too.large') {
+    return res
+      .status(413)
+      .json({ error: { code: 'payload_too_large', message: 'żądanie jest za duże' } });
+  }
+
   if (err instanceof HttpError || err.status) {
     const body = {
       error: {

@@ -3,21 +3,25 @@
  * its password) and to reset one somebody lost, so it is worth testing like any
  * other interface — including what it prints.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { findByUsername } from '../src/repos/users.js';
 import { isLocked } from '../src/domain/passwords.js';
+import { createFileStore } from '../src/files/store.js';
 import { run } from '../src/cli/users.js';
 import { makeSignedApp, PASSWORD, signInAnother } from './helpers.js';
 
 const OWNER = 'wincyj'; // the account migration 002 creates for pre-existing data
 
-/** Run a command and hand back what it printed. */
+/** Run a command and hand back what it printed. A trailing object is its options. */
 function cli(db, ...args) {
+  const options = typeof args.at(-1) === 'object' && args.at(-1) !== null ? args.pop() : {};
   const lines = [];
   const spy = vi.spyOn(console, 'log').mockImplementation((...args) => lines.push(args.join(' ')));
   const err = vi.spyOn(console, 'error').mockImplementation((...args) => lines.push(args.join(' ')));
-  run(db, args);
+  run(db, args, options);
   spy.mockRestore();
   err.mockRestore();
   return lines.join('\n');
@@ -132,6 +136,40 @@ describe('users CLI', () => {
     expect(output).toContain('nie ma konta');
     expect(process.exitCode).toBe(1);
     process.exitCode = 0;
+  });
+
+  it('moves resources to the account that takes the data over', async () => {
+    const { db, api } = ctx;
+    const created = await api.post('/api/files/resources').send({ name: 'Dokumenty' });
+    const taker = await signInAnother(ctx, { username: 'ola' });
+
+    const output = cli(db, 'adopt', 'ala', 'ola');
+
+    expect(output).toContain('file_resources=1');
+    expect(db.prepare('SELECT owner_id FROM file_resources WHERE id = ?').get(created.body.id).owner_id).toBe(
+      taker.user.id,
+    );
+    // Now it is Ola's own — she sees it as the owner, not as a guest.
+    expect((await taker.api.get('/api/files/resources')).body.items[0]).toMatchObject({
+      name: 'Dokumenty',
+      role: 'owner',
+    });
+  });
+
+  it('removes the folders on disk together with the account', async () => {
+    const { db, api, filesDir } = ctx;
+    const created = await api.post('/api/files/resources').send({ name: 'Wrzutki' });
+    await api
+      .put(`/api/files/resources/${created.body.id}/files/${encodeURIComponent('a.txt')}`)
+      .type('text/plain')
+      .send(Buffer.from('a'));
+    const folder = path.join(filesDir, String(created.body.id));
+    expect(fs.existsSync(folder)).toBe(true);
+
+    const output = cli(db, 'remove', 'ala', { files: createFileStore(filesDir) });
+
+    expect(output).toContain('foldery=1');
+    expect(fs.existsSync(folder)).toBe(false);
   });
 
   it('gives an existing account a starter desktop', async () => {

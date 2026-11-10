@@ -4,11 +4,17 @@ import type { z } from 'zod';
 import type {
   DesktopItemSchema,
   DesktopItemsSchema,
+  FilePageSchema,
+  FileResourceSchema,
+  FileSchema,
   FavoritesSchema,
   NotePageSchema,
   NoteRevisionSchema,
   NotepadSessionSchema,
   NoteSchema,
+  ResourceDetailSchema,
+  ResourceMemberSchema,
+  ShareableUsersSchema,
   SortOrderSchema,
   StickyPageSchema,
   StickySchema,
@@ -31,3 +37,12 @@ export type Favorites = z.infer<typeof FavoritesSchema>;
 export type NotepadSession = z.infer<typeof NotepadSessionSchema>;
 export type SortOrder = z.infer<typeof SortOrderSchema>;
 export type AuthUser = z.infer<typeof UserSchema>;
+export type FileResource = z.infer<typeof FileResourceSchema>;
+export type FileEntry = z.infer<typeof FileSchema>;
+export type FilePage = z.infer<typeof FilePageSchema>;
+export type ResourceMember = z.infer<typeof ResourceMemberSchema>;
+export type ResourceDetail = z.infer<typeof ResourceDetailSchema>;
+export type ShareableUsers = z.infer<typeof ShareableUsersSchema>;
+
+/** 'owner' — theirs; 'edit' — may upload/rename/delete; 'read' — may only take. */
+export type ResourceRole = FileResource['role'];

@@ -2,12 +2,14 @@ import type { ComponentType } from 'react';
 import { appById } from '@note/shared/manifest';
 import {
   CalculatorIcon,
+  FilesIcon,
   FolderIcon,
   NotepadIcon,
   StickiesIcon,
   UnknownAppIcon,
 } from './icons';
 import { CalculatorApp } from '../apps/calculator/CalculatorApp';
+import { FilesApp } from '../apps/files/FilesApp';
 import { NotepadApp } from '../apps/notepad/NotepadApp';
 import { StickiesApp } from '../apps/stickies/StickiesApp';
 import { FolderView } from './FolderView';
@@ -31,6 +33,7 @@ export interface AppProps {
 
 const APP_VIEWS: Record<string, ComponentType<AppProps>> = {
   calculator: CalculatorApp,
+  files: FilesApp,
   notepad: NotepadApp,
   stickies: StickiesApp,
 };
@@ -61,6 +64,8 @@ export function AppGlyph({ appId, size = 48 }: { appId: string; size?: number })
       return <NotepadIcon size={size} />;
     case 'stickies':
       return <StickiesIcon size={size} />;
+    case 'files':
+      return <FilesIcon size={size} />;
     case 'folder':
       return <FolderIcon size={size} />;
     default:

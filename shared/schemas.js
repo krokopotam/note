@@ -13,8 +13,11 @@ import {
   FAVORITE_SLOTS,
   NOTE_BODY_MAX,
   NOTE_TITLE_MAX,
+  FILE_NAME_MAX,
+  FILE_PERMISSIONS,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  RESOURCE_NAME_MAX,
   SORT_ORDERS,
   STICKY_BODY_MAX,
   STICKY_COLORS,
@@ -212,6 +215,73 @@ export const ApiErrorSchema = z.object({
     message: z.string(),
     details: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
   }),
+});
+
+// --- pliki ------------------------------------------------------------------
+
+/** A resource ("zasób"): a named folder of files, owned by one account. */
+export const FileResourceSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  /** What the *requesting* user may do here: owner is 'edit' plus sharing rights. */
+  role: z.enum(['owner', 'edit', 'read']),
+  file_count: z.number().int(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const FileResourcePageSchema = z.object({ items: z.array(FileResourceSchema) });
+
+export const FileResourceCreateSchema = z.object({
+  name: z.string().trim().min(1).max(RESOURCE_NAME_MAX),
+});
+
+export const FileResourcePatchSchema = z.object({
+  name: z.string().trim().min(1).max(RESOURCE_NAME_MAX),
+});
+
+export const FileSchema = z.object({
+  id: z.number().int(),
+  resource_id: z.number().int(),
+  name: z.string(),
+  size: z.number().int(),
+  content_type: z.string(),
+  /** null when the account that uploaded it is gone — the file itself stays. */
+  created_by: z.number().int().nullable(),
+  created_by_name: z.string(),
+  created_at: z.string(),
+});
+
+export const FilePageSchema = z.object({ items: z.array(FileSchema) });
+
+/** Rename only — the bytes never change identity, only their label. */
+export const FilePatchSchema = z.object({
+  name: z.string().trim().min(1).max(FILE_NAME_MAX),
+});
+
+/**
+ * Sharing one resource with one account. `permission: null` takes it away again.
+ * The list of people who may be shared with comes from the users table.
+ */
+export const ResourceMemberPutSchema = z.object({
+  user_id: z.number().int(),
+  permission: z.enum(FILE_PERMISSIONS).nullable(),
+});
+
+export const ResourceMemberSchema = z.object({
+  user_id: z.number().int(),
+  username: z.string(),
+  permission: z.enum(FILE_PERMISSIONS),
+});
+
+export const ResourceDetailSchema = z.object({
+  resource: FileResourceSchema,
+  members: z.array(ResourceMemberSchema),
+});
+
+/** Who can be picked in the sharing dialog (usernames only, no hashes). */
+export const ShareableUsersSchema = z.object({
+  items: z.array(z.object({ id: z.number().int(), username: z.string() })),
 });
 
 /**

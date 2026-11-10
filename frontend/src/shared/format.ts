@@ -10,6 +10,25 @@ export function formatStamp(iso: string): string {
   return `${DAY.format(date)} ${TIME.format(date)}`;
 }
 
+const UNITS = ['B', 'kB', 'MB', 'GB', 'TB'];
+
+/**
+ * Byte count the way a Polish file manager writes it: `3 B`, `12,4 kB`, `1,8 GB`.
+ * A raw number next to a uploaded file makes people guess; this does not.
+ */
+export function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  if (unit === 0) return `${Math.round(value)} B`;
+  const text = value >= 100 ? Math.round(value).toString() : value.toFixed(1).replace(/\.0$/, '');
+  return `${text.replace('.', ',')} ${UNITS[unit]}`;
+}
+
 /** First line of a body, used as a preview under a note title. */
 export function preview(body: string, max = 60): string {
   const line = body
