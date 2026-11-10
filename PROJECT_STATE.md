@@ -62,23 +62,34 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - **Bilard: jedna fizyka, dwa rysunki.** `games/billiards/billiards.ts` liczy zderzenia, tarcie,
   łuzy i przymiar; 2D rysuje to w SVG, 3D w three.js. Step dzieli się na podpikroki (kula nie
   przelatuje przez kulę), krok czasu podaje widok, więc test idzie na stopklatce.
-- **Sterowanie to wybór gracza, nie widełki kodu** (`games/billiards/controls.ts`). Celowanie:
-  **kij** (palec wskazuje kierunek) albo **stół** (przeciągnięcie w bok obraca świat, a uderzenie
-  zawsze idzie od gracza). Uderzenie: **pociągnięcie** wzdłuż kija albo dopiero **guzik „Uderz”**.
-  Pasek przełączników rysem wspólny (`ControlStrip.tsx`), więc 2D i 3D mówią tymi samymi słowami.
-  Siła liczona w pikselach ekranu (`dragEffect`) — ten sam gest znaczy tyle samo na telefonie i na
-  monitorze; 200 px to pełna siła, 12 px to drgnienie ręki. Wybór mieszka w `localStorage` pod
-  jednym kluczem dla obu bilardów: gierki nie mają swoich tabel ani endpointów, a przeżycie po
-  odświeżeniu strony to cała ich pamięć.
-- **Obracany stół obraca kadr, nie tylko rysunek.** 2D obraca grupę wokół środka stołu i odwraca
-  `viewBox` na pionowy, a `fitScale()` dobiera skalę, żeby żaden kadr nie wyciął połowy bili.
-  Na telefonie trzymanym pionowo to nagroda: długa krawędź stołu staje się długą krawędzią ekranu.
-  3D obraca `orbit` (kąt w jednostkach stołu), a kamera `za kulą` patrzy kawałek w stronę środka
-  sukna, więc rack zostaje w kadrze. `top` i `side` obrotu nie słuchają.
+- **Trzy widełki sterowania, każdy osobno** (`games/billiards/controls.ts`, rysem `ControlStrip.tsx`
+  wspólny dla 2D i 3D):
+  - **Celowanie**: `Kij` albo `Stół`. Oba czytają ten sam `dragEffect` — w bok kręci, do gracza
+    nabiera siły — różnią się tym, co wolno pójść za palcem: przy kiju tylko kij (kamera trzyma
+    słowo), przy stole cały świat, więc uderzenie zawsze od gracza.
+  - **Uderzenie**: `Pociągnięcie` (puszczenie odpala) albo `Guzik` (uderza tylko „Uderz").
+  - **Widok**: `Auto` (kamera pilnuje stołu), `Swobodny` (ekran należy do palca, **celowanie śpi**:
+    znikają kij i przymiar, „Uderz" jest zablokowany) i `Własny` — kadr zamrożony tam, gdzie gracz
+    go zostawił, a kij celuje w środku niego.
+  Siła w pikselach ekranu: 12 px to drgnienie ręki, 200 px pełna — ten sam gest na telefonie i na
+  monitorze. Celowanie i uderzenie mieszkają w `localStorage` pod jednym kluczem obu bilardów;
+  **widoku nie zapisujemy**: to kadr na jedną chwilę, a start gry z wyłączonym celowaniem byłby głupi.
+- **Tapnięcie w celowanie nie wyrzuca ustawionego kadru** (`afterAimTap`): `Swobodny` → `Własny`,
+  kamera staje w miejscu, kij wraca. `auto` zostaje `auto`. `aimingActive(camera)` odcina kij,
+  przymiar i `fire()`, dopóki gracz ustawia widok.
+- **Kadr 2D liczy się z obrotu, nie z góry założonej ramki** (`turnedBox`): `viewBox` to naprawdę
+  pudełko, którego stół potrzebuje po obrocie, więc wypełnia okno pod każdym kątem (na telefonie
+  pionowym długa krawędź stołu staje się długą krawędzią ekranu), a palec wraca na stół przez
+  `screenToTable` (odkręć, pomniejsz, przesuń). Bez tego centrującego `translate` stół stoi poza
+  własnym kadrem — i tak stał, dopóki nikt nie zajrzał w zrzut z telefonu.
+- **Kamera 3D ma trzy źródła** (`cameraFor(mode, cue, pose)`): `pose` od gracza (yaw, pochylenie,
+  dystans — trzyma kadr w miejscu), `pose` z samego yaw, gdy gracz obraca stół, albo nic, czyli
+  automat `za kulą`. Presety `Z góry`/`Z boku` nie dają się przestawiać. Spojrzenie zawsze lekko
+  przechyla się ku środkowi sukna, inaczej rack wypada z kadru.
 - **three.js jest leniwe** (`registry.tsx`): `lazy` + `Suspense`, osobny chunk ~137 kB gzip.
   Kamera 3D (`camera.ts`, czyste funkcje) nie zależy od kierunku celowania — obracała stołem w
-  pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`. Słucha za to `orbit`, ale tylko
-  tego, które gracz sam przeciągnął: kursor kamery nie rusza.
+  pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`. Rusza ją tylko to, co gracz
+  przeciągnął sam: kursor kamery nie rusza.
 - **Plansze z DOM i SVG, bez canvasu** — to samo, co widzi test (jsdom nie ma `getContext`), i skalują
   się razem z oknem (`grid-template-columns`, `viewBox`) zamiast przewijać.
 - **Wysokość okna jest w ramie** (`WindowFrame` → `height: win.height`). Wszystkie aplikacje są napisane
@@ -252,7 +263,9 @@ Do tego `proxy_request_buffering off`, żeby wolne wrzucanie nie leżało bufore
 
 - Wybrane sterowanie bilarda pamięta **przeglądarka**, nie konto: na innym telefonie trzeba je
   ustawić ponownie. Świadomie — gierki nie mają własnych tabel, a jedna wartość w bazie za pasek
-  przełączników to cena, której nikt nie poprosił.
+  przełączników to cena, której nikt nie poprosił. Ustawionego kadru nie pamiętamy wcale.
+- Swobodna kamera nie ma gestu dwoma palcami ani kółka myszy: obraca ją przeciągnięcie, a dystans daje
+  suwak. Dwa palce w jednym `PointerEvent`-owym szkielecie to osobna robota.
 
 - Kolejność aplikacji w doku i launcherze zapisuje baza, ale nie ma jeszcze interfejsu do przeciągania
   po samych paskach.

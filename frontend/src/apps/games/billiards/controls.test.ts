@@ -1,13 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AIM_MODES,
+  ZOOM,
+  DEFAULT_CAMERA,
   DEFAULT_CONTROLS,
+  aimingActive,
+  afterAimTap,
+  clamp,
+  DISTANCE,
   dragEffect,
-  fitScale,
   formatControls,
   loadControls,
   parseControls,
   saveControls,
   strikesOnRelease,
+  TILT,
+  screenToTable,
+  turnedBox,
+  viewDrag,
   viewRotation,
 } from './controls';
 
@@ -62,35 +72,84 @@ describe('ustawienia sterowania', () => {
   });
 });
 
-describe('pociągnięcie', () => {
-  it('wzdłuż kija ładuje siłę od zera do jedynki', () => {
-    const start = { x: 100, y: 100 };
+describe('pociągnięcie palca', () => {
+  const start = { x: 200, y: 100 };
 
-    expect(dragEffect(start, { x: 105, y: 100 }, 'cue').power).toBe(0); // drgnienie ręki
-    expect(dragEffect(start, { x: 112, y: 100 }, 'cue').power).toBeCloseTo(0, 6);
-    expect(dragEffect(start, { x: 212, y: 100 }, 'cue').power).toBeCloseTo(0.5, 2);
-    expect(dragEffect(start, { x: 100 + 300, y: 100 }, 'cue').power).toBe(1);
-  });
-
-  it('przy obrocie stołem w bok kręci, a w dół ładuje', () => {
-    const start = { x: 200, y: 100 };
-
-    const turn = dragEffect(start, { x: 250, y: 100 }, 'table');
-    expect(turn.aimDelta).toBeGreaterThan(0);
+  it('w bok kręci, w dół nabiera siły', () => {
+    const turn = dragEffect(start, { x: 250, y: 100 });
+    expect(turn.spin).toBeGreaterThan(0);
     expect(turn.power).toBe(0);
 
-    const pull = dragEffect(start, { x: 200, y: 212 }, 'table');
-    expect(pull.aimDelta).toBe(0);
+    const pull = dragEffect(start, { x: 200, y: 212 });
+    expect(pull.spin).toBe(0);
     expect(pull.power).toBeCloseTo(0.5, 2);
 
-    // Cofnięcie kuli nie daje ujemnej siły.
-    expect(dragEffect(start, { x: 200, y: 20 }, 'table').power).toBe(0);
+    // Ukośnie: jedno i drugie naraz, więc kij słucha palca płynnie.
+    const diagonal = dragEffect(start, { x: 250, y: 312 });
+    expect(diagonal.spin).toBeGreaterThan(0);
+    expect(diagonal.power).toBe(1);
   });
 
-  it('obrót w drugą stronę jest w drugą stronę', () => {
-    const start = { x: 200, y: 100 };
+  it('drgnięcie ręki nie jest naciągnięciem kija', () => {
+    expect(dragEffect(start, { x: 204, y: 104 }).power).toBe(0);
+    expect(dragEffect(start, { x: 200, y: 312 }).power).toBe(1);
+  });
 
-    expect(dragEffect(start, { x: 150, y: 100 }, 'table').aimDelta).toBeLessThan(0);
+  it('pchnięcie od gracza nie daje ujemnej siły', () => {
+    expect(dragEffect(start, { x: 200, y: 20 }).power).toBe(0);
+  });
+
+  it('kręci w obie strony', () => {
+    expect(dragEffect(start, { x: 250, y: 100 }).spin).toBeGreaterThan(0);
+    expect(dragEffect(start, { x: 150, y: 100 }).spin).toBeLessThan(0);
+  });
+});
+
+describe('ustawianie widoku', () => {
+  const start = { x: 300, y: 300 };
+
+  it('w bok obraca, w górę i w dół podnosi albo przybliża', () => {
+    const orbit = viewDrag(start, { x: 360, y: 300 });
+    expect(orbit.spin).toBeGreaterThan(0);
+    expect(orbit.lift).toBe(0);
+
+    expect(viewDrag(start, { x: 300, y: 250 }).lift).toBeLessThan(0);
+    expect(viewDrag(start, { x: 300, y: 350 }).lift).toBeGreaterThan(0);
+  });
+
+  it('celowanie prze przejmuje kadr, nie wyrzuca go', () => {
+    // Po ustawieniu widoku tapnięcie w celowanie zamraża kamerę (»,własny«).
+    expect(afterAimTap('free')).toBe('placed');
+    // Auto i własny zostają tym, czym były.
+    expect(afterAimTap('auto')).toBe('auto');
+    expect(afterAimTap('placed')).toBe('placed');
+    expect(DEFAULT_CAMERA).toBe('auto');
+  });
+
+  it('przy swobodnym widoku kij śpi', () => {
+    expect(aimingActive('free')).toBe(false);
+    expect(aimingActive('placed')).toBe(true);
+    expect(aimingActive('auto')).toBe(true);
+  });
+
+  it('granice kamery trzymają się kupy', () => {
+    expect(clamp(0, TILT.min, TILT.max)).toBe(TILT.min);
+    expect(clamp(99, TILT.min, TILT.max)).toBe(TILT.max);
+    expect(clamp(0.5, TILT.min, TILT.max)).toBe(0.5);
+    // Baza mieści się w zakresie — inaczej pierwszy kadr byłby ścianą.
+    expect(TILT.base).toBeGreaterThan(TILT.min);
+    expect(TILT.base).toBeLessThan(TILT.max);
+    expect(DISTANCE.base).toBeGreaterThan(DISTANCE.min);
+    expect(DISTANCE.base).toBeLessThan(DISTANCE.max);
+  });
+
+  it('tryby mają polskie podpiski', () => {
+    expect(AIM_MODES.map((mode) => mode.label)).toEqual(['Kij', 'Stół']);
+  });
+
+  it('zoom trzyma się widełek', () => {
+    expect(clamp(9, ZOOM.min, ZOOM.max)).toBe(ZOOM.max);
+    expect(clamp(0.01, ZOOM.min, ZOOM.max)).toBe(ZOOM.min);
   });
 });
 
@@ -105,24 +164,60 @@ describe('uderzenie', () => {
     expect(viewRotation(0)).toBeCloseTo(-90, 6);
     expect(viewRotation(Math.PI / 2)).toBeCloseTo(-180, 6);
   });
+});
 
-  it('obrócony stół kurczy się tak, żeby cały został w kadrze', () => {
-    // Prosto: bez zmiany rozmiaru.
-    expect(fitScale(0, 238, 128)).toBeCloseTo(1, 6);
-    expect(fitScale(360, 238, 128)).toBeCloseTo(1, 6);
-    // O obrót: długa krawędź staje się pionowa, więc mieści się niższa.
-    expect(fitScale(-90, 238, 128)).toBeCloseTo(128 / 238, 6);
-    // Ukośnie: mieszczący Skalnik musi być mniejszy niż przy prostym.
-    expect(fitScale(45, 238, 128)).toBeLessThan(1);
-    // Odbicie w dół i obrót o pół obrotu to to samo.
-    expect(fitScale(90, 238, 128)).toBeCloseTo(fitScale(-90, 238, 128), 6);
+describe('kadr 2D', () => {
+  it('pudełko rośnie razem z obrotem stołu', () => {
+    const straight = turnedBox(238, 128, 0);
+    expect(straight.width).toBeCloseTo(238 * 1.04, 6);
+    expect(straight.height).toBeCloseTo(128 * 1.04, 6);
+
+    // O obrót: box jest wysoki, więc telefon w pionie dostaje cały stół.
+    const turned = turnedBox(238, 128, -90);
+    expect(turned.width).toBeCloseTo(straight.height, 6);
+    expect(turned.height).toBeCloseTo(straight.width, 6);
+    // Pudełko jest zawsze wyśrodkowane na origem.
+    expect(straight.x).toBeCloseTo(-straight.width / 2, 6);
+    expect(straight.y).toBeCloseTo(-straight.height / 2, 6);
   });
 
-  it('obrócony stół w pionowym kadrze mieści się bez kurczenia', () => {
-    // Kadr odwrócony razem ze stołem: 146 × 238 dla stołu 238 × 128.
-    expect(fitScale(-90, 238, 128, 146, 238)).toBeCloseTo(1, 6);
-    expect(fitScale(90, 238, 128, 146, 238)).toBeCloseTo(1, 6);
-    // Ukośnie dalej trzeba przymknąć.
-    expect(fitScale(45, 238, 128, 146, 238)).toBeLessThan(0.6);
-});
+  it('palec wraca na stół bez obrotu i zoomu', () => {
+    const box = turnedBox(200, 100, 0, 1);
+    const screen = { left: 0, top: 0, width: 400, height: 200 };
+    const centre = { x: 110, y: 55 };
+
+    // Środek ekranu to środek stołu.
+    expect(screenToTable({ x: 200, y: 100 }, screen, { box, angle: 0, zoom: 1, centre })).toEqual(centre);
+    // Prawa krawędź ekranu: +100 w jednostkach stołu od środka.
+    expect(screenToTable({ x: 400, y: 100 }, screen, { box, angle: 0, zoom: 1, centre })).toEqual({
+      x: 210,
+      y: 55,
+    });
+  });
+
+  it('obrócony i przybliżony kadr nie myli palca', () => {
+    const box = turnedBox(200, 100, 90, 1);
+    const screen = { left: 0, top: 0, width: 200, height: 400 };
+    const centre = { x: 100, y: 50 };
+
+    // Kadr obrócony o +90 stopni: to, co na stole w prawo, ląduje na ekranie w dół.
+    // Żeby więc palec po prawej znów trafił w to samo, musi wskoczyć nad środek.
+    const right = screenToTable({ x: 150, y: 200 }, screen, { box, angle: 90, zoom: 1, centre });
+    expect(right.x).toBeCloseTo(centre.x, 6);
+    expect(right.y).toBeLessThan(centre.y);
+    expect(centre.y - right.y).toBeCloseTo(25, 6);
+
+    // Dwukrotny zoom: ten sam palec znaczy połowę drogi od środka stołu.
+    const near = screenToTable({ x: 150, y: 200 }, screen, { box, angle: 90, zoom: 2, centre });
+    expect(centre.y - near.y).toBeCloseTo((centre.y - right.y) / 2, 6);
+  });
+
+  it('ekran bez rozmiaru nie dzieli przez zero', () => {
+    const box = turnedBox(200, 100, 0, 1);
+    const centre = { x: 10, y: 20 };
+
+    expect(
+      screenToTable({ x: 5, y: 5 }, { left: 0, top: 0, width: 0, height: 0 }, { box, angle: 0, zoom: 1, centre }),
+    ).toEqual(centre);
+  });
 });

@@ -52,27 +52,13 @@
   color: #ffb4b4;
 }
 
-.modes {
+/* Grupa etykieta + suwak (dystans kamery). */
+.group {
   display: inline-flex;
-  gap: 4px;
-}
-
-.mode {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #c9d6ea;
-  font: inherit;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
-  cursor: pointer;
-}
-
-.modeOn {
-  border-color: rgba(120, 170, 255, 0.7);
-  background: rgba(47, 111, 237, 0.35);
-  color: #f2f7ff;
+  color: #9fb0cc;
 }
 
 .powerLabel {
@@ -123,5 +109,12 @@
   .pop,
   .score {
     animation-duration: 1ms;
+  }
+}
+
+/* Na telefonie liczy się każdy centymetr ekranu: podpowiedź jest już w pasku. */
+@media (max-width: 760px) {
+  .tip {
+    display: none;
   }
 }

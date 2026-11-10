@@ -18,10 +18,22 @@ import {
 } from '../billiards/billiards';
 import type { Point, World } from '../billiards/billiards';
 import { BALL_LIFT, CAMERA_MODES, SCALE, cameraFor, tableToScene } from './camera';
-import type { CameraMode } from './camera';
+import type { CameraMode, FreePose } from './camera';
 import { ControlStrip } from '../billiards/ControlStrip';
-import { DEFAULT_CONTROLS, dragEffect, loadControls, saveControls, strikesOnRelease } from '../billiards/controls';
-import type { Controls } from '../billiards/controls';
+import {
+  afterAimTap,
+  aimingActive,
+  clamp,
+  DEFAULT_CONTROLS,
+  DISTANCE,
+  dragEffect,
+  loadControls,
+  saveControls,
+  strikesOnRelease,
+  TILT,
+  viewDrag,
+} from '../billiards/controls';
+import type { AimMode, CameraWanted, Controls } from '../billiards/controls';
 import styles from './Billiards3dApp.module.css';
 
 /** What the HUD shows; the scene reports it when a shot finishes. */
@@ -41,6 +53,8 @@ interface Engine {
   reset: () => void;
   setMode: (mode: CameraMode) => void;
   setControls: (controls: Controls) => void;
+  setCamera: (camera: CameraWanted) => void;
+  setDistance: (distance: number) => void;
   dispose: () => void;
 }
 
@@ -276,10 +290,17 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
   let aim = 0;
   let mode: CameraMode = 'behind';
   let controls: Controls = DEFAULT_CONTROLS;
-  // Direction the player turned the table to; only „za kulą” follows it.
-  let orbit = Math.PI / 2;
-  let orbitAtGrab = orbit;
+  // Where the camera stands and who decides that. `auto` trusts the presets,
+  // `free` hands the screen to the finger (and puts the cue to sleep), `placed`
+  // keeps the frame the player set and lets the cue aim inside it.
+  let cameraWanted: CameraWanted = 'auto';
+  let yaw = Math.PI / 2;
+  let tilt = TILT.base;
+  let distance = DISTANCE.base;
+  let viewGrabbed: { x: number; y: number } | null = null;
+  let frameAtGrab = { yaw, tilt, distance };
   let grabbed: { x: number; y: number } | null = null;
+  let aimAtGrab = aim;
   let loaded = 0;
   let pull = 0; // how far the cue is pulled back, animated
   let striking = -1;
@@ -302,26 +323,52 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     line.computeLineDistances();
   };
 
+  /**
+   * The pose the eye gets, or `null` for the camera's own judgement.
+   *
+   * A frame the player placed wins and does not move on its own. With `auto` the
+   * only thing that turns the view is the player turning the table, and then it is
+   * the yaw that moves, never the tilt or the distance.
+   */
+  const wantedPose = (): FreePose | null => {
+    if (cameraWanted !== 'auto') return { yaw, tilt, distance };
+    if (controls.aim === 'table') return { yaw, tilt: TILT.base, distance: DISTANCE.base };
+    return null;
+  };
+
   /** Hits the white ball; both triggers (pull and button) come through here. */
   const fire = (strength: number) => {
+    if (!aimingActive(cameraWanted)) return;
     if (strength < MIN_POWER || !resting(world) || world.won || cueBall(world).potted) return;
     world = strike(world, aim, strength);
     striking = performance.now();
   };
 
   const onPointerMove = (event: PointerEvent) => {
+    const now = { x: event.clientX, y: event.clientY };
+    // Setting the view: the whole screen belongs to the camera, balls can roll.
+    if (viewGrabbed) {
+      const dragged = viewDrag(viewGrabbed, now);
+      yaw = frameAtGrab.yaw + dragged.spin;
+      tilt = clamp(frameAtGrab.tilt + dragged.lift, TILT.min, TILT.max);
+      return;
+    }
     if (!resting(world)) return;
     if (grabbed) {
-      const effect = dragEffect(grabbed, { x: event.clientX, y: event.clientY }, controls.aim);
+      const effect = dragEffect(grabbed, now);
       if (controls.aim === 'table') {
         // Turning the table: the world spins and the shot follows the eyes.
-        orbit = orbitAtGrab + effect.aimDelta;
-        aim = orbit;
+        yaw = frameAtGrab.yaw + effect.spin;
+        aim = yaw;
+      } else {
+        // The cue answers to the finger on its own: sideways swings it around
+        // the white ball, towards the player loads it. The camera keeps its word.
+        aim = aimAtGrab + effect.spin;
       }
       loaded = effect.power;
       return;
     }
-    if (controls.aim === 'table') return;
+    if (!aimingActive(cameraWanted) || controls.aim === 'table') return;
     const rect = renderer.domElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     raycaster.setFromCamera(
@@ -339,13 +386,23 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    if (!aimingActive(cameraWanted)) {
+      viewGrabbed = { x: event.clientX, y: event.clientY };
+      frameAtGrab = { yaw, tilt, distance };
+      return;
+    }
     if (!resting(world) || world.won || cueBall(world).potted) return;
     grabbed = { x: event.clientX, y: event.clientY };
-    orbitAtGrab = orbit;
+    aimAtGrab = aim;
+    frameAtGrab = { yaw, tilt, distance };
     loaded = 0;
   };
 
   const onPointerUp = () => {
+    if (viewGrabbed) {
+      viewGrabbed = null;
+      return;
+    }
     if (!grabbed) return;
     const strength = loaded;
     grabbed = null;
@@ -425,7 +482,8 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     // Cue stick: sits behind the white ball, pulls with the drag, snaps on strike.
     const cue = cueBall(world);
     const cueAt = tableToScene(cue);
-    const stillQueued = resting(world) && !cue.potted && !world.won;
+    const stillQueued =
+      aimingActive(cameraWanted) && resting(world) && !cue.potted && !world.won;
     const wantPull = striking < 0 ? (grabbed ? loaded * 0.55 : 0.03) : 0;
     pull += (wantPull - pull) * Math.min(1, dt * 12);
     let offset = BALL_LIFT * 1.3 + pull;
@@ -484,7 +542,11 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     }
 
     // Camera eases towards its pose so the view glides instead of jumping.
-    const pose = cameraFor(mode, cueAt, controls.aim === 'table' ? orbit : null);
+    const pose = cameraFor(
+      cameraWanted === 'auto' ? mode : 'free',
+      cueAt,
+      wantedPose(),
+    );
     camPos.set(pose.position.x, pose.position.y, pose.position.z);
     camTarget.set(pose.target.x, pose.target.y, pose.target.z);
     camera.up.set(pose.up.x, pose.up.y, pose.up.z);
@@ -518,7 +580,13 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
       // Switching to a turning table starts from wherever the cue already points,
       // so the shot being lined up stays lined up.
       controls = next;
-      if (next.aim === 'table') orbit = aim;
+      if (next.aim === 'table') yaw = aim;
+    },
+    setCamera: (next: CameraWanted) => {
+      cameraWanted = next;
+    },
+    setDistance: (next: number) => {
+      distance = clamp(next, DISTANCE.min, DISTANCE.max);
     },
     dispose: () => {
       cancelAnimationFrame(frame);
@@ -546,6 +614,8 @@ export function Billiards3dApp() {
   const [power, setPower] = useState(0.6);
   const [mode, setMode] = useState<CameraMode>('behind');
   const [controls, setControls] = useState<Controls>(() => loadControls());
+  const [camera, setCamera] = useState<CameraWanted>('auto');
+  const [distance, setDistance] = useState(Math.round(DISTANCE.base * 10));
 
   useEffect(() => {
     if (!host.current) return undefined;
@@ -576,6 +646,20 @@ export function Billiards3dApp() {
     saveControls(controls);
   }, [controls]);
 
+  useEffect(() => {
+    engine.current?.setCamera(camera);
+  }, [camera]);
+
+  useEffect(() => {
+    engine.current?.setDistance(distance / 10);
+  }, [distance]);
+
+  /** Tapping an aiming option wakes the cue up but keeps the frame it was set in. */
+  const chooseAim = (mode: AimMode) => {
+    setControls({ ...controls, aim: mode });
+    setCamera(afterAimTap);
+  };
+
   return (
     <div className={shell.shell} data-testid="billiard3d">
       <div className={shell.hud}>
@@ -597,19 +681,7 @@ export function Billiards3dApp() {
           Faule <strong>{hud.fouls}</strong>
         </span>
         <span className={shell.hudSpacer} />
-        <span className={styles.modes}>
-          {CAMERA_MODES.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={mode === option.id}
-              className={`${styles.mode} ${mode === option.id ? styles.modeOn : ''}`}
-              onClick={() => setMode(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </span>
+        {/* Presety kamery mieszkają teraz w pasku sterowania, przy „Widok”. */}
         <button type="button" className={shell.action} onClick={() => engine.current?.reset()}>
           Nowy bilard
         </button>
@@ -646,17 +718,48 @@ export function Billiards3dApp() {
             data-testid="billiard3d-power"
           />
         </span>
+        {camera !== 'auto' && (
+          <span className={styles.group}>
+            Dystans
+            <input
+              type="range"
+              min={Math.round(DISTANCE.min * 10)}
+              max={Math.round(DISTANCE.max * 10)}
+              value={distance}
+              onChange={(event) => setDistance(Number(event.target.value))}
+              aria-label="Dystans kamery"
+              className={styles.slider}
+              data-testid="billiard3d-distance"
+            />
+          </span>
+        )}
         <ControlStrip
           controls={controls}
           onChange={setControls}
+          onAim={chooseAim}
+          camera={camera}
+          onCamera={setCamera}
+          placedAvailable={camera !== 'auto'}
           onStrike={() => engine.current?.strike(power)}
+          // Przy swobodnym widoku presety nie mają sensu — kadr trzyma palec.
+          presets={
+            camera === 'free'
+              ? undefined
+              : CAMERA_MODES.map((option) => ({ id: option.id, label: option.label }))
+          }
+          preset={camera === 'auto' ? mode : null}
+          onPreset={(id) => {
+            setCamera('auto');
+            setMode(id as CameraMode);
+          }}
           testid="billiard3d"
         />
-        <span className={shell.hudSpacer} />
-        <span className={styles.tip}>
-          {controls.aim === 'table'
-            ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę.'
-            : 'Rusz myszą nad stołem, aby celować; przeciągnij wzdłuż kija, aby dobierać siłę.'}
+        <span className={shell.hudSpacer} />        <span className={styles.tip}>
+          {camera === 'free'
+            ? 'Przeciągnij w bok, aby obrócić kadr, i w górę albo w dół, aby go pochylić.'
+            : controls.aim === 'table'
+              ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę.'
+              : 'Rusz myszą nad stołem, aby celować; na telefonie przeciągnij w bok i w dół.'}
         </span>
       </div>
     </div>

@@ -21,6 +21,10 @@ const stubTableBox = (width = 660, height = 348) => {
   vi.spyOn(table(), 'getBoundingClientRect').mockReturnValue(box);
 };
 
+/** How much the frame is turned, read out of the group's transform. */
+const frameAngle = () =>
+  Number(/rotate\(([-\d.]+)\)/.exec(screen.getByTestId('billiard-view').getAttribute('transform') ?? '')?.[1] ?? 0);
+
 /** Table units to client pixels. */
 const px = (x: number, y: number) => ({
   clientX: ((x + 9) / (TABLE.width + 18)) * 660,
@@ -69,17 +73,17 @@ describe('bilard 2D na ekranie', () => {
     expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
   });
 
-  it('pociągnięcie wzdłuż kija ładuje go, a puszczenie uderza', () => {
+  it('pociągnięcie do siebie nabija kij, a puszczenie uderza', () => {
     vi.useFakeTimers();
     render(<Billiards2dApp />);
     stubTableBox();
     const node = table();
 
     fireEvent.pointerDown(node, { clientX: 200, clientY: 240 });
-    fireEvent.pointerMove(node, { clientX: 312, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 200, clientY: 352 });
     expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '50%' });
 
-    fireEvent.pointerUp(node, { clientX: 312, clientY: 240 });
+    fireEvent.pointerUp(node, { clientX: 200, clientY: 352 });
 
     expect(screen.getByText(/Strzały/)).toHaveTextContent('1');
     // Kij znika, bo kula jest w ruchu.
@@ -98,11 +102,11 @@ describe('bilard 2D na ekranie', () => {
     fireEvent.click(screen.getByTestId('billiard2d-trigger-button'));
 
     fireEvent.pointerDown(node, { clientX: 200, clientY: 240 });
-    fireEvent.pointerMove(node, { clientX: 340, clientY: 240 });
-    fireEvent.pointerUp(node, { clientX: 340, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 200, clientY: 368 });
+    fireEvent.pointerUp(node, { clientX: 200, clientY: 368 });
 
     expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
-    expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '64%' });
+    expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '58%' });
 
     fireEvent.click(screen.getByTestId('billiard2d-strike'));
 
@@ -114,21 +118,28 @@ describe('bilard 2D na ekranie', () => {
     stubTableBox();
     const node = table();
 
-    expect(screen.getByTestId('billiard-view').getAttribute('transform')).toBeNull();
+    // Kadr prosto: zero skręta, stół wyśrodkowany.
+    expect(frameAngle()).toBe(0);
+    expect(screen.getByTestId('billiard-view').getAttribute('transform')).toContain('translate(');
 
     fireEvent.click(screen.getByTestId('billiard2d-aim-table'));
+    // Sam wybór „stół” kładzie uderzenie pionowo: kadr już jest skręcony.
+    const start = frameAngle();
+    expect(start).not.toBe(0);
+
     fireEvent.pointerDown(node, { clientX: 300, clientY: 240 });
     fireEvent.pointerMove(node, { clientX: 350, clientY: 240 });
     fireEvent.pointerUp(node, { clientX: 350, clientY: 240 });
 
-    const before = screen.getByTestId('billiard-view').getAttribute('transform') ?? '';
-    expect(before).toContain('rotate(');
+    const before = frameAngle();
+    expect(before).not.toBe(start);
 
     fireEvent.pointerDown(node, { clientX: 300, clientY: 240 });
     fireEvent.pointerMove(node, { clientX: 250, clientY: 240 });
     fireEvent.pointerUp(node, { clientX: 250, clientY: 240 });
 
-    expect(screen.getByTestId('billiard-view').getAttribute('transform')).not.toBe(before);
+    // Tak samo w drugą stronę: kadr wraca tam, skąd wystartował.
+    expect(frameAngle()).toBeCloseTo(start, 6);
   });
 
   it('wybrane sterowanie zostaje na następne wejście', () => {
@@ -141,7 +152,86 @@ describe('bilard 2D na ekranie', () => {
 
     expect(screen.getByTestId('billiard2d-aim-table')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('billiard2d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('billiard2d-hint')).toHaveTextContent('obrócić');
+    expect(screen.getByTestId('billiard2d-hint')).toHaveTextContent('uderza tylko');
+    // Widoku nie pamiętamy: to kadr na jedną chwilę, nie ustawienie gry.
+    expect(screen.getByTestId('billiard2d-camera-auto')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('kij słucha palca: w bok kręci się wokół kuli', () => {
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+    const guide = () => screen.getByTestId('aim-guide').getAttribute('points') ?? '';
+
+    fireEvent.pointerMove(node, { clientX: 300, clientY: 120 });
+    const before = guide();
+
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 200 });
+    fireEvent.pointerMove(node, { clientX: 380, clientY: 200 });
+    fireEvent.pointerUp(node, { clientX: 380, clientY: 200 });
+
+    expect(guide()).not.toBe(before);
+  });
+
+  it('swobodny widok oddaje ekran palcu i usypia celowanie', () => {
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+
+    fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
+
+    expect(screen.queryByTestId('cue-stick')).toBeNull();
+    expect(screen.queryByTestId('aim-guide')).toBeNull();
+    expect(screen.getByTestId('billiard2d-strike')).toBeDisabled();
+    expect(screen.getByTestId('billiard2d-hint')).toHaveTextContent('celowanie śpi');
+
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 300 });
+    fireEvent.pointerMove(node, { clientX: 420, clientY: 240 });
+    fireEvent.pointerUp(node, { clientX: 420, clientY: 240 });
+
+    const placed = screen.getByTestId('billiard-view').getAttribute('transform') ?? '';
+    expect(placed).toContain('rotate(');
+    expect(placed).toContain('scale(');
+    // Uderzenie? Żadne: palec ruszał kadr, nie kij.
+    expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
+  });
+
+  it('wybór celowania zostawia ustawiony kadr i oddaje kij', () => {
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+    fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 300 });
+    fireEvent.pointerMove(node, { clientX: 420, clientY: 260 });
+    fireEvent.pointerUp(node, { clientX: 420, clientY: 260 });
+
+    const placed = screen.getByTestId('billiard-view').getAttribute('transform') ?? '';
+
+    fireEvent.click(screen.getByTestId('billiard2d-aim-cue'));
+
+    // Kadr ten sam, co został po ustawianiu — kamera nie skoczyła na auto.
+    expect(screen.getByTestId('billiard-view').getAttribute('transform')).toBe(placed);
+    expect(screen.getByTestId('billiard2d-camera-placed')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard2d-strike')).toBeEnabled();
+    expect(screen.getByTestId('cue-stick')).toBeInTheDocument();
+  });
+
+  it('Auto oddaje kadr kamerze, Własny trzyma ustawiony', () => {
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+    fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 300 });
+    fireEvent.pointerMove(node, { clientX: 400, clientY: 300 });
+    fireEvent.pointerUp(node, { clientX: 400, clientY: 300 });
+    fireEvent.click(screen.getByTestId('billiard2d-aim-cue'));
+
+    fireEvent.click(screen.getByTestId('billiard2d-camera-auto'));
+
+    // Auto kasuje skręt i zoom, zostaje samo wyśrodkowanie.
+    const auto = screen.getByTestId('billiard-view').getAttribute('transform') ?? '';
+    expect(frameAngle()).toBe(0);
+    expect(auto).toContain('scale(1)');
   });
 
   it('klawiatura obraca kij, dobiera siłę i uderza', () => {

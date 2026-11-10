@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## 2026-11-10 — bilard: swobodny widok i kij, który słucha palca
+
+Telefon pokazał, co nie gra: palec na stole celuje tam, gdzie przykrywa je opuszka, a kamera
+robi co chce. Doszedł **Widok** jako trzecia, niezależna widełka sterowania.
+
+- **`Widok: Auto | Swobodny | Własny`** (`controls.ts`, `ControlStrip.tsx`). W `Swobodnym` ekran
+  należy do palca — obraca kadr i przybliża — a **celowanie śpi**: kij i przymiar znikają, „Uderz"
+  jest zablokowany (`aimingActive`). Tapnięcie w celowanie nie wyrzuca ustawionego kadru
+  (`afterAimTap`): kadr zostaje jako `Własny`, wraca tylko kij. W 3D presety `Za kulą / Z góry /
+  Z boku` przeniosły się do tego samego paska i znikają na czas ustawiania widoku.
+- **Kij rusza się płynnie** (`dragEffect`): od teraz oba tryby celowania czytają ten sam gest —
+  w bok kręci, do gracza nabiera siły — różni się tylko to, co idzie za palcem (kij albo cały
+  świat). Dawniej pociągnięcie zaginało wyłącznie siłę i liczyło ją od przebytej drogi, więc na
+  telefonie nie dało się naprowadzać kija.
+- **Kadr 2D liczony z obrotu** (`turnedBox`, `screenToTable`): `viewBox` to pudełko stołu po
+  obrocie, więc stół wypełnia okno pod każdym kątem (na telefonie pionowym — długą krawędzią
+  ekranu), a palec wraca na stół przez odwrotność przekształcenia. Naprawione po drodze: bez
+  centrującego `translate` prosto ustawiony stół stał **poza własnym kadrem** — widać to było
+  dopiero na zrzucie z telefonu, testy przeszły.
+- **Kamera 3D ma trzy źródła** (`cameraFor(mode, cue, pose)`): kadr gracza (yaw, pochylenie,
+  dystans — trzyma słowo), sam yaw, gdy gracz obraca stół, albo automat `za kulą`. Presety `z góry`
+  i `z boku` nie dają się przestawiać; `FreePose` jest w czystym `camera.ts`, więc da się policzyć
+  bez WebGL.
+- **Telefon**: `Siła` i `Dystans` w jednym rzędzie, podpowiedź 3D schowana (jest w pasku), guziki
+  40 px, „Uderz" na cały pas.
+- Testy: 666 (backend 184, frontend 482), lint czysty. Nowe: gest w bok/do siebie, budzenie
+  celowania, pudełko po obrocie, palec na stole przez obrócony i przybliżony kadr, pochylenie i
+  dystans kamery, presets znikające przy swobodnym widoku.
+
 ## 2026-11-10 — bilard: własne sterowanie (kij albo obracany stół)
 
 Do obu bilardów wszedł pasek przełączników: czym celujemy i co odpala uderzenie.

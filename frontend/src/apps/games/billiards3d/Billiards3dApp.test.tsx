@@ -58,13 +58,53 @@ describe('bilard 3D na ekranie', () => {
 
     fireEvent.click(screen.getByTestId('billiard3d-aim-table'));
     fireEvent.click(screen.getByTestId('billiard3d-trigger-button'));
-    expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('obrócić');
+    expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('uderza tylko');
     first.unmount();
 
     render(<Billiards3dApp />);
 
     expect(screen.getByTestId('billiard3d-aim-table')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('billiard3d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
+    // Widok to nie ustawienie gry: zaczyna się od automatu.
+    expect(screen.getByTestId('billiard3d-camera-auto')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('swobodna kamera przejmuje ekran i usypia celowanie', () => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+    render(<Billiards3dApp />);
+
+    fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
+
+    expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('celowanie śpi');
+    expect(screen.getByTestId('billiard3d-strike')).toBeDisabled();
+    expect(screen.getByTestId('billiard3d-distance')).toBeInTheDocument();
+    // Presety kamery znikają razem z celowaniem: kadr jest teraz własność palca.
+    expect(screen.queryByTestId('billiard3d-preset-top')).toBeNull();
+  });
+
+  it('celowanie bierze zamrożony kadr i budzi kij', () => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+    render(<Billiards3dApp />);
+    fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
+
+    fireEvent.click(screen.getByTestId('billiard3d-aim-cue'));
+
+    expect(screen.getByTestId('billiard3d-camera-placed')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard3d-strike')).toBeEnabled();
+    // Presety wracają i są czynne: można skoczyć z powrotem na auto.
+    expect(screen.getByTestId('billiard3d-preset-top')).toBeEnabled();
+  });
+
+  it('preset kamery wraca do automatu', () => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+    render(<Billiards3dApp />);
+    fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
+    fireEvent.click(screen.getByTestId('billiard3d-camera-auto'));
+    fireEvent.click(screen.getByTestId('billiard3d-preset-top'));
+
+    expect(screen.getByTestId('billiard3d-camera-auto')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard3d-preset-top')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('billiard3d-distance')).toBeNull();
   });
 
   it('uderzenie i nowy bilard bez sceny niczego nie rozbijają', () => {
