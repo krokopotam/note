@@ -1,9 +1,9 @@
 .launcher {
   position: absolute;
   left: 0;
-  top: 32px;
+  top: var(--topbar-h);
   bottom: 0;
-  width: 56px;
+  width: var(--launcher-w);
   padding: 8px 0;
   display: flex;
   flex-direction: column;

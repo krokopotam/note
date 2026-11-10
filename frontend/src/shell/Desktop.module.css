@@ -1,6 +1,11 @@
 .desktop {
   position: absolute;
-  inset: 0;
+  /* Nie inset: 0 — górny pasek i lewy launcher leżą NA pulpicie, a nie obok niego.
+     Ikony liczone są od tego rogu, więc nie da się ich upchać pod pasek. */
+  top: var(--topbar-h);
+  left: var(--launcher-w);
+  right: 0;
+  bottom: 0;
   padding: 8px;
   overflow: hidden;
 }

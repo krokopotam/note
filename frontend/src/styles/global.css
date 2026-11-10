@@ -1,3 +1,10 @@
+:root {
+  /* Pasek górny i launcher zabierają pas pulpitu: ikony nie mogą pod nie wchodzić,
+     więc ich kontener zaczyna się dopiero za nimi (patrz Desktop.module.css). */
+  --topbar-h: 32px;
+  --launcher-w: 56px;
+}
+
 *,
 *::before,
 *::after {
