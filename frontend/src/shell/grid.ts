@@ -8,6 +8,19 @@
 
 export const CELL = { width: 96, height: 104 } as const;
 
+/**
+ * The shell chrome that floats above the desktop. These numbers must match
+ * `--topbar-h`, `--launcher-w` and `--dock-band` in styles/global.css — the CSS
+ * lays the bars out, JS (window placement) needs the same sizes to keep clear of them.
+ */
+export const TOPBAR_HEIGHT = 32;
+export const LAUNCHER_WIDTH = 56;
+/** Band kept free at the bottom for the floating dock. */
+export const DOCK_BAND = 96;
+
+/** Where usable screen starts: nothing a user must reach belongs under the bars. */
+export const SAFE_AREA = { left: LAUNCHER_WIDTH, top: TOPBAR_HEIGHT } as const;
+
 export interface Cell {
   x: number;
   y: number;

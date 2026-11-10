@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 2026-11-10 — okna i ikony nie wchodzą pod paski
+
+- Zmaksymalizowane okno brało `0,0` i `100vw`, a pasek górny ma `z-index: 960` — przykrywał
+  własny pasek tytułu okna, więc nie było czym zminimalizować ani zamknąć. „Maksymalne"
+  znaczy teraz cały **użyteczny** ekran: `--launcher-w` z lewej, `--topbar-h` od góry,
+  `--dock-band` od dołu. Ramka w trybie maksymalnym nie wystawia własnej geometrii.
+- Ikony: kontener pulpitu zaczyna się za paskami, więc początek siatki to bezpieczny obszar,
+  a upuszczenie na pasek przycina się do pierwszej wolnej kolumny/wiersza.
+- Nowe okna otwierają się w bezpiecznym obszarze, a przeciąganie trzyma kawałek paska tytułu
+  na ekranie — okna nie da się już wyrzucić tak, żeby zniknęło.
+- Wymiary pasków: `--topbar-h`, `--launcher-w`, `--dock-band` w `styles/global.css`
+  i `SAFE_AREA` w `shell/grid.ts` (JS potrzebuje tych samych liczb).
+- Testy: frontend 171 → 174 (razem 275).
+
 ## 2026-11-10 — konta: każdy widzi tylko swoje
 
 - **Rejestracja jest otwarta**: login + hasło wpisane dwa razy; logowanie — hasło raz,

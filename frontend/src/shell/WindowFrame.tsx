@@ -24,8 +24,11 @@ export function WindowFrame({ win, focused }: { win: WindowState; focused: boole
   });
 
   const View = resolveView(win.appId);
-  const left = win.maximized ? 0 : win.x + (delta?.dx ?? 0);
-  const top = win.maximized ? 0 : win.y + (delta?.dy ?? 0);
+  // While maximized the frame carries no geometry at all: the stylesheet owns it,
+  // so the window fills the safe area instead of hiding under the shell bars.
+  const geometry = win.maximized
+    ? {}
+    : { left: win.x + (delta?.dx ?? 0), top: win.y + (delta?.dy ?? 0), width: win.width };
 
   if (win.minimized) return null;
 
@@ -33,7 +36,7 @@ export function WindowFrame({ win, focused }: { win: WindowState; focused: boole
     <section
       className={win.maximized ? `${styles.window} ${styles.maximized}` : styles.window}
       data-active={focused}
-      style={{ left, top, width: win.maximized ? undefined : win.width, zIndex: win.z }}
+      style={{ ...geometry, zIndex: win.z }}
       onPointerDown={() => focus(win.key)}
       data-testid={`window-${win.appId}`}
       aria-label={win.title}

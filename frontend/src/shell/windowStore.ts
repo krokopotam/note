@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { SAFE_AREA } from './grid';
 
 /**
  * Window manager state.
@@ -51,6 +52,27 @@ interface WindowStore {
 
 const CASCADE = 28;
 const MARGIN = 24;
+/** How much of the title bar must stay on screen, so a window is never lost. */
+const TITLE_GRIP = { width: 120, height: 48 } as const;
+
+/** Viewport size, tolerating a test run without a window object. */
+function viewport(): { width: number; height: number } {
+  return typeof window === 'undefined'
+    ? { width: 1280, height: 800 }
+    : { width: window.innerWidth, height: window.innerHeight };
+}
+
+/**
+ * Keep a window where the user can still grab it: below the top bar, right of the
+ * launcher, and with a piece of the title bar inside the screen.
+ */
+function clampPosition(x: number, y: number): { x: number; y: number } {
+  const { width, height } = viewport();
+  return {
+    x: Math.min(Math.max(x, SAFE_AREA.left), Math.max(SAFE_AREA.left, width - TITLE_GRIP.width)),
+    y: Math.min(Math.max(y, SAFE_AREA.top), Math.max(SAFE_AREA.top, height - TITLE_GRIP.height)),
+  };
+}
 
 /** Opening state, exported so tests can start from a clean desktop. */
 export const windowDefaults: Pick<WindowStore, 'windows' | 'focusedKey'> = {
@@ -79,6 +101,8 @@ export const useWindows = create<WindowStore>((set, get) => ({
 
     const offset = get().windows.length * CASCADE;
     const top = nextZ(get().windows);
+    // New windows land inside the safe area, never under the top bar or launcher.
+    const spot = clampPosition(SAFE_AREA.left + MARGIN + offset, SAFE_AREA.top + MARGIN + offset);
     set((state) => ({
       focusedKey: windowKey,
       windows: [
@@ -87,8 +111,8 @@ export const useWindows = create<WindowStore>((set, get) => ({
           key: windowKey,
           appId,
           title,
-          x: MARGIN + offset,
-          y: MARGIN + offset,
+          x: spot.x,
+          y: spot.y,
           width,
           height,
           z: top,
@@ -127,7 +151,7 @@ export const useWindows = create<WindowStore>((set, get) => ({
   move: (key, x, y) =>
     set((state) => ({
       windows: state.windows.map((win) =>
-        win.key === key ? { ...win, x: Math.max(0, x), y: Math.max(0, y) } : win,
+        win.key === key ? { ...win, ...clampPosition(x, y) } : win,
       ),
     })),
 

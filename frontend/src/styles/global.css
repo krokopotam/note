@@ -3,6 +3,7 @@
      więc ich kontener zaczyna się dopiero za nimi (patrz Desktop.module.css). */
   --topbar-h: 32px;
   --launcher-w: 56px;
+  --dock-band: 96px;
 }
 
 *,

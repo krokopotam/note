@@ -12,12 +12,19 @@
   overflow: hidden;
 }
 
+/*
+ * "Maksymalne" means the whole *usable* screen. Filling 100vw/100vh from (0,0)
+ * put the window under the top bar and the launcher — including its own title
+ * bar, so minimize and close were covered by the chrome they sat beneath.
+ */
 .maximized {
-  left: 0 !important;
-  top: 0 !important;
-  width: 100vw !important;
+  left: var(--launcher-w);
+  top: var(--topbar-h);
+  right: 0;
+  width: auto;
+  max-width: none;
+  height: calc(100vh - var(--topbar-h) - var(--dock-band));
   max-height: none;
-  height: calc(100vh - 96px);
   border-radius: 0;
 }
 

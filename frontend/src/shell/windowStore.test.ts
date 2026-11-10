@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SAFE_AREA } from './grid';
 import { openApp, openFolder } from './openApp';
 import { useWindows, windowDefaults } from './windowStore';
 import type { DesktopItem } from '../api/types';
@@ -88,11 +89,33 @@ describe('window store', () => {
     expect(useWindows.getState().focusedKey).toBeNull();
   });
 
-  it('keeps a window from being dragged into negative coordinates', () => {
+  it('opens inside the safe area, not under the top bar or the launcher', () => {
     openApp('calculator');
-    useWindows.getState().move('calculator', -40, -10);
 
-    expect(useWindows.getState().windows[0]).toMatchObject({ x: 0, y: 0 });
+    const win = useWindows.getState().windows[0];
+    expect(win.x).toBeGreaterThanOrEqual(SAFE_AREA.left);
+    expect(win.y).toBeGreaterThanOrEqual(SAFE_AREA.top);
+  });
+
+  it('will not let a window be thrown under the shell bars', () => {
+    openApp('calculator');
+
+    useWindows.getState().move('calculator', -400, -220);
+
+    expect(useWindows.getState().windows[0]).toMatchObject({
+      x: SAFE_AREA.left,
+      y: SAFE_AREA.top,
+    });
+  });
+
+  it('keeps a piece of the title bar on screen when dragged far out', () => {
+    openApp('calculator');
+
+    useWindows.getState().move('calculator', 90_000, 90_000);
+
+    const win = useWindows.getState().windows[0];
+    expect(win.x).toBeLessThan(window.innerWidth);
+    expect(win.y).toBeLessThan(window.innerHeight);
   });
 
   it('cascades new windows so they do not cover each other exactly', () => {

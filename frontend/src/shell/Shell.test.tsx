@@ -392,3 +392,26 @@ describe('signing in', () => {
     expect(screen.getByTestId('login-error')).toHaveTextContent('Nie udało się połączyć');
   });
 });
+
+describe('maximised windows', () => {
+  it('can still be minimised, and come back from the dock', async () => {
+    render(<Shell />);
+    await screen.findByTestId('icon-1');
+    await userEvent.click(screen.getByTestId('dock-calculator'));
+    const frame = await screen.findByTestId('window-calculator');
+
+    await userEvent.click(within(frame).getByRole('button', { name: 'Maksymalizuj' }));
+
+    // No geometry of its own while maximised: (0,0) + 100vw is exactly what used to
+    // slide the window under the top bar, covering its own title bar and buttons.
+    expect(frame.style.top).toBe('');
+    expect(frame.style.left).toBe('');
+    expect(frame.style.width).toBe('');
+
+    await userEvent.click(within(frame).getByRole('button', { name: 'Zminimalizuj' }));
+    expect(screen.queryByTestId('window-calculator')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('dock-calculator'));
+    expect(screen.getByTestId('window-calculator')).toBeInTheDocument();
+  });
+});
