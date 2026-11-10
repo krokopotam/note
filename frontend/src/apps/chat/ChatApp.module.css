@@ -398,6 +398,12 @@
   pointer-events: none;
 }
 
+.refused {
+  margin: 0;
+  font-size: 12px;
+  color: #ffb3ab;
+}
+
 .pending {
   display: flex;
   gap: 6px;

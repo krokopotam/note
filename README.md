@@ -124,8 +124,9 @@ dwie rzeczy: najpierw leci jako surowe bajty do rozmowy (`POST .../attachments`)
 wymienia jego identyfikator (`attachment_ids`) — dlatego **wiadomość może być samym zdjęciem**, a
 pasek boczny pokazuje wtedy „zdjęcie". Pliki należą do **rozmowy**, nie do osoby, więc zostają, kiedy
 konto wysyłającego zniknie; usunięcie wiadomości usuwa jej zdjęcia, a `prune` zamiata te wrzucone i
-nigdy niewysłane (po 24 h). Czat to nie dysk: tylko `.png`, `.jpg`, `.gif`, `.webp`, do 4 MB każde i
-do 4 na wiadomość. Kliknięcie zdjęcia powiększa je w tym samym oknie.
+nigdy niewysłane (po 24 h). Czat to nie dysk: tylko `.png`, `.jpg`, `.gif`, `.webp`, do
+`CHAT_ATTACHMENT_MAX_MB` (8) każde i do 4 na wiadomość — a pole pisania odrzuca za duży plik, zanim
+wogóle wyruszy z przeglądarki. Kliknięcie zdjęcia powiększa je w tym samym oknie.
 
 **Wiadomość można zmienić przez 5 minut od jej napisania** (`MESSAGE_EDIT_MINUTES`). Okno liczy się od
 chwili wysłania, więc poprawka w czwartej minucie nie dokłada kolejnych pięciu. Po upływie czasu

@@ -41,7 +41,8 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   Lista jest krótka i pogrupowana (buzie, gesty, serca, zwierzęta, jedzenie, świat) — picker, którego
   trzeba szukać, to picker, którego się nie otwiera.
 - **Zdjęcie idzie do rozmowy, nie do wiadomości.** Najpierw `POST /chat/conversations/:id/attachments`
-  (surowe bajty, limit 4 MB), potem `POST .../messages` z `attachment_ids`. Dzięki temu wiadomość może
+  (surowe bajty, limit `CHAT_ATTACHMENT_MAX_MB` = 8 MB), potem `POST .../messages` z `attachment_ids`.
+  Dzięki temu wiadomość może
   być **samym zdjęciem**, a upload, z którego nic nie wyszło, jest widoczny i zamiatany przez `prune`
   po 24 h. `message_attachments.conversation_id` + `ON DELETE CASCADE`: bajty przeżywają usunięcie
   konta, które je wrzuciło (`uploader_id SET NULL`), tak samo jak plik należy do zasobu, nie do osoby.
@@ -148,6 +149,16 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - Każde okno aplikacji ma jeden klucz (`appId`), foldery `folder:<id>` — stąd aplikacje są singletonami,
   a foldery można otworzyć wiele razy.
 
+## Na serwerze: pliki a nginx (pułapka na przyszłość)
+
+Każde miejsce, które przyjmuje ciało większe niż kilka kilobajtów, potrzebuje **własnego `location`
+z `client_max_body_size`**. Domyślna setka nginx to 1 MB i nie pyta aplikacji o zdanie: pierwszy
+telefonowy kadr wracał jako 413 ze strony HTML, a aplikacja nie widziała bajtów. Dlatego
+`deploy/nginx/note.wincyj.pl.conf` ma `location /api/files/` (105 m) i teraz też
+`location ~ ^/api/chat/conversations/[0-9]+/attachments$` (12 m przy limicie aplikacji 8 MB) —
+nginx jest zawsze hojniejszy o zapas, żeby to aplikacja odpowiadała 413 po polsku (`file_too_large`).
+Do tego `proxy_request_buffering off`, żeby wolne wrzucanie nie leżało buforem na dysku serwera.
+
 ## Znane ograniczenia / następne kroki
 
 - Kolejność aplikacji w doku i launcherze zapisuje baza, ale nie ma jeszcze interfejsu do przeciągania
@@ -161,7 +172,7 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - Usunięcie zasobu kasuje folder z dysku od razu; nie ma kosza ani odzyskiwania plików.
 - Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).
 - Zdjęcia w czacie nie mają miniatur w sensie rozmazywania (serwer oddaje oryginalne bajty) ani
-  limitu miejsca na rozmowę — liczy się tylko 4 MB na plik i 4 na wiadomość.
+  limitu miejsca na rozmowę — liczy się tylko limit na plik (8 MB) i 4 na wiadomość.
 - Grupy istnieją, ale nie ma z nich wyjścia (tylko autor może dopisywać, nikt się nie wypisuje) ani
   szukania w wiadomościach; powiadomienie to liczba na ikonie, nie komunikat systemowy. Znak znika do
   5 s po przeczytaniu, bo pulpit pyta własnym rytmem — okno czatu mu o tym nie mówi.

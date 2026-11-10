@@ -6,6 +6,7 @@ import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pickRowAction } from '../../test/rowMenu';
+import { CHAT_ATTACHMENT_MAX_MB } from '@note/shared/manifest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { chatApi } from './chatApi';
 import { ChatApp } from './ChatApp';
@@ -592,6 +593,35 @@ describe('zdjęcia', () => {
     });
 
     expect(screen.queryByTestId('pending-pictures')).not.toBeInTheDocument();
+  });
+
+  it('stops a picture that is too big before it leaves the browser', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    const huge = new File([new Uint8Array(CHAT_ATTACHMENT_MAX_MB * 1024 * 1024 + 1)], 'olbrzym.png', {
+      type: 'image/png',
+    });
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), { target: { files: [huge] } });
+
+    expect(await screen.findByRole('status')).toHaveTextContent('olbrzym.png');
+    expect(screen.queryByTestId('pending-pictures')).not.toBeInTheDocument();
+    expect(api.uploadAttachment).not.toHaveBeenCalled();
+  });
+
+  it('keeps what fits and says which file did not', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    const huge = new File([new Uint8Array(CHAT_ATTACHMENT_MAX_MB * 1024 * 1024 + 1)], 'olbrzym.png', {
+      type: 'image/png',
+    });
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+      target: { files: [huge, picture()] },
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent('olbrzym.png');
+    expect(within(screen.getByTestId('pending-pictures')).getByRole('img', { name: 'kot.png' })).toBeInTheDocument();
   });
 
   it('makes a picture bigger on a click and hides it again', async () => {

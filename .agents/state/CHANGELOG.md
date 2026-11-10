@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 2026-11-10 — 413 przy wrzucaniu png (naprawa na serwerze)
+
+Zgłoszone: wysłanie zdjęcia daje 413. W logach nic nie ma, bo **żądanie nie dochodziło do aplikacji** —
+`location /` w nginx nie ma `client_max_body_size`, więc obowiązuje domyślne 1 MB i nginx sam odrzucał
+każdy kadr z telefonu (odpowiedź HTML, nie JSON).
+
+- Dodane `location ~ ^/api/chat/conversations/[0-9]+/attachments$` z `client_max_body_size 12m`
+  (limit aplikacji to 8 MB, więc to aplikacja mówi „zdjęcie jest za duże" po polsku), `proxy_request_buffering off`
+  i własnym limitem prób; konfiguracja w repo `deploy/nginx/note.wincyj.pl.conf` = to, co na serwerze.
+  Sprawdzono: 1,5 MB → 201, 9 MB → 413 `file_too_large`, 13,6 MB → 413 od nginx (powyżej zapasu).
+- Interfejs nie wysyła już nic, co z góry wiadomo, że odpornione: `Composer` odrzuca plik powyżej
+  limitu i mówi który, dobre zdjęcia zostają w liście (+2 testy).
+- Poprawione w dokumentach: limit to 8 MB (`CHAT_ATTACHMENT_MAX_MB`), nie 4.
+
 ## 2026-11-10 — czat ma życie: emotikonki i zdjęcia
 
 - **Emotikonki** (`apps/chat/emoji.ts`, `EmojiPicker.tsx`): panel z sześcioma grupami, wstawia w
@@ -10,7 +24,7 @@
   `GET /api/chat/attachments/:id` tylko dla osób z rozmowy, `attachment_ids` przy zapisie wiadomości.
   Wiadomość może być samym zdjęciem; pasek boczny pokazuje wtedy „zdjęcie".
 - **Tylko obrazy**: `domain/media.js` (`.png/.jpg/.gif/.webp`, rozszerzenie i `Content-Type` muszą się
-  zgadzać) → 415 `not_an_image`; 4 MB na plik, 4 na wiadomość; pusty upload → 400, za duży → 413.
+  zgadzać) → 415 `not_an_image`; 8 MB na plik, 4 na wiadomość; pusty upload → 400, za duży → 413.
 - **Cykl życia**: zdjęcie należy do rozmowy (`ON DELETE CASCADE`, autor `SET NULL`), usunięcie
   wiadomości usuwa pliki z dysku, `prune` sprząta wrzucone-a-niewysłane po 24 h.
 - **Interfejs**: spinacz w polu pisania, miniatury przed wysłaniem (można zdjąć), miniatury w bańce,

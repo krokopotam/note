@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHAT_ATTACHMENTS_PER_MESSAGE, CHAT_POLL_MS, MESSAGE_EDIT_MINUTES, MESSAGE_MAX_LENGTH } from '@note/shared/manifest';
+import { CHAT_ATTACHMENT_MAX_MB, CHAT_ATTACHMENTS_PER_MESSAGE, CHAT_POLL_MS, MESSAGE_EDIT_MINUTES, MESSAGE_MAX_LENGTH } from '@note/shared/manifest';
 import { formatCountdown, formatStamp } from '../../shared/format';
 import { RowMenu } from '../../shared/RowMenu';
 import { attachmentUrl } from './chatApi';
@@ -488,6 +488,7 @@ function Composer({ conversation }: { conversation: Conversation }) {
   const sending = useChat((state) => state.sending);
   const [draft, setDraft] = useState('');
   const [pictures, setPictures] = useState<File[]>([]);
+  const [refused, setRefused] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -514,10 +515,25 @@ function Composer({ conversation }: { conversation: Conversation }) {
     });
   };
 
+  /**
+   * What the person picked, kept: pictures only, each within the limit, up to the
+   * number a message can carry. Too big is said out loud and stopped here — a 40 MB
+   * file has no business traveling to the server just to be refused.
+   */
   const addPictures = (files: FileList | null) => {
     if (!files) return;
-    const picked = [...files].filter((file) => file.type.startsWith('image/'));
-    setPictures((current) => [...current, ...picked].slice(0, CHAT_ATTACHMENTS_PER_MESSAGE));
+    const limit = CHAT_ATTACHMENT_MAX_MB * 1024 * 1024;
+    const images = [...files].filter((file) => file.type.startsWith('image/'));
+    const tooBig = images.filter((file) => file.size > limit);
+
+    setRefused(
+      tooBig.length > 0
+        ? `${tooBig.map((file) => file.name).join(', ')} — zdjęcie może mieć do ${CHAT_ATTACHMENT_MAX_MB} MB`
+        : null,
+    );
+    setPictures((current) =>
+      [...current, ...images.filter((file) => file.size <= limit)].slice(0, CHAT_ATTACHMENTS_PER_MESSAGE),
+    );
   };
 
   const submit = async () => {
@@ -533,6 +549,12 @@ function Composer({ conversation }: { conversation: Conversation }) {
   return (
     <div className={styles.writing}>
       {emojiOpen && <EmojiPicker onPick={putEmoji} onClose={() => setEmojiOpen(false)} />}
+
+      {refused && (
+        <p className={styles.refused} role="status">
+          {refused}
+        </p>
+      )}
 
       {pictures.length > 0 && (
         <ul className={styles.pending} data-testid="pending-pictures">
@@ -571,6 +593,7 @@ function Composer({ conversation }: { conversation: Conversation }) {
           type="button"
           className={styles.tool}
           aria-label="Dodaj zdjęcie"
+          title={`Zdjęcie do ${CHAT_ATTACHMENT_MAX_MB} MB, maksymalnie ${CHAT_ATTACHMENTS_PER_MESSAGE} na wiadomość`}
           onClick={() => fileInput.current?.click()}
         >
           <ClipIcon />
