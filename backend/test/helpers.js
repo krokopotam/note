@@ -21,11 +21,17 @@ export function makeDb() {
  * `seed` defaults to a no-op: most tests assert a resource in isolation and do not
  * want a starter desktop in the way. The registration seeding has its own test.
  */
-export function makeTestApp({ apps = APPS, seed = () => {}, throttle, maxUploadBytes } = {}) {
+export function makeTestApp({
+  apps = APPS,
+  seed = () => {},
+  throttle,
+  maxUploadBytes,
+  maxAttachmentBytes,
+} = {}) {
   const db = makeDb();
   // Uploads go to a throwaway folder, never into the repository's data/files.
   const filesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'note-files-'));
-  const app = createApp({ db, apps, seed, throttle, filesDir, maxUploadBytes });
+  const app = createApp({ db, apps, seed, throttle, filesDir, maxUploadBytes, maxAttachmentBytes });
   return { db, app, filesDir };
 }
 

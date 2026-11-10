@@ -1,6 +1,4 @@
-import { request } from '../../api/client';
-import { ApiError } from '../../api/client';
-import { reportStatus } from '../../api/client';
+import { request, uploadRaw } from '../../api/client';
 
 /**
  * File API: resources, files, sharing.
@@ -45,8 +43,9 @@ export function downloadUrl(fileId: number): string {
   return `/api/files/${fileId}`;
 }
 
+
 /**
- * Raw upload with progress.
+ * Raw upload with progress — the bytes travel as they are, the name rides in the URL.
  *
  * @param onProgress fraction 0..1, for the bar next to the file name
  */
@@ -55,41 +54,9 @@ export function uploadFile(
   file: File,
   onProgress?: (fraction: number) => void,
 ): Promise<FilePage['items'][number]> {
-  const url = `/api/files/resources/${resourceId}/files/${encodeURIComponent(file.name)}`;
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-
-    xhr.upload.onprogress = (event) => {
-      if (onProgress && event.lengthComputable) onProgress(event.loaded / event.total);
-    };
-    xhr.onerror = () => reject(new ApiError(0, 'network_error', 'nie udało się połączyć z serwerem'));
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText));
-        return;
-      }
-      reportStatus(xhr.status);
-      reject(httpError(xhr));
-    };
-
-    xhr.send(file);
-  });
-}
-
-/** nginx or a proxy can answer instead of the app, so the body may not be our shape. */
-function httpError(xhr: XMLHttpRequest): ApiError {
-  const fallback = new ApiError(xhr.status, 'unexpected_response', `serwer odpowiedział ${xhr.status}`);
-  let code: unknown;
-  let message: unknown;
-  try {
-    const body = JSON.parse(xhr.responseText) as { error?: { code?: unknown; message?: unknown } };
-    code = body.error?.code;
-    message = body.error?.message;
-  } catch {
-    return fallback;
-  }
-  if (typeof code !== 'string' || typeof message !== 'string') return fallback;
-  return new ApiError(xhr.status, code, message);
+  return uploadRaw<FilePage['items'][number]>(
+    `/files/resources/${resourceId}/files/${encodeURIComponent(file.name)}`,
+    file,
+    onProgress,
+  );
 }

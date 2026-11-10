@@ -9,6 +9,7 @@
  */
 import { Router } from 'express';
 import {
+  CHAT_ATTACHMENT_MAX_MB,
   MESSAGE_EDIT_MINUTES,
   ConversationCreateSchema,
   ConversationGroupCreateSchema,
@@ -18,6 +19,8 @@ import {
   parseOrThrow,
 } from '@note/shared';
 import { HttpError } from '../../domain/errors.js';
+import { imageMime } from '../../domain/media.js';
+import { createAttachment, getAttachment, storeFolder } from '../../repos/attachments.js';
 import {
   addToGroup,
   chatPeers,
@@ -25,6 +28,7 @@ import {
   deleteMessage,
   editMessage,
   getConversation,
+  isMemberOf,
   listConversations,
   listMessages,
   sendMessage,
@@ -37,6 +41,8 @@ const REFUSAL = {
   not_found: () => new HttpError(404, 'not_found', 'rozmowa nie istnieje'),
   conversation: () => new HttpError(404, 'not_found', 'rozmowa nie istnieje'),
   no_user: () => new HttpError(404, 'not_found', 'konto nie istnieje'),
+  attachment: () =>
+    new HttpError(400, 'invalid_attachment', 'zdjęcie nie należy do ciebie ani do tej rozmowy'),
   gone: () => new HttpError(410, 'message_gone', 'wiadomość została usunięta'),
   not_author: () => new HttpError(403, 'not_author', 'możesz zmieniać tylko własne wiadomości'),
   direct: () =>
@@ -50,8 +56,20 @@ const refusal = (result) => {
   throw (REFUSAL[result.error] ?? REFUSAL.not_found)();
 };
 
-/** @param {import('better-sqlite3').Database} db */
-export function chatRouter(db) {
+const tooLarge = () => new HttpError(413, 'file_too_large', 'zdjęcie jest za duże');
+
+/** Name worth showing under a picture — never a path, never a disk name. */
+function displayName(raw) {
+  const base = String(raw ?? '').split(/[\\/]+/).pop().trim();
+  return (base || 'zdjęcie').slice(0, 120);
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {{store?: ReturnType<typeof import('../../files/store.js').createFileStore>,
+ *   maxAttachmentBytes?: number}} options
+ */
+export function chatRouter(db, { store = null, maxAttachmentBytes = CHAT_ATTACHMENT_MAX_MB * 1024 * 1024 } = {}) {
   const router = Router();
 
   const idOf = (raw, label = 'id') => {
@@ -121,9 +139,103 @@ export function chatRouter(db) {
     res.json(page);
   });
 
+  /**
+   * A picture waiting to be sent: the bytes are piped straight to disk and the
+   * size is counted chunk by chunk, so an eight-megabyte photo costs disk and not
+   * RAM. Permission (membership) is decided before anything is written.
+   */
+  router.post('/conversations/:id/attachments', (req, res) => {
+    const conversationId = idOf(req.params.id, 'rozmowa');
+    if (!store) throw new HttpError(500, 'storage_missing', 'brak miejsca na pliki');
+    if (!isMemberOf(db, req.userId, conversationId)) throw REFUSAL.conversation();
+
+    const name = displayName(req.query.name);
+    const picture = imageMime(name, req.get('content-type'));
+    if (!picture) {
+      throw new HttpError(415, 'not_an_image', 'w czacie trzymamy tylko obrazki');
+    }
+
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > maxAttachmentBytes) throw tooLarge();
+
+    const folder = storeFolder(conversationId);
+    const reply = (status, code, message) => {
+      if (!res.headersSent) res.status(status).json({ error: { code, message } });
+    };
+
+    const target = store.createWrite(folder, name);
+    let received = 0;
+    let settled = false;
+
+    /** One answer per request, and never a half-written file left behind. */
+    const fail = (status, code, message) => {
+      if (settled) return;
+      settled = true;
+      store.remove(folder, target.storedName);
+      req.destroy();
+      reply(status, code, message);
+    };
+
+    req.on('data', (chunk) => {
+      received += chunk.length;
+      if (received > maxAttachmentBytes) fail(413, 'file_too_large', `zdjęcie może mieć do ${CHAT_ATTACHMENT_MAX_MB} MB`);
+    });
+    req.on('aborted', () => fail(400, 'upload_interrupted', 'wysyłanie przerwane'));
+    req.on('error', () => fail(400, 'upload_interrupted', 'wysyłanie przerwane'));
+    target.stream.on('error', () => fail(500, 'write_failed', 'nie udało się zapisać zdjęcia'));
+
+    target.stream.on('close', () => {
+      if (settled) return;
+      settled = true;
+
+      if (received === 0) {
+        store.remove(folder, target.storedName);
+        return reply(400, 'empty_upload', 'zdjęcie jest puste — nic nie przyszło');
+      }
+
+      const size = store.sizeOf(folder, target.storedName) ?? received;
+      const row = createAttachment(db, req.userId, conversationId, {
+        storedName: target.storedName,
+        fileName: name,
+        mime: picture.mime,
+        size,
+      });
+
+      res.status(201).json({
+        id: row.id,
+        file_name: row.file_name,
+        mime: row.mime,
+        size: row.size,
+        created_at: row.created_at,
+      });
+    });
+
+    req.pipe(target.stream);
+  });
+
+  /** A picture of a message — only for people inside that conversation. */
+  router.get('/attachments/:id', (req, res) => {
+    const row = getAttachment(db, req.userId, idOf(req.params.id, 'zdjęcie'));
+    if (!row) throw REFUSAL.not_found();
+
+    const stream = store.read(storeFolder(row.conversation_id), row.stored_name);
+    if (!stream) throw new HttpError(410, 'file_missing', 'zdjęcia nie ma już na dysku');
+
+    res.setHeader('Content-Type', row.mime);
+    res.setHeader('Content-Length', String(row.size));
+    // Inline, so an <img> shows it; the name is only what a "save as" would offer.
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(row.file_name)}`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
+  });
+
   router.post('/conversations/:id/messages', (req, res) => {
     const input = parseOrThrow(MessageCreateSchema, req.body, 'validation_error');
-    const result = sendMessage(db, req.userId, idOf(req.params.id, 'rozmowa'), input);
+    const result = sendMessage(db, req.userId, idOf(req.params.id, 'rozmowa'), {
+      body: input.body,
+      attachmentIds: input.attachment_ids,
+    });
     refusal(result);
     res.status(201).json(result.message);
   });
@@ -136,7 +248,12 @@ export function chatRouter(db) {
   });
 
   router.delete('/messages/:id', (req, res) => {
-    refusal(deleteMessage(db, req.userId, idOf(req.params.id, 'wiadomość')));
+    const result = deleteMessage(db, req.userId, idOf(req.params.id, 'wiadomość'));
+    refusal(result);
+    // The rows are gone; the bytes of its pictures go now too.
+    for (const file of result.files ?? []) {
+      store?.remove(storeFolder(file.conversation_id), file.stored_name);
+    }
     res.status(204).end();
   });
 

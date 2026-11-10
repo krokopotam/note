@@ -2,6 +2,7 @@
 // zod with them) never reach the browser bundle.
 import type { z } from 'zod';
 import type {
+  ChatAttachmentSchema,
   ChatPeerSchema,
   ConversationDetailSchema,
   ConversationListSchema,
@@ -56,5 +57,6 @@ export type Conversation = z.infer<typeof ConversationSchema>;
 export type ConversationDetail = z.infer<typeof ConversationDetailSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
 export type Unread = z.infer<typeof UnreadSchema>;
+export type ChatAttachment = z.infer<typeof ChatAttachmentSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type MessagePage = z.infer<typeof MessagePageSchema>;

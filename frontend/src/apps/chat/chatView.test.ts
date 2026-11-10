@@ -17,6 +17,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   editable_until: null,
   can_edit: false,
   deleted: false,
+  attachments: [],
   ...overrides,
 });
 

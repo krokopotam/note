@@ -46,7 +46,8 @@ interface ChatStore {
   openAddMember: () => Promise<void>;
   closeAddMember: () => void;
   addMember: (userId: number) => Promise<void>;
-  send: (body: string) => Promise<boolean>;
+  /** Words, pictures picked a moment ago, or both. */
+  send: (body: string, files?: File[]) => Promise<boolean>;
   edit: (id: number, body: string) => Promise<boolean>;
   remove: (id: number) => Promise<void>;
 }
@@ -196,14 +197,20 @@ export const useChat = create<ChatStore>((set, get) => ({
     }
   },
 
-  send: async (body) => {
+  send: async (body, files = []) => {
     const trimmed = body.trim();
     const activeId = get().activeId;
-    if (!trimmed || activeId === null) return false;
+    if ((!trimmed && files.length === 0) || activeId === null) return false;
 
     set({ sending: true, error: null });
     try {
-      const message = await chatApi.send(activeId, trimmed);
+      // Pictures first: the message names the uploads it carries.
+      const ids: number[] = [];
+      for (const file of files) {
+        const uploaded = await chatApi.uploadAttachment(activeId, file);
+        ids.push(uploaded.id);
+      }
+      const message = await chatApi.send(activeId, trimmed, ids);
       set({
         messages: merge(get().messages, [message]),
         sending: false,

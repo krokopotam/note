@@ -1,5 +1,6 @@
-import { request } from '../../api/client';
+import { request, uploadRaw } from '../../api/client';
 import type {
+  ChatAttachment,
   ChatPeer,
   Conversation,
   ConversationDetail,
@@ -41,9 +42,29 @@ export const chatApi = {
       `/chat/conversations/${conversationId}/messages${since ? `?since=${encodeURIComponent(since)}` : ''}`,
     ),
 
-  send: (conversationId: number, body: string) =>
-    request<Message>(`/chat/conversations/${conversationId}/messages`, { method: 'POST', body: { body } }),
+  send: (conversationId: number, body: string, attachmentIds: number[] = []) =>
+    request<Message>(`/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: { body, attachment_ids: attachmentIds },
+    }),
+
+  /**
+   * A picture goes to the conversation first, then the message that claims it.
+   * Two calls on purpose: the bytes are streamed, and a message that fails to
+   * send leaves nothing on the server but one upload waiting to be swept.
+   */
+  uploadAttachment: (conversationId: number, file: File, onProgress?: (fraction: number) => void) =>
+    uploadRaw<ChatAttachment>(
+      `/chat/conversations/${conversationId}/attachments?name=${encodeURIComponent(file.name)}`,
+      file,
+      onProgress,
+    ),
   edit: (messageId: number, body: string) =>
     request<Message>(`/chat/messages/${messageId}`, { method: 'PATCH', body: { body } }),
   remove: (messageId: number) => request<void>(`/chat/messages/${messageId}`, { method: 'DELETE' }),
 };
+
+/** Address a browser can put in an <img>: the backend streams the picture itself. */
+export function attachmentUrl(attachmentId: number): string {
+  return `/api/chat/attachments/${attachmentId}`;
+}

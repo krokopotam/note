@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 2026-11-10 — czat ma życie: emotikonki i zdjęcia
+
+- **Emotikonki** (`apps/chat/emoji.ts`, `EmojiPicker.tsx`): panel z sześcioma grupami, wstawia w
+  miejscu kursora i zostawia kursor za sobą; panel nie zamyka się po wyborze, bo nikt nie wysyła
+  jednego emoji. To zwykłe znaki w treści — zero zmian w bazie.
+- **Zdjęcia w wiadomościach**: migracja `009_chat_media.sql` (tabela `message_attachments`),
+  `POST /api/chat/conversations/:id/attachments` (surowe bajty → `data/files/chat/<rozmowa>/<uuid>`),
+  `GET /api/chat/attachments/:id` tylko dla osób z rozmowy, `attachment_ids` przy zapisie wiadomości.
+  Wiadomość może być samym zdjęciem; pasek boczny pokazuje wtedy „zdjęcie".
+- **Tylko obrazy**: `domain/media.js` (`.png/.jpg/.gif/.webp`, rozszerzenie i `Content-Type` muszą się
+  zgadzać) → 415 `not_an_image`; 4 MB na plik, 4 na wiadomość; pusty upload → 400, za duży → 413.
+- **Cykl życia**: zdjęcie należy do rozmowy (`ON DELETE CASCADE`, autor `SET NULL`), usunięcie
+  wiadomości usuwa pliki z dysku, `prune` sprząta wrzucone-a-niewysłane po 24 h.
+- **Interfejs**: spinacz w polu pisania, miniatury przed wysłaniem (można zdjąć), miniatury w bańce,
+  kliknięcie powiększa w oknie (lightbox, Escape zamyka). `uploadRaw` w `api/client.ts` — wspólny
+  surowy POST z progresem, z którego korzysta też aplikacja Pliki.
+- Testy: backend 173 (+16), frontend 303 (+20); `npm run lint` i build czyste.
+
 ## 2026-11-10 — czat: stan rozchodzi się, rozmowa ma kilkoro ludzi, ikona pokazuje ile czeka
 
 Trzy rzeczy naraz, bo były o siebie oparte:

@@ -2,7 +2,7 @@
 
 Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami, karteczki,
 pliki (drag & drop do zasobów, współdzielonych z innymi kontami) oraz czaty — rozmowy z innymi
-kontami, ze zmianą wiadomości przez 5 minut od jej napisania.
+kontami, ze zmianą wiadomości przez 5 minut, ze zdjęciami i emotikonkami.
 Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki, pliki i układ pulpitu.
 Backend Node + SQLite w pliku, jeden proces, jeden port.
 
@@ -14,7 +14,7 @@ przeglądarka
           backend (Express, 127.0.0.1:8120) │
               ├── /api/auth/* → sesja       │
               ├── /api/*      → repos → SQLite  data/note.db  (plik w folderze aplikacji)
-              ├── /api/chat/* → rozmowy i wiadomości (API ankiety, bez gniazd)
+              ├── /api/chat/* → rozmowy, wiadomości i zdjęcia (API ankiety, bez gniazd)
               ├── /api/files/*→ strumień na dysk  data/files/<zasób>/<uuid>
               └── /           → frontend/dist  ┘
 ```
@@ -51,7 +51,7 @@ Tryb deweloperski z przeładowaniem: `npm run dev` (backend 8120, Vite 5173 z pr
 ## Testy
 
 ```bash
-npm test                  # backend (145) + frontend (238)
+npm test                  # backend (173) + frontend (303)
 npm run lint              # tsc --noEmit dla frontendu
 ```
 
@@ -79,7 +79,9 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | GET | `/api/chat/conversations/:id` | rozmowa razem z listą członków |
 | POST | `/api/chat/conversations/:id/members` | `{ user_id }` — dopisanie osoby do grupy |
 | GET | `/api/chat/conversations/:id/messages?since=` | wiadomości (od najstarszej; `since` = wszystko, co zmieniło się od tamtej chwili: nowe, poprawione, usunięte) |
-| POST | `/api/chat/conversations/:id/messages` | `{ body }` — zapisanie wiadomości |
+| POST | `/api/chat/conversations/:id/attachments` | wrzucenie zdjęcia do rozmowy — ciało to surowe bajty, nazwa w `?name=` |
+| GET | `/api/chat/attachments/:id` | pobranie zdjęcia (tylko dla osób z rozmowy) |
+| POST | `/api/chat/conversations/:id/messages` | `{ body, attachment_ids? }` — zapisanie wiadomości (tekst, zdjęcia albo jedno i drugie) |
 | PATCH/DELETE | `/api/chat/messages/:id` | zmiana (tylko 5 minut) / usunięcie własnej wiadomości |
 | GET/POST | `/api/files/resources` | lista zasobów / nowy zasób |
 | GET/PATCH/DELETE | `/api/files/resources/:id` | zagląd (z listą osób), zmiana nazwy, usunięcie |
@@ -114,6 +116,16 @@ nowsze niż wiadomość 12": wraca więc to, że ktoś **poprawił** swoją wcze
 **Znak na ikonie czatu** liczy nieprzeczytane we wszystkich rozmowach (`GET /api/chat/unread`) i zapala
 się na ikonie w doku, na launcherze i na pulpicie, nawet przy zamkniętym oknie czatu — pulpit pyta co
 5 s, dopóki karta jest widoczna. Otwarcie rozmowy zeruje licznik po stronie serwera.
+
+**Emotikonki i zdjęcia — żeby miało życie.** W polu pisania jest uśmieszek (panel z grupami: buzie,
+gesty, serca, zwierzęta, jedzenie, świat) i spinacz. Emotikonka to zwykły znak: wstawia się w miejscu
+kursora i jedzie w treści wiadomości jak każda inna litera, nic osobnego nie leży w bazie. Zdjęcie robi
+dwie rzeczy: najpierw leci jako surowe bajty do rozmowy (`POST .../attachments`), a potem wiadomość
+wymienia jego identyfikator (`attachment_ids`) — dlatego **wiadomość może być samym zdjęciem**, a
+pasek boczny pokazuje wtedy „zdjęcie". Pliki należą do **rozmowy**, nie do osoby, więc zostają, kiedy
+konto wysyłającego zniknie; usunięcie wiadomości usuwa jej zdjęcia, a `prune` zamiata te wrzucone i
+nigdy niewysłane (po 24 h). Czat to nie dysk: tylko `.png`, `.jpg`, `.gif`, `.webp`, do 4 MB każde i
+do 4 na wiadomość. Kliknięcie zdjęcia powiększa je w tym samym oknie.
 
 **Wiadomość można zmienić przez 5 minut od jej napisania** (`MESSAGE_EDIT_MINUTES`). Okno liczy się od
 chwili wysłania, więc poprawka w czwartej minucie nie dokłada kolejnych pięciu. Po upływie czasu

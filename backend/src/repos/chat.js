@@ -16,6 +16,7 @@
 import { HttpError } from '../domain/errors.js';
 import { editableUntil, isEditable, pairKey } from '../domain/chat.js';
 import { assertUserId } from '../domain/scope.js';
+import { attachmentsForMessages, attachToMessage, detachFromMessage } from './attachments.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -52,6 +53,8 @@ const CONVERSATION_SELECT = `
          last.created_at AS last_at,
          last.author_id AS last_author_id,
          last.deleted_at AS last_deleted_at,
+         (SELECT COUNT(*) FROM message_attachments media
+           WHERE media.message_id = last.id) > 0 AS last_has_attachment,
          (SELECT COUNT(*) FROM messages unread
            WHERE unread.conversation_id = c.id
              AND unread.created_at > mine.last_read_at
@@ -85,6 +88,7 @@ function shapeConversation(row, userId) {
     last_at: row.last_at,
     last_from_me: row.last_author_id === userId,
     last_deleted: row.last_deleted_at !== null,
+    last_has_attachment: row.last_has_attachment === 1,
     unread: row.unread,
     created_at: row.created_at,
   };
@@ -256,6 +260,11 @@ export function addToGroup(db, userId, conversationId, peerId, now = nowIso()) {
   return { conversation: getConversation(db, me, conversationId) };
 }
 
+/** Membership without reading the whole conversation — asked before an upload starts. */
+export function isMemberOf(db, userId, conversationId) {
+  return isMember(db, assertUserId(userId), conversationId);
+}
+
 function isMember(db, userId, conversationId) {
   return Boolean(
     db
@@ -264,7 +273,7 @@ function isMember(db, userId, conversationId) {
   );
 }
 
-function shapeMessage(row, userId, now) {
+function shapeMessage(row, userId, now, attachments = []) {
   const mine = row.author_id === userId;
   return {
     id: row.id,
@@ -280,7 +289,14 @@ function shapeMessage(row, userId, now) {
     can_edit: row.deleted_at === null && isEditable(row.author_id, userId, row.created_at, now),
     /** The message is gone; the fact that something was here is not. */
     deleted: row.deleted_at !== null,
+    attachments,
   };
+}
+
+/** One query for the whole page, then the pictures are folded into their lines. */
+function shapePage(db, rows, userId, now) {
+  const grouped = attachmentsForMessages(db, rows.map((row) => row.id));
+  return rows.map((row) => shapeMessage(row, userId, now, grouped[row.id] ?? []));
 }
 
 const MESSAGE_ROW = `SELECT m.*, u.username AS author_name FROM messages m
@@ -330,29 +346,54 @@ export function listMessages(db, userId, conversationId, { since } = {}, now = n
     from ?? '',
   );
 
-  return { items: rows.map((row) => shapeMessage(row, me, now)), watermark: seen || stamp };
+  return { items: shapePage(db, rows, me, now), watermark: seen || stamp };
 }
 
-/** Write one message. Membership checked before anything lands in the table. */
-export function sendMessage(db, userId, conversationId, { body }, now = new Date()) {
+/**
+ * Write one message: words, pictures uploaded a moment ago, or both.
+ *
+ * Membership is checked before anything lands, and the pictures are claimed in the
+ * same transaction — if an id turns out not to be this person's own unbound upload
+ * in this conversation, the message is not written either.
+ */
+export function sendMessage(db, userId, conversationId, { body = '', attachmentIds = [] }, now = new Date()) {
   const me = assertUserId(userId);
   if (!isMember(db, me, conversationId)) return { error: 'conversation' };
 
   const stamp = now.toISOString();
-  const info = db
-    .prepare(
-      `INSERT INTO messages (conversation_id, author_id, body, created_at)
-       VALUES (@conversation, @author, @body, @created)`,
-    )
-    .run({ conversation: conversationId, author: me, body, created: stamp });
+  const write = db.transaction(() => {
+    const info = db
+      .prepare(
+        `INSERT INTO messages (conversation_id, author_id, body, created_at)
+         VALUES (@conversation, @author, @body, @created)`,
+      )
+      .run({ conversation: conversationId, author: me, body, created: stamp });
 
-  // What you just wrote you have certainly read.
-  db.prepare(
-    'UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?',
-  ).run(stamp, conversationId, me);
+    const attachments = attachToMessage(db, me, conversationId, info.lastInsertRowid, attachmentIds, stamp);
+    if (attachments === null) throw new AttachmentRefused();
 
-  return { message: shapeMessage(db.prepare(MESSAGE_ROW).get(info.lastInsertRowid), me, now) };
+    // What you just wrote you have certainly read.
+    db.prepare(
+      'UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?',
+    ).run(stamp, conversationId, me);
+
+    return info.lastInsertRowid;
+  });
+
+  let id;
+  try {
+    id = write();
+  } catch (error) {
+    if (error instanceof AttachmentRefused) return { error: 'attachment' };
+    throw error;
+  }
+
+  const row = db.prepare(MESSAGE_ROW).get(id);
+  return { message: shapeMessage(row, me, now, attachmentsForMessages(db, [id])[id] ?? []) };
 }
+
+/** Thrown to roll the transaction back when an attachment id does not check out. */
+class AttachmentRefused extends Error {}
 
 /**
  * Change a message — while the window is open.
@@ -396,7 +437,8 @@ export function deleteMessage(db, userId, messageId, now = new Date()) {
     now.toISOString(),
     messageId,
   );
-  return { ok: true };
+  // The pictures of a deleted message go with it — the caller deletes the files.
+  return { ok: true, files: detachFromMessage(db, messageId) };
 }
 
 /** A message only when the asking user is in its conversation. */
@@ -413,20 +455,31 @@ function messageWithMembership(db, userId, messageId) {
 /**
  * Threads nobody can reach any more.
  *
- * When the last member is gone the conversation goes too (its messages follow by
- * cascade): rows that no screen can ever list again are not history, they are litter.
+ * When the last member is gone the conversation goes too (its messages and
+ * pictures follow by cascade): rows that no screen can ever list again are not
+ * history, they are litter.
  *
- * @returns {number} how many conversations were removed
+ * @returns {number[]} ids of the conversations that were removed — the caller
+ *   deletes their folders on disk, which a repository has no business touching
  */
 export function pruneEmptyConversations(db) {
-  return db
+  const orphans = db
     .prepare(
-      `DELETE FROM conversations
+      `SELECT id FROM conversations
         WHERE NOT EXISTS (
           SELECT 1 FROM conversation_members m WHERE m.conversation_id = conversations.id
         )`,
     )
-    .run().changes;
+    .all();
+  if (orphans.length === 0) return [];
+
+  db.prepare(
+    `DELETE FROM conversations
+      WHERE NOT EXISTS (
+        SELECT 1 FROM conversation_members m WHERE m.conversation_id = conversations.id
+      )`,
+  ).run();
+  return orphans.map((row) => row.id);
 }
 
 /** Ids of conversations an account takes part in (for the CLI: which rows to move). */

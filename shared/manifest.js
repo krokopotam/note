@@ -108,5 +108,16 @@ export const BADGE_POLL_MS = 5000;
 export const CONVERSATION_TITLE_MAX = 60;
 export const GROUP_MEMBERS_MAX = 32;
 
+/**
+ * Pictures in chat. Small on purpose: a phone photo is a couple of megabytes and
+ * the server keeps other sites company, so this is "a picture in a conversation",
+ * not a photo drive — that is what the Files app is for.
+ */
+export const CHAT_ATTACHMENT_MAX_MB = 8;
+export const CHAT_ATTACHMENTS_PER_MESSAGE = 4;
+
+/** An upload nobody turned into a message is swept away after this many hours. */
+export const ATTACHMENT_STALE_HOURS = 24;
+
 /** @param {string} id @returns {(typeof APPS)[number] | null} */
 export const appById = (id) => APPS.find((app) => app.id === id) ?? null;

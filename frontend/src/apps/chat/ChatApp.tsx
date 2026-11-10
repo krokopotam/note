@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHAT_POLL_MS, MESSAGE_EDIT_MINUTES, MESSAGE_MAX_LENGTH } from '@note/shared/manifest';
+import { CHAT_ATTACHMENTS_PER_MESSAGE, CHAT_POLL_MS, MESSAGE_EDIT_MINUTES, MESSAGE_MAX_LENGTH } from '@note/shared/manifest';
 import { formatCountdown, formatStamp } from '../../shared/format';
 import { RowMenu } from '../../shared/RowMenu';
+import { attachmentUrl } from './chatApi';
+import { EmojiPicker } from './EmojiPicker';
 import { useChat } from './chatStore';
+import { insertAtCaret } from './emoji';
 import { avatarHue, avatarInitial, startsGroup } from './chatView';
 import type { Conversation, Message } from '../../api/types';
 import type { AppProps } from '../../shell/registry';
@@ -24,6 +27,17 @@ export function ChatApp(_props: AppProps) {
   const thread = useRef<HTMLDivElement>(null);
   const narrow = useNarrow();
   const [sideOpen, setSideOpen] = useState(false);
+  /** Picture clicked in a bubble: shown big, in this window rather than a new tab. */
+  const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!zoom) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setZoom(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [zoom]);
 
   useEffect(() => {
     void useChat.getState().load();
@@ -109,6 +123,7 @@ export function ChatApp(_props: AppProps) {
                   key={message.id}
                   message={message}
                   grouped={!startsGroup(state.messages[index - 1], message)}
+                  onZoom={setZoom}
                 />
               ))}
               {state.messages.length === 0 && (
@@ -124,6 +139,21 @@ export function ChatApp(_props: AppProps) {
 
         {state.error && <p className={styles.error}>{state.error}</p>}
       </section>
+
+      {zoom && (
+        <div
+          className={styles.lightbox}
+          role="dialog"
+          aria-label={zoom.name}
+          data-testid="lightbox"
+          onClick={() => setZoom(null)}
+        >
+          <img className={styles.lightImage} src={zoom.url} alt={zoom.name} />
+          <button type="button" className={styles.lightClose} onClick={() => setZoom(null)}>
+            Zamknij
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -305,7 +335,15 @@ function AddMember() {
  * One message: avatar, and — only when this is the first one in a row from the
  * same person — the name and the hour above the bubble.
  */
-function MessageRow({ message, grouped }: { message: Message; grouped: boolean }) {
+function MessageRow({
+  message,
+  grouped,
+  onZoom,
+}: {
+  message: Message;
+  grouped: boolean;
+  onZoom: (picture: { url: string; name: string }) => void;
+}) {
   const edit = useChat((state) => state.edit);
   const remove = useChat((state) => state.remove);
   const [editing, setEditing] = useState(false);
@@ -358,6 +396,27 @@ function MessageRow({ message, grouped }: { message: Message; grouped: boolean }
           </header>
         )}
 
+        {!message.deleted && message.attachments.length > 0 && (
+          <span className={styles.pictures}>
+            {message.attachments.map((attachment) => (
+              <button
+                key={attachment.id}
+                type="button"
+                className={styles.thumbButton}
+                aria-label={`Powiększ ${attachment.file_name}`}
+                onClick={() => onZoom({ url: attachmentUrl(attachment.id), name: attachment.file_name })}
+              >
+                <img
+                  className={styles.thumb}
+                  src={attachmentUrl(attachment.id)}
+                  alt={attachment.file_name}
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </span>
+        )}
+
         {editing ? (
           <div className={styles.editForm}>
             <textarea
@@ -394,7 +453,7 @@ function MessageRow({ message, grouped }: { message: Message; grouped: boolean }
             {grouped && <span className={styles.srOnly}>{message.author_name}</span>}
             wiadomość usunięta
           </p>
-        ) : (
+        ) : message.body === '' ? null : (
           <p className={styles.bubble} title={formatStamp(message.created_at)}>
             {grouped && <span className={styles.srOnly}>{message.author_name}</span>}
             {message.body}
@@ -428,7 +487,10 @@ function Composer({ conversation }: { conversation: Conversation }) {
   const send = useChat((state) => state.send);
   const sending = useChat((state) => state.sending);
   const [draft, setDraft] = useState('');
+  const [pictures, setPictures] = useState<File[]>([]);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // The field grows with what is typed, up to a few lines, then scrolls.
   useEffect(() => {
@@ -438,53 +500,157 @@ function Composer({ conversation }: { conversation: Conversation }) {
     box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
   }, [draft]);
 
+  /** An emoji goes where the caret was, and the caret stays behind it. */
+  const putEmoji = (emoji: string) => {
+    const box = input.current;
+    const caret = box
+      ? { start: box.selectionStart, end: box.selectionEnd }
+      : { start: draft.length, end: draft.length };
+    const next = insertAtCaret(draft, caret, emoji);
+    setDraft(next.text);
+    requestAnimationFrame(() => {
+      box?.focus();
+      box?.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  const addPictures = (files: FileList | null) => {
+    if (!files) return;
+    const picked = [...files].filter((file) => file.type.startsWith('image/'));
+    setPictures((current) => [...current, ...picked].slice(0, CHAT_ATTACHMENTS_PER_MESSAGE));
+  };
+
   const submit = async () => {
-    const ok = await send(draft);
-    // Only a delivered message leaves the field empty; a failed one stays typed.
-    if (ok) setDraft('');
+    const ok = await send(draft, pictures);
+    // Only a delivered message empties the field; a failed one keeps text and pictures.
+    if (ok) {
+      setDraft('');
+      setPictures([]);
+      setEmojiOpen(false);
+    }
   };
 
   return (
-    <form
-      className={styles.composer}
-      onSubmit={(event) => {
-        event.preventDefault();
-        void submit();
-      }}
-    >
-      <div className={styles.pill}>
-        <textarea
-          ref={input}
-          className={styles.input}
-          value={draft}
-          placeholder={`Do: ${conversation.title}`}
-          aria-label="Treść wiadomości"
-          maxLength={MESSAGE_MAX_LENGTH}
-          rows={1}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter sends, Shift+Enter is a new line — the way people expect.
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void submit();
-            }
+    <div className={styles.writing}>
+      {emojiOpen && <EmojiPicker onPick={putEmoji} onClose={() => setEmojiOpen(false)} />}
+
+      {pictures.length > 0 && (
+        <ul className={styles.pending} data-testid="pending-pictures">
+          {pictures.map((file, index) => (
+            <li key={`${file.name}-${index}`} className={styles.pendingItem}>
+              <img className={styles.pendingThumb} src={previewUrl(file)} alt={file.name} />
+              <button
+                type="button"
+                aria-label={`Usuń ${file.name}`}
+                onClick={() => setPictures((current) => current.filter((_, position) => position !== index))}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form
+        className={styles.composer}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <button
+          type="button"
+          className={styles.tool}
+          aria-label="Wstaw emotikonkę"
+          aria-expanded={emojiOpen}
+          onClick={() => setEmojiOpen((open) => !open)}
+        >
+          <SmileyIcon />
+        </button>
+        <button
+          type="button"
+          className={styles.tool}
+          aria-label="Dodaj zdjęcie"
+          onClick={() => fileInput.current?.click()}
+        >
+          <ClipIcon />
+        </button>
+        <input
+          ref={fileInput}
+          className={styles.fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          aria-label="Wybierz zdjęcie"
+          onChange={(event) => {
+            addPictures(event.target.files);
+            event.target.value = '';
           }}
         />
-        {draft.length > MESSAGE_MAX_LENGTH * 0.8 && (
-          <span className={styles.counter}>
-            {draft.length}/{MESSAGE_MAX_LENGTH}
-          </span>
-        )}
-      </div>
-      <button type="submit" className={styles.send} aria-label="Wyślij" disabled={sending || draft.trim() === ''}>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-          <path
-            fill="currentColor"
-            d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2 .1 6.4Z"
+
+        <div className={styles.pill}>
+          <textarea
+            ref={input}
+            className={styles.input}
+            value={draft}
+            aria-label="Treść wiadomości"
+            placeholder={`Napisz wiadomość do ${conversation.title}…`}
+            maxLength={MESSAGE_MAX_LENGTH}
+            rows={1}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter sends, Shift+Enter is a new line — the way people expect.
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void submit();
+              }
+            }}
           />
-        </svg>
-      </button>
-    </form>
+          {draft.length > MESSAGE_MAX_LENGTH * 0.8 && (
+            <span className={styles.counter}>
+              {draft.length}/{MESSAGE_MAX_LENGTH}
+            </span>
+          )}
+        </div>
+        <button
+          type="submit"
+          className={styles.send}
+          aria-label="Wyślij"
+          disabled={sending || (draft.trim() === '' && pictures.length === 0)}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2 .1 6.4Z" />
+          </svg>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/** Thumbnails are made from the picked file; without the API (jsdom) they are just names. */
+function previewUrl(file: File): string {
+  return typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '';
+}
+
+function SmileyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12 17.5c2.1 0 3.9-1.2 4.7-3H7.3c.8 1.8 2.6 3 4.7 3Z"
+      />
+    </svg>
+  );
+}
+
+function ClipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M16.5 6.6v8.9a4.5 4.5 0 0 1-9 0V6.4a3 3 0 0 1 6 0v8.2a1.5 1.5 0 0 1-3 0V7.6H9v7a3 3 0 0 0 6 0V6.4a4.5 4.5 0 0 0-9 0v9.1a6 6 0 0 0 12 0V6.6h-1.5Z"
+      />
+    </svg>
   );
 }
 

@@ -19,6 +19,7 @@ vi.mock('./chatApi', () => ({
     unread: vi.fn(),
     messages: vi.fn(),
     send: vi.fn(),
+    uploadAttachment: vi.fn(),
     edit: vi.fn(),
     remove: vi.fn(),
   },
@@ -40,6 +41,7 @@ const conversation = (id: number, overrides: Partial<Conversation> = {}): Conver
   last_at: '2026-01-05T10:00:00.000Z',
   last_from_me: false,
   last_deleted: false,
+  last_has_attachment: false,
   unread: 0,
   created_at: '2026-01-01T00:00:00.000Z',
   ...overrides,
@@ -57,6 +59,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   editable_until: '2026-01-05T10:05:00.000Z',
   can_edit: true,
   deleted: false,
+  attachments: [],
   ...overrides,
 });
 
@@ -197,7 +200,7 @@ describe('writing', () => {
     const ok = await useChat.getState().send('  cześć  ');
 
     expect(ok).toBe(true);
-    expect(api.send).toHaveBeenCalledWith(1, 'cześć');
+    expect(api.send).toHaveBeenCalledWith(1, 'cześć', []);
     expect(useChat.getState().messages.map((m) => m.id)).toEqual([9]);
     expect(api.conversations).toHaveBeenCalled();
   });
@@ -218,6 +221,47 @@ describe('writing', () => {
     expect(await useChat.getState().send('   ')).toBe(false);
     expect(await useChat.getState().send('jest treść, nie ma rozmowy')).toBe(false);
     expect(api.send).not.toHaveBeenCalled();
+  });
+
+  it('uploads pictures first, then names them in the message', async () => {
+    useChat.setState({ activeId: 1 });
+    const cat = new File([new Uint8Array([1])], 'kot.png', { type: 'image/png' });
+    const sun = new File([new Uint8Array([2])], 'zachod.png', { type: 'image/jpeg' });
+    api.uploadAttachment
+      .mockResolvedValueOnce({ id: 11, file_name: 'kot.png', mime: 'image/png', size: 1, created_at: MARK })
+      .mockResolvedValueOnce({ id: 12, file_name: 'zachod.png', mime: 'image/jpeg', size: 1, created_at: MARK });
+    api.send.mockResolvedValue(message(9, { body: 'zdjęcia' }));
+
+    const ok = await useChat.getState().send('zdjęcia', [cat, sun]);
+
+    expect(ok).toBe(true);
+    expect(api.uploadAttachment.mock.calls.map(([id, file]) => [id, file.name])).toEqual([
+      [1, 'kot.png'],
+      [1, 'zachod.png'],
+    ]);
+    expect(api.send).toHaveBeenCalledWith(1, 'zdjęcia', [11, 12]);
+  });
+
+  it('carries a picture with no words at all', async () => {
+    useChat.setState({ activeId: 1 });
+    api.uploadAttachment.mockResolvedValue({ id: 11, file_name: 'kot.png', mime: 'image/png', size: 1, created_at: MARK });
+    api.send.mockResolvedValue(message(9, { body: '' }));
+
+    expect(await useChat.getState().send('', [new File([new Uint8Array([1])], 'kot.png', { type: 'image/png' })])).toBe(true);
+    expect(api.send).toHaveBeenCalledWith(1, '', [11]);
+  });
+
+  it('says nothing happened when an upload fails', async () => {
+    useChat.setState({ activeId: 1 });
+    api.uploadAttachment.mockRejectedValue(new ApiError(413, 'file_too_large', 'za duży plik'));
+    api.send.mockResolvedValue(message(9));
+
+    const ok = await useChat.getState().send('spójrz', [new File([new Uint8Array([1])], 'kot.png', { type: 'image/png' })]);
+
+    expect(ok).toBe(false);
+    expect(api.send).not.toHaveBeenCalled();
+    expect(useChat.getState().error).toBe('za duży plik');
+    expect(useChat.getState().messages).toHaveLength(0);
   });
 
   it('edits a message in place', async () => {

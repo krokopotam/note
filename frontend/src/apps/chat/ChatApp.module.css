@@ -305,6 +305,13 @@
 
 /* --- pisanie --------------------------------------------------------------- */
 
+.writing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+
 .composer {
   display: flex;
   align-items: flex-end;
@@ -362,6 +369,126 @@
 
 .send:hover:not(:disabled) {
   background: #7bb0ff;
+}
+
+/* Emoji and paperclip: small round tools, quieter than the send button. */
+.tool {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b9c8e2;
+}
+
+.tool:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #eaf1ff;
+}
+
+/* The real input stays out of the way; the paperclip opens it. */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pending {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.pendingItem {
+  position: relative;
+  display: flex;
+}
+
+.pendingThumb {
+  width: 62px;
+  height: 62px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #0d1420;
+}
+
+.pendingItem button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: #ff5f57;
+  border: 0;
+  color: #1b0d0c;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* --- zdjęcia w wiadomości -------------------------------------------------- */
+
+.pictures {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.thumbButton {
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.thumb {
+  max-width: min(280px, 100%);
+  max-height: 220px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  object-fit: cover;
+  display: block;
+}
+
+.me .thumb {
+  border-color: rgba(148, 190, 255, 0.4);
+}
+
+/* Clicking a picture keeps it inside this window — no stray browser tab. */
+.lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 18px;
+  background: rgba(6, 10, 18, 0.86);
+  cursor: zoom-out;
+}
+
+.lightImage {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+}
+
+.lightClose {
+  grid-row: 2;
+  font-size: 12px;
+  padding: 4px 12px;
 }
 
 /* --- nowy czat ------------------------------------------------------------- */

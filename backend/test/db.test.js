@@ -30,6 +30,7 @@ describe('database bootstrap', () => {
         'file_resources',
         'file_resource_members',
         'files',
+        'message_attachments',
         'messages',
         'notes',
         'notepad_state',
@@ -37,6 +38,16 @@ describe('database bootstrap', () => {
         'stickies',
       ]),
     );
+  });
+
+  it('keeps a picture with the conversation, not with the person who sent it', () => {
+    const db = openDb(':memory:');
+    const columns = db.prepare('PRAGMA table_info(message_attachments)').all().map((c) => c.name);
+
+    expect(columns).toEqual(
+      expect.arrayContaining(['conversation_id', 'uploader_id', 'stored_name', 'message_id', 'mime', 'size']),
+    );
+    db.close();
   });
 
   it('gives messages a tombstone and groups a title', () => {
@@ -84,6 +95,7 @@ describe('database bootstrap', () => {
       { version: '006_chat_icon.sql' },
       { version: '007_drop_note_revisions.sql' },
       { version: '008_chat_sync.sql' },
+      { version: '009_chat_media.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -136,6 +148,7 @@ describe('upgrading a database that predates accounts', () => {
       '006_chat_icon.sql',
       '007_drop_note_revisions.sql',
       '008_chat_sync.sql',
+      '009_chat_media.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');

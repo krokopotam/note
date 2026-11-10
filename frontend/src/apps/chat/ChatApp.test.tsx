@@ -12,7 +12,10 @@ import { ChatApp } from './ChatApp';
 import { chatDefaults, useChat } from './chatStore';
 import type { Conversation, Message } from '../../api/types';
 
-vi.mock('./chatApi', () => ({
+// The API calls are mocks; `attachmentUrl` is a string builder and stays real, so
+// the assertions below check the address a picture will actually be fetched from.
+vi.mock('./chatApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./chatApi')>()),
   chatApi: {
     people: vi.fn(),
     conversations: vi.fn(),
@@ -23,6 +26,7 @@ vi.mock('./chatApi', () => ({
     unread: vi.fn(),
     messages: vi.fn(),
     send: vi.fn(),
+    uploadAttachment: vi.fn(),
     edit: vi.fn(),
     remove: vi.fn(),
   },
@@ -43,6 +47,7 @@ const conversation = (id: number, overrides: Partial<Conversation> = {}): Conver
   last_at: '2026-01-05T10:00:00.000Z',
   last_from_me: false,
   last_deleted: false,
+  last_has_attachment: false,
   unread: 0,
   created_at: '2026-01-01T00:00:00.000Z',
   ...overrides,
@@ -60,6 +65,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   editable_until: stillEditable,
   can_edit: true,
   deleted: false,
+  attachments: [],
   ...overrides,
 });
 
@@ -234,7 +240,7 @@ describe('writing', () => {
     await userEvent.type(field, 'cześć');
     await userEvent.keyboard('{Enter}');
 
-    expect(api.send).toHaveBeenCalledWith(1, 'cześć');
+    expect(api.send).toHaveBeenCalledWith(1, 'cześć', []);
     expect(field).toHaveValue('');
     expect(await screen.findByTestId('message-9')).toBeInTheDocument();
   });
@@ -427,5 +433,180 @@ describe('rozmowa z kilkoma osobami', () => {
     const panel = await screen.findByTestId('new-chat');
 
     expect(within(panel).getByRole('button', { name: 'Utwórz rozmowę' })).toBeDisabled();
+  });
+});
+
+describe('emotikonki', () => {
+  it('opens the panel, puts the pick into the field and sends it with the text', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Wstaw emotikonkę' }));
+    const panel = await screen.findByTestId('emoji-picker');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😀' }));
+
+    const field = screen.getByRole('textbox', { name: 'Treść wiadomości' });
+    expect(field).toHaveValue('😀');
+
+    await userEvent.type(field, ' cześć');
+    await userEvent.click(screen.getByRole('button', { name: 'Wyślij' }));
+
+    expect(api.send).toHaveBeenCalledWith(1, '😀 cześć', []);
+  });
+
+  it('keeps the panel open after a pick, because nobody sends one alone', async () => {
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Wstaw emotikonkę' }));
+    const panel = await screen.findByTestId('emoji-picker');
+
+    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😂' }));
+    await userEvent.click(within(panel).getByRole('button', { name: 'Wstaw 😍' }));
+
+    expect(screen.getByRole('textbox', { name: 'Treść wiadomości' })).toHaveValue('😂😍');
+    expect(screen.getByTestId('emoji-picker')).toBeInTheDocument();
+  });
+
+  it('changes the category without leaving the panel', async () => {
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Wstaw emotikonkę' }));
+    const panel = await screen.findByTestId('emoji-picker');
+
+    expect(within(panel).getByRole('button', { name: 'Wstaw 😀' })).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Zwierzęta' }));
+
+    expect(within(panel).getByRole('button', { name: 'Wstaw 🐶' })).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: 'Wstaw 😀' })).not.toBeInTheDocument();
+  });
+
+  it('closes the panel on request', async () => {
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Wstaw emotikonkę' }));
+    const panel = await screen.findByTestId('emoji-picker');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByTestId('emoji-picker')).not.toBeInTheDocument();
+    expect(panel).toBeDefined();
+  });
+});
+
+describe('zdjęcia', () => {
+  const picture = () => new File([new Uint8Array([1, 2, 3])], 'kot.png', { type: 'image/png' });
+
+  it('draws a thumbnail for a picture that came with a message', async () => {
+    api.messages.mockResolvedValue(
+      page([message(1, { body: '', attachments: [{ id: 5, file_name: 'kot.png', mime: 'image/png', size: 3, created_at: MARK }] })]),
+    );
+
+    renderChat();
+
+    const thumb = await screen.findByRole('img', { name: 'kot.png' });
+    expect(thumb).toHaveAttribute('src', '/api/chat/attachments/5');
+  });
+
+  it('shows a picture of its own, without an empty bubble next to it', async () => {
+    api.messages.mockResolvedValue(
+      page([message(1, { body: '', attachments: [{ id: 5, file_name: 'wakacje.png', mime: 'image/png', size: 3, created_at: MARK }] })]),
+    );
+
+    renderChat();
+    const row = await screen.findByTestId('message-1');
+
+    expect(within(row).getByRole('img', { name: 'wakacje.png' })).toBeInTheDocument();
+    // A picture on its own gets no empty bubble beside it.
+    expect(row.querySelector('p')).toBeNull();
+  });
+
+  it('sends the bytes first and names the upload in the message', async () => {
+    api.uploadAttachment.mockResolvedValue({
+      id: 9,
+      file_name: 'kot.png',
+      mime: 'image/png',
+      size: 3,
+      created_at: MARK,
+    });
+
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+      target: { files: [picture()] },
+    });
+
+    const pending = await screen.findByTestId('pending-pictures');
+    expect(within(pending).getByRole('img', { name: 'kot.png' })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Treść wiadomości' }), 'spójrz');
+    await userEvent.click(screen.getByRole('button', { name: 'Wyślij' }));
+
+    expect(api.uploadAttachment).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'kot.png' }));
+    expect(api.send).toHaveBeenCalledWith(1, 'spójrz', [9]);
+  });
+
+  it('lets a picture go out without a word', async () => {
+    api.uploadAttachment.mockResolvedValue({
+      id: 9,
+      file_name: 'kot.png',
+      mime: 'image/png',
+      size: 3,
+      created_at: MARK,
+    });
+
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    const send = screen.getByRole('button', { name: 'Wyślij' });
+    expect(send).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+      target: { files: [picture()] },
+    });
+
+    expect(send).toBeEnabled();
+    await userEvent.click(send);
+
+    expect(api.send).toHaveBeenCalledWith(1, '', [9]);
+  });
+
+  it('takes a picture away again before it is sent', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+      target: { files: [picture()] },
+    });
+    expect(await screen.findByTestId('pending-pictures')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Usuń kot.png' }));
+
+    expect(screen.queryByTestId('pending-pictures')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wyślij' })).toBeDisabled();
+  });
+
+  it('refuses to carry something that is not a picture', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    fireEvent.change(screen.getByLabelText('Wybierz zdjęcie'), {
+      target: { files: [new File(['MZ'], 'instalator.exe', { type: 'application/octet-stream' })] },
+    });
+
+    expect(screen.queryByTestId('pending-pictures')).not.toBeInTheDocument();
+  });
+
+  it('makes a picture bigger on a click and hides it again', async () => {
+    api.messages.mockResolvedValue(
+      page([message(1, { body: '', attachments: [{ id: 5, file_name: 'kot.png', mime: 'image/png', size: 3, created_at: MARK }] })]),
+    );
+
+    renderChat();
+    await userEvent.click(await screen.findByRole('button', { name: 'Powiększ kot.png' }));
+
+    const lightbox = await screen.findByTestId('lightbox');
+    expect(within(lightbox).getByRole('img', { name: 'kot.png' })).toHaveAttribute('src', '/api/chat/attachments/5');
+
+    await userEvent.click(within(lightbox).getByRole('button', { name: 'Zamknij' }));
+
+    expect(screen.queryByTestId('lightbox')).not.toBeInTheDocument();
   });
 });

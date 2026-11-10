@@ -15,11 +15,12 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APPS } from '@note/shared';
+import { APPS, ATTACHMENT_STALE_HOURS } from '@note/shared';
 import { openDb } from '../db/index.js';
 import { LOCKED_HASH, hashPassword } from '../domain/passwords.js';
 import { createFileStore } from '../files/store.js';
 import { pruneEmptyConversations } from '../repos/chat.js';
+import { pruneStaleAttachments, storeFolder } from '../repos/attachments.js';
 import { ownedResourceIds } from '../repos/files.js';
 import { seedUser } from '../repos/seed.js';
 import { destroyAllForUser, listSessions } from '../repos/sessions.js';
@@ -118,10 +119,12 @@ export function run(db, args, { files = createFileStore(path.join(PROJECT_ROOT, 
       const removed = deleteUser(db, account.id);
       folders.forEach((id) => files.removeResource(id));
       // Czyjeś rozmowy przeżyją jego konto — ale nie te, z których odszedł ostatni.
+      // Zdjęcia razem z rozmowami, z których odszedł ostatni człowiek.
       const orphans = pruneEmptyConversations(db);
+      orphans.forEach((id) => files.removeResource(storeFolder(id)));
       console.log(
         `usunięto konto ${username} wraz z:`,
-        [...Object.entries(removed), ['foldery', folders.length], ['osierocone', orphans]]
+        [...Object.entries(removed), ['foldery', folders.length], ['osierocone', orphans.length]]
           .map(([what, n]) => `${what}=${n}`)
           .join(' '),
       );
@@ -130,7 +133,16 @@ export function run(db, args, { files = createFileStore(path.join(PROJECT_ROOT, 
 
     case 'prune': {
       const orphans = pruneEmptyConversations(db);
-      console.log(`rozmowy bez członków usunięte: ${orphans}`);
+      orphans.forEach((id) => files.removeResource(storeFolder(id)));
+
+      // Zdjęcie wysłane i niedopięte do żadnej wiadomości to porzucony plik.
+      const cutoff = new Date(Date.now() - ATTACHMENT_STALE_HOURS * 60 * 60 * 1000).toISOString();
+      const stale = pruneStaleAttachments(db, cutoff);
+      stale.forEach((row) => files.remove(storeFolder(row.conversation_id), row.stored_name));
+
+      console.log(
+        `rozmowy bez członków usunięte: ${orphans.length}; porzucone zdjęcia: ${stale.length}`,
+      );
       return;
     }
 

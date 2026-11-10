@@ -2,7 +2,8 @@
 
 Projekt: **note** — pulpit w przeglądarce (okna, dock, launcher) z aplikacjami: kalkulator,
 notatnik (wiele zakładek + wyszukiwarka), karteczki, pliki (wrzucanie, pobieranie,
-współdzielenie zasobów między kontami) i czaty (rozmowy 1:1 i grupy, edycja wiadomości do 5 minut, znak na ikonie).
+współdzielenie zasobów między kontami) i czaty (rozmowy 1:1 i grupy, edycja wiadomości do 5 minut,
+zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 
 ## Stan
 
@@ -16,10 +17,14 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1 i grupy, edycja 
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
 | Czaty (1:1 i grupy, wiadomości, okno edycji 5 min, nieprzeczytane, znak na ikonie) | gotowy, działa |
-| Build produkcyjny (`frontend/dist`, 213 kB / 68 kB gzip) | przechodzi |
+| Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
+| Build produkcyjny (`frontend/dist`, 225 kB / 73 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 440 przechodzi (backend 157, frontend 283). `npm run lint` → czysto.
+Testy: `npm test` → 476 przechodzi (backend 173, frontend 303). `npm run lint` → czysto.
+
+Migracja `009_chat_media.sql` (tabela `message_attachments`) dokłada tylko nową tabelę i indeks —
+żadnej zmiany w starych wierszach, więc weszła na serwer bez przygotowania kopii poza zwykłą.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -27,6 +32,29 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (ostatnia runda: życie w czacie)
+
+- **Emotikonki to znaki, nie zasoby.** Panel (`apps/chat/EmojiPicker.tsx`) wkłada emoji w miejscu
+  kursora (`emoji.ts: insertAtCaret` — liczy jednostki kodu, bo „❤️" to dwie), a treść wiadomości
+  jedzie jak każdy inny tekst. W bazie nie ma nic nowego, historia rozmowy zostaje listą stringów.
+  Lista jest krótka i pogrupowana (buzie, gesty, serca, zwierzęta, jedzenie, świat) — picker, którego
+  trzeba szukać, to picker, którego się nie otwiera.
+- **Zdjęcie idzie do rozmowy, nie do wiadomości.** Najpierw `POST /chat/conversations/:id/attachments`
+  (surowe bajty, limit 4 MB), potem `POST .../messages` z `attachment_ids`. Dzięki temu wiadomość może
+  być **samym zdjęciem**, a upload, z którego nic nie wyszło, jest widoczny i zamiatany przez `prune`
+  po 24 h. `message_attachments.conversation_id` + `ON DELETE CASCADE`: bajty przeżywają usunięcie
+  konta, które je wrzuciło (`uploader_id SET NULL`), tak samo jak plik należy do zasobu, nie do osoby.
+- **Czat to nie dysk.** `domain/media.js` przepuszcza tylko `.png/.jpg/.gif/.webp` i musi się zgadzać
+  zarówno rozszerzenie, jak i `Content-Type`; reszta dostaje 415 `not_an_image`. Limit na wiadomość:
+  4 zdjęcia (`CHAT_ATTACHMENTS_PER_MESSAGE`). Surowe pliki wykonywalne byłyby tu tym samym, czym
+  śmieci w zasobach — tylko częściej wrzucanym.
+- **Wiersz `message_id IS NULL` to upload, nie wiadomość.** Wiązanie z wiadomością dzieje się w
+  transakcji i tylko wśród wierszy tego samego autora w tej samej rozmowie — stąd `400 invalid_attachment`,
+  zamiast cichego podpięcia czyjegoś pliku.
+- **Miniatury serwowane są z backentu** (`GET /api/chat/attachments/:id`, `Cache-Control: private`),
+  więc `<img src>` działa na tej samej sesji co reszta API; przycisk powiększa w tym samym oknie
+  (lightbox), bo przekierowanie do nowej karty w „systemie" byłoby pęknięciem iluzji.
 
 ## Decyzje
 
@@ -132,6 +160,8 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   (liczy się tylko rozmiar pojedynczego pliku) — każdy może założyć dowolną liczbę zasobów.
 - Usunięcie zasobu kasuje folder z dysku od razu; nie ma kosza ani odzyskiwania plików.
 - Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).
+- Zdjęcia w czacie nie mają miniatur w sensie rozmazywania (serwer oddaje oryginalne bajty) ani
+  limitu miejsca na rozmowę — liczy się tylko 4 MB na plik i 4 na wiadomość.
 - Grupy istnieją, ale nie ma z nich wyjścia (tylko autor może dopisywać, nikt się nie wypisuje) ani
   szukania w wiadomościach; powiadomienie to liczba na ikonie, nie komunikat systemowy. Znak znika do
   5 s po przeczytaniu, bo pulpit pyta własnym rytmem — okno czatu mu o tym nie mówi.

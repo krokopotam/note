@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { APPS, MAX_UPLOAD_MB } from '@note/shared';
+import { APPS, CHAT_ATTACHMENT_MAX_MB, MAX_UPLOAD_MB } from '@note/shared';
 import { createFileStore } from './files/store.js';
 import { accountRouter, authRouter } from './http/routes/auth.js';
 import { chatRouter } from './http/routes/chat.js';
@@ -22,9 +22,13 @@ const DEFAULT_FILES_DIR = path.resolve(
   'files',
 );
 
-/** Raw upload: `PUT /api/files/resources/:id/files/:name` carries bytes, not JSON. */
+/** Raw uploads carry bytes, not JSON — the JSON parser must keep its hands off. */
 const isFileUpload = (req) =>
   req.method === 'PUT' && /^\/api\/files\/resources\/\d+\/files\//.test(req.path);
+
+/** A chat picture arrives the same way: raw bytes, streamed to disk. */
+const isChatAttachment = (req) =>
+  req.method === 'POST' && /^\/api\/chat\/conversations\/\d+\/attachments/.test(req.path);
 
 /**
  * Build the HTTP application without starting a listener, so tests can drive the
@@ -45,7 +49,9 @@ export function createApp({
   seed,
   filesDir = DEFAULT_FILES_DIR,
   maxUploadBytes = MAX_UPLOAD_MB * 1024 * 1024,
+  maxAttachmentBytes = CHAT_ATTACHMENT_MAX_MB * 1024 * 1024,
 }) {
+  const fileStore = createFileStore(filesDir);
   const app = express();
   app.disable('x-powered-by');
   // nginx terminates TLS and forwards the protocol/client IP; without this req.secure
@@ -53,7 +59,7 @@ export function createApp({
   app.set('trust proxy', 1);
   // JSON everywhere, except on the upload route: a JSON file uploaded as bytes must
   // not be parsed into an object before the raw parser sees it.
-  app.use(express.json({ limit: '1mb', type: (req) => !isFileUpload(req) }));
+  app.use(express.json({ limit: '1mb', type: (req) => !isFileUpload(req) && !isChatAttachment(req) }));
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -64,8 +70,8 @@ export function createApp({
   // Everything below belongs to somebody.
   app.use('/api', requireAuth(db));
   app.use('/api', accountRouter(db));
-  app.use('/api/chat', chatRouter(db));
-  app.use('/api/files', filesRouter(db, { store: createFileStore(filesDir), maxUploadBytes }));
+  app.use('/api/chat', chatRouter(db, { store: fileStore, maxAttachmentBytes }));
+  app.use('/api/files', filesRouter(db, { store: fileStore, maxUploadBytes }));
   app.use('/api/notes', notesRouter(db));
   app.use('/api/stickies', stickiesRouter(db));
   app.use('/api/desktop', desktopRouter(db, { apps }));

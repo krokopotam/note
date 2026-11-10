@@ -15,6 +15,7 @@ import {
   GROUP_MEMBERS_MAX,
   NOTE_BODY_MAX,
   NOTE_TITLE_MAX,
+  CHAT_ATTACHMENTS_PER_MESSAGE,
   FILE_NAME_MAX,
   FILE_PERMISSIONS,
   PASSWORD_MAX_LENGTH,
@@ -300,6 +301,8 @@ export const ConversationSchema = z.object({
   last_from_me: z.boolean(),
   /** The last message was deleted — the preview says so instead of quoting it. */
   last_deleted: z.boolean(),
+  /** The last message was a picture: the preview says "zdjęcie" instead of nothing. */
+  last_has_attachment: z.boolean(),
   unread: z.number().int(),
   created_at: z.string(),
 });
@@ -330,6 +333,15 @@ export const ConversationDetailSchema = ConversationSchema.extend({
 /** What the desktop reads for the badge on the chat icon. */
 export const UnreadSchema = z.object({ total: z.number().int() });
 
+/** One picture inside a message. The bytes have their own address on disk. */
+export const ChatAttachmentSchema = z.object({
+  id: z.number().int(),
+  file_name: z.string(),
+  mime: z.string(),
+  size: z.number().int(),
+  created_at: z.string(),
+});
+
 export const MessageSchema = z.object({
   id: z.number().int(),
   conversation_id: z.number().int(),
@@ -347,6 +359,7 @@ export const MessageSchema = z.object({
   can_edit: z.boolean(),
   /** A tombstone: the message is gone, the fact that it was here is not. */
   deleted: z.boolean(),
+  attachments: z.array(ChatAttachmentSchema),
 });
 
 export const MessagePageSchema = z.object({
@@ -355,12 +368,27 @@ export const MessagePageSchema = z.object({
   watermark: z.string(),
 });
 
-/** Send and edit share one rule: a message is non-empty text with a ceiling. */
+/** Editing still needs text: what you correct is the words, not the picture. */
 const MessageBodySchema = z.object({
   body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
 });
 
-export const MessageCreateSchema = MessageBodySchema;
+/**
+ * Sending: words, a picture, or both — but not nothing.
+ *
+ * `attachment_ids` are uploads this person made into this conversation a moment
+ * ago; the server binds them to the message and refuses ids it did not hand out.
+ */
+export const MessageCreateSchema = z
+  .object({
+    body: z.string().trim().max(MESSAGE_MAX_LENGTH).default(''),
+    attachment_ids: z.array(z.number().int()).max(CHAT_ATTACHMENTS_PER_MESSAGE).default([]),
+  })
+  .refine((value) => value.body.length > 0 || value.attachment_ids.length > 0, {
+    message: 'wiadomość musi mieć tekst albo zdjęcie',
+    path: ['body'],
+  });
+
 export const MessagePatchSchema = MessageBodySchema;
 
 /**

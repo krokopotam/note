@@ -74,6 +74,54 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return parsed as T;
 }
 
+/**
+ * Send one file as the raw body of a POST, with progress.
+ *
+ * `fetch` reports no upload progress, so this is the second place that has to turn
+ * an HTTP failure into an ApiError — and the reason the bytes go out as they are:
+ * a picture does not become JSON on its way to the server.
+ *
+ * @param path app-relative, e.g. `/chat/conversations/3/attachments?name=kot.png`
+ * @param onProgress fraction 0..1
+ */
+export function uploadRaw<T>(path: string, file: File, onProgress?: (fraction: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api${path}`);
+
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'network_error', 'nie udało się połączyć z serwerem'));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText) as T);
+        return;
+      }
+      reportStatus(xhr.status);
+      reject(fromXhr(xhr));
+    };
+
+    xhr.send(file);
+  });
+}
+
+/** nginx or a proxy can answer instead of the app, so the body may not be our shape. */
+function fromXhr(xhr: XMLHttpRequest): ApiError {
+  const fallback = new ApiError(xhr.status, 'unexpected_response', `serwer odpowiedział ${xhr.status}`);
+  let code: unknown;
+  let message: unknown;
+  try {
+    const body = JSON.parse(xhr.responseText) as { error?: { code?: unknown; message?: unknown } };
+    code = body.error?.code;
+    message = body.error?.message;
+  } catch {
+    return fallback;
+  }
+  if (typeof code !== 'string' || typeof message !== 'string') return fallback;
+  return new ApiError(xhr.status, code, message);
+}
+
 /** Relative URL for a keyword/sort/pagination query; empty values are omitted. */
 export function queryString(params: Record<string, string | number | undefined | null>): string {
   const search = new URLSearchParams();

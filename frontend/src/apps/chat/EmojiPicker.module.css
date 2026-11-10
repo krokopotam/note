@@ -1,0 +1,61 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #101724;
+  padding: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tab,
+.tabOn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #93a1b8;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+.tabOn {
+  background: rgba(88, 148, 246, 0.22);
+  border-color: rgba(88, 148, 246, 0.5);
+  color: #dbe8ff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
+  gap: 2px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.cell {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 19px;
+  line-height: 1.3;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.close {
+  align-self: flex-end;
+  font-size: 12px;
+  padding: 3px 9px;
+}
