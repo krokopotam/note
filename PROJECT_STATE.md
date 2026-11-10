@@ -19,7 +19,7 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomo�
 | Build produkcyjny (`frontend/dist`, 213 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 394 przechodzą (backend 147, frontend 247). `npm run lint` → czysto.
+Testy: `npm test` → 407 przechodzi (backend 147, frontend 260). `npm run lint` → czysto.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -81,6 +81,13 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   Jeden proces, jedno żądanie, nic do odtworzenia po restarcie; `?after=<id>` niesie tylko to, co nowe.
 - **Przeczytane = pobrane.** Znacznik `conversation_members.last_read_at` aktualizuje się przy odczycie
   wiadomości, więc licznik nieprzeczytanych jest liczony w bazie i drugi okienko widzi to samo.
+- **To, czyja jest wiadomość, mówi serwer** (`from_me` w `MessageSchema`) — okno czatu nie zagląda do
+  store'a logowania, więc aplikacje nie zależą od `shell` i bańka wie, po której stronie stanąć.
+- **Kształt wątku to czyste funkcje** (`apps/chat/chatView.ts`: `startsGroup`, `avatarHue`,
+  `avatarInitial`): grupowanie po autorze i 5 minutach, kolor awatara z nicku. Komponent tylko pyta
+  „rysować imię tutaj?" i ma to testowane bez renderowania.
+- **Wąskie okno: lista rozmów za przyciskiem** (`@media (max-width: 620px)`, `data-side` na kontenerze).
+  jsdom nie ma `matchMedia`, więc komponent pyta o niego przez `typeof` i bez niego przyjmuje „jest szeroko".
 - **Notatnik nie ma historii** (migracja `007_drop_note_revisions.sql` kasuje tabelę `note_revisions`).
   Historia była zgadywanką: autozapis co 500 ms, każdy skuteczny zapis dodawał wpis, a lista „Historia”
   zapełniała się wersjami, których nikt nie otwierał. Notatka to teraz dokładnie to, co w polu tekstowym —

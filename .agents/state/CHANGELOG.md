@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 2026-11-10 — czat przestaje być sztywny: bańki, awatary, luźny pasek pisania
+
+- Wiadomości to teraz bańki, nie karty: swoje niebieskie (`.me`), obce szare (`.them`), usunięte —
+  ramka przerywana. Szerokość bańki `min(78%, 640px)`, tekst zawija się tam, gdzie trzeba.
+- Awatar: koło z pierwszą literą nicku, kolor liczony z nicku (`chatView.ts: avatarHue` — paleta ośmiu
+  spokojnych barw, ten sam człowiek zawsze tak samo). Usunięte konto dostaje „?".
+- Grupowanie: kolejne wiadomości tej samej osoby w ciągu 5 minut tworzą jeden blok — imię i godzina przy
+  pierwszym, przy następnych sama bańka (i `srOnly` z imieniem dla czytnika ekranu). Przerwa > 5 min
+  otwiera nowy blok (`startsGroup`). Odstęp między blokami 10 px, w bloku 2 px.
+- Licznik czasu na poprawkę + trzy kropki: chip po prawej stronie wiersza, zawsze widoczny (przygaszony),
+  na hover/focus dostaje tło. Wcześniej licznik i menu zajmowały nagłówek każdej wiadomości.
+- Pasek pisania: pill z autorskim rozrostem (1 linia → do 160 px, potem scroll), okrągły przycisk
+  wysyłania z ikoną samolotu (`aria-label="Wyślij"`), licznik znaków tylko od 80% limitu.
+- Wąskie okno (≤ 620 px): lista rozmów schowa się za przyciskiem „Rozmowy" (`data-side` na kontenerze),
+  otwarcie rozmowy ją zamyka. `useNarrow()` pyta o `matchMedia` przez `typeof` — w jsdomie go nie ma.
+- Backend: `MessageSchema` dostaje `from_me` (`shapeMessage` — serwer mówi, czyja bańka), dzięki czemu
+  aplikacja czatu nie importuje store'a logowania i trzyma kierunek zależności `apps → shared`.
+- Testy: 407 (backend 147, frontend 260) — +8 `chatView` (awatar, grupowanie), +5 kształtu wątku
+  (blok, pauza, „moje", zwijanie listy, licznik znaków), +1 kontrakt `from_me` po drugiej stronie.
+
 ## 2026-11-10 — notatnik bez historii: kasujemy `note_revisions`
 
 - Historia notatek wyszła z aplikacji: zniknęła panel „Historia” z okna, endpointy

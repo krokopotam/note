@@ -152,6 +152,8 @@ function shapeMessage(row, userId, now) {
     body: row.body,
     created_at: row.created_at,
     edited_at: row.edited_at,
+    /** Kto to napisał — okno czatu rysuje bańkę po swojej stronie tylko dlatego, że serwer to mówi. */
+    from_me: mine,
     editable_until: mine ? editableUntil(row.created_at) : null,
     can_edit: isEditable(row.author_id, userId, row.created_at, now),
   };

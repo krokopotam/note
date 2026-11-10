@@ -1,6 +1,7 @@
 .app {
+  position: relative;
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: 250px minmax(0, 1fr);
   height: 100%;
   background: #151b26;
 }
@@ -20,19 +21,24 @@
   padding: 6px;
   list-style: none;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .row,
 .rowOn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 10px;
   background: transparent;
   color: #e7eefb;
   font: inherit;
   text-align: left;
-  padding: 7px 8px;
+  padding: 6px 8px;
   cursor: pointer;
 }
 
@@ -43,6 +49,13 @@
 .rowOn {
   background: rgba(88, 148, 246, 0.18);
   border-color: rgba(88, 148, 246, 0.4);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .rowTop,
@@ -62,7 +75,7 @@
 }
 
 .rowBottom {
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .preview {
@@ -114,35 +127,58 @@
   font-weight: 600;
 }
 
+/* Button that only exists when there is no room for two columns. */
+.sideToggle {
+  display: none;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
 .thread {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-right: 4px;
+  gap: 2px;
+  padding: 4px 4px 6px 0;
 }
 
 .message {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: #101724;
-  padding: 7px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
-.gone {
-  border-style: dashed;
-  opacity: 0.8;
+/* A block starts where another person speaks — the gap is the punctuation. */
+.groupStart {
+  margin-top: 10px;
+}
+
+.gutter {
+  flex: 0 0 26px;
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.stack {
+  min-width: 0;
+  max-width: min(78%, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .meta {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
+  padding-left: 2px;
 }
 
 .author {
   font-size: 12px;
+  font-weight: 600;
   color: #a9c4f2;
 }
 
@@ -157,31 +193,75 @@
   font-style: italic;
 }
 
-.body {
-  margin: 4px 0 0;
+.bubble {
+  margin: 0;
+  padding: 6px 11px;
+  border-radius: 14px;
   font-size: 13px;
+  line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-/* Right end of a message header: how much time is left, then the dots. */
-.tail {
+/* The corner that points at the avatar is the sharp one. */
+.groupStart .bubble {
+  border-top-left-radius: 6px;
+}
+
+.them .bubble {
+  background: #1f2937;
+  color: #e9f0fb;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.me .bubble {
+  background: #2f62c4;
+  color: #f4f8ff;
+  border: 1px solid rgba(148, 190, 255, 0.35);
+}
+
+.gone .bubble {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  color: #8d9cb6;
+  font-style: italic;
+}
+
+/* Time left + actions: a chip that shows up when the message is looked at. */
+.tools {
+  margin-left: auto;
+  align-self: center;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  opacity: 0.55;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease;
+}
+
+/* The time left is always readable; the pill around it only appears when hovered. */
+.message:hover .tools,
+.message:focus-within .tools {
+  opacity: 1;
+  background: rgba(10, 16, 26, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .left {
-  color: #7e8ba3;
+  color: #a6b6cf;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .editForm {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 6px;
 }
 
 .editBox {
@@ -202,21 +282,64 @@
   gap: 8px;
 }
 
+.pill {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: #0d1420;
+  padding: 5px 14px;
+}
+
+.pill:focus-within {
+  border-color: rgba(88, 148, 246, 0.6);
+}
+
 .input {
   flex: 1;
-  min-height: 46px;
-  resize: vertical;
+  min-height: 22px;
+  max-height: 160px;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  line-height: 1.4;
+  resize: none;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.counter {
+  padding-bottom: 5px;
+  color: #7e8ba3;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .send {
-  white-space: nowrap;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #5894f6;
+  color: #08101d;
+}
+
+.send:hover:not(:disabled) {
+  background: #7bb0ff;
 }
 
 /* --- nowy czat ------------------------------------------------------------- */
 
 .newPanel {
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #101724;
   padding: 8px 10px;
 }
@@ -261,6 +384,16 @@
 
 /* --- wspólne --------------------------------------------------------------- */
 
+.avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  font-weight: 600;
+  user-select: none;
+}
+
 .empty {
   color: #7e8ba3;
   font-size: 12px;
@@ -274,6 +407,15 @@
   color: #ffb4b4;
   font-size: 12px;
   padding: 6px 10px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 input,
@@ -299,4 +441,33 @@ button:hover:not(:disabled) {
 button:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* --- wąskie okno: lista rozmów chowa się za przyciskiem -------------------- */
+
+@media (max-width: 620px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(82%, 280px);
+    z-index: 6;
+    background: #151b26;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.16s ease;
+  }
+
+  .app[data-side='open'] .side {
+    transform: none;
+    box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+  }
+
+  .sideToggle {
+    display: inline-flex;
+    align-items: center;
+  }
 }

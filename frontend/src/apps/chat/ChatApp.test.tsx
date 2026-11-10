@@ -2,7 +2,7 @@
  * The chat window, driven like a person: read the list, answer, fix a typo inside
  * the five minutes, start a new thread.
  */
-import { screen, within } from '@testing-library/dom';
+import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pickRowAction } from '../../test/rowMenu';
@@ -48,6 +48,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   body: `wiadomość ${id}`,
   created_at: '2026-01-05T10:00:00.000Z',
   edited_at: null,
+  from_me: true,
   editable_until: stillEditable,
   can_edit: true,
   ...overrides,
@@ -61,7 +62,7 @@ beforeEach(() => {
   useChat.setState(chatDefaults);
   vi.resetAllMocks();
   api.conversations.mockResolvedValue({ items: [conversation(1)] });
-  api.messages.mockResolvedValue({ items: [message(1), message(2, { author_id: 11, author_name: 'ola', can_edit: false })] });
+  api.messages.mockResolvedValue({ items: [message(1), message(2, { author_id: 11, author_name: 'ola', can_edit: false, from_me: false })] });
   api.people.mockResolvedValue({ items: [{ id: 5, username: 'ola' }, { id: 6, username: 'ivo' }] });
   api.start.mockResolvedValue(conversation(3, { peer: { id: 5, username: 'ola' } }));
   api.send.mockResolvedValue(message(9, { body: 'cześć' }));
@@ -108,6 +109,69 @@ describe('reading', () => {
     renderChat();
 
     expect(await screen.findByTestId('message-1')).toHaveTextContent('edytowane');
+  });
+});
+
+describe('kształt wątku', () => {
+  it('prints the name and the hour once per block, not once per line', async () => {
+    api.messages.mockResolvedValue({
+      items: [
+        message(1, { body: 'od 12 do 13.30 mam spotkanie' }),
+        message(2, { body: 'o której wracają?' }),
+        message(3, { author_id: 11, author_name: 'ola', from_me: false, can_edit: false, body: 'Ok, potem obiad' }),
+      ],
+    });
+
+    renderChat();
+    await screen.findByTestId('message-3');
+
+    expect(screen.getAllByText('Ty')).toHaveLength(1);
+    expect(screen.getByTestId('message-2')).not.toHaveTextContent('Ty');
+    expect(screen.getByTestId('message-3')).toHaveTextContent('ola');
+  });
+
+  it('breaks the block when the same person comes back after a pause', async () => {
+    api.messages.mockResolvedValue({
+      items: [
+        message(1, { created_at: '2026-01-05T10:00:00.000Z' }),
+        message(2, { created_at: '2026-01-05T12:30:00.000Z' }),
+      ],
+    });
+
+    renderChat();
+    await screen.findByTestId('message-2');
+
+    expect(screen.getAllByText('Ty')).toHaveLength(2);
+  });
+
+  it('says which bubbles are mine', async () => {
+    renderChat();
+    await screen.findByTestId('message-1');
+
+    expect(screen.getByTestId('message-1')).toHaveAttribute('data-me');
+    expect(screen.getByTestId('message-2')).not.toHaveAttribute('data-me');
+  });
+
+  it('folds the list of conversations behind a button in a narrow window', async () => {
+    renderChat();
+    expect(await screen.findByTestId('chat')).toHaveAttribute('data-side', 'closed');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rozmowy' }));
+    expect(screen.getByTestId('chat')).toHaveAttribute('data-side', 'open');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rozmowy' }));
+    expect(screen.getByTestId('chat')).toHaveAttribute('data-side', 'closed');
+  });
+
+  it('counts characters only when the message gets long', async () => {
+    renderChat();
+    const field = await screen.findByRole('textbox', { name: 'Treść wiadomości' });
+
+    expect(screen.queryByText(/\/2000/)).not.toBeInTheDocument();
+
+    fireEvent.change(field, { target: { value: 'x'.repeat(1700) } });
+
+    expect(screen.getByText('1700/2000')).toBeInTheDocument();
   });
 });
 

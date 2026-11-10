@@ -88,10 +88,15 @@ describe('messages', () => {
       author_name: 'ala',
       body: 'cześć, Olu',
       edited_at: null,
+      from_me: true,
       can_edit: true,
     });
     const window = (Date.parse(sent.body.editable_until) - Date.parse(sent.body.created_at)) / 60_000;
     expect(window).toBe(MESSAGE_EDIT_MINUTES);
+
+    // The other side gets the same message, but the bubble is not theirs.
+    const seen = await ola.api.get(`/api/chat/conversations/${conv.id}/messages`);
+    expect(seen.body.items[0]).toMatchObject({ from_me: false, can_edit: false });
   });
 
   it('refuses an empty message and one that is a wall of text', async () => {

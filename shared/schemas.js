@@ -309,6 +309,8 @@ export const MessageSchema = z.object({
   body: z.string(),
   created_at: z.string(),
   edited_at: z.string().nullable(),
+  /** Czy napisał to zalogowany użytkownik — decyduje serwer, nie przeglądarka. */
+  from_me: z.boolean(),
   /** When editing stops being possible; null for somebody else's message. */
   editable_until: z.string().nullable(),
   /** Decided by the server — the client only draws what it is told. */

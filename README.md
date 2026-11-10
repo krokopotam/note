@@ -102,7 +102,14 @@ Rozmowy są jeden-na-jeden z dowolnym kontem w serwisie. Para ma jeden wątek (u
 **Wiadomość można zmienić przez 5 minut od jej napisania** (`MESSAGE_EDIT_MINUTES`). Okno liczy się od
 chwili wysłania, więc poprawka w czwartej minucie nie dokłada kolejnych pięciu. Po upływie czasu
 serwer odpowiada `403 edit_window_closed`; interfejs pokazuje przycisk „Popraw" tylko dopóki czas nie
-minął (licznik sekund odświeża się co sekundę). Usunąć własną wiadomość można zawsze.
+minął. Akcje wiadomości — podobnie jak gdzie indziej — siedzą pod trzema kropkami obok bańki;
+pojawiają się, gdy najedzie się na wiadomość, a licznik czasu widać cały czas. Usunąć własną wiadomość
+można zawsze.
+
+Wiadomości układają się w **bańki**: swoje są niebieskie, obce szare, awatar z pierwszą literą nicku
+koloruje się na stałe po nicku. Następujące jedna po drugiej wiadomości tej samej osoby spinają się w
+blok — imię i godzina są przy pierwszej, przy następnych tylko bańka (przerwa dłuższa niż 5 minut
+otwiera nowy blok). Na wąskim oknie lista rozmów chowa się za przyciskiem „Rozmowy".
 
 Nowe wiadomości przychodzą przez **odpytywanie co 3 s**, dopóki okno jest otwarte i widoczne w karcie —
 aplikacja nie ma procesów w tle ani gniazd websocket, więc da się ją zrestartować w każdej chwili.

@@ -37,6 +37,7 @@ const message = (id: number, overrides: Partial<Message> = {}): Message => ({
   body: `wiadomość ${id}`,
   created_at: '2026-01-05T10:00:00.000Z',
   edited_at: null,
+  from_me: true,
   editable_until: '2026-01-05T10:05:00.000Z',
   can_edit: true,
   ...overrides,
