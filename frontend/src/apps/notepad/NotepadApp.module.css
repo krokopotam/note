@@ -205,12 +205,15 @@
 @media (max-width: 760px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(120px, 34vh) minmax(0, 1fr);
+    /* Lista bierze tyle, ile ma wierszy, ale nie więcej niż kawałek ekranu. */
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    max-height: 42vh;
+    overflow-y: auto;
   }
 
   .tools {

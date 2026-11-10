@@ -127,6 +127,21 @@ describe('reading', () => {
     expect(await screen.findByTestId('conversation-1')).toHaveTextContent('wiadomość usunięta');
   });
 
+  it('offers a way into a conversation when nothing is open', async () => {
+    // A phone has no "left": nothing is open, so the way in has to be on screen.
+    api.conversations.mockResolvedValue({ items: [] });
+
+    renderChat();
+    const actions = await screen.findByText('Wybierz rozmowę z listy albo napisz do kogoś nowego.');
+
+    expect(actions).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Napisz do kogoś' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rozmowy' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Napisz do kogoś' }));
+    expect(await screen.findByTestId('new-chat')).toBeInTheDocument();
+  });
+
   it('opens the first conversation and lists its messages', async () => {
     renderChat();
 

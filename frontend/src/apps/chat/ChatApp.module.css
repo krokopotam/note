@@ -686,6 +686,14 @@ button:disabled {
   .thread {
     padding: 4px 2px 6px 0;
   }
+
+  /* Te przyciski są jedyną drogą do rozmowy, gdy nic nie jest otwarte. */
+  .sideToggle,
+  .noChat .newChat {
+    min-height: 44px;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
 }
 
 /* Na ekranie dotykowym nie ma „spojrzenia": chip z czasem i kropkami jest widoczny
@@ -701,4 +709,27 @@ button:disabled {
     /* Kropki obok bańki muszą trafić w palec, nie w piksel. */
     min-height: 44px;
   }
+}
+
+/* Brak otwartej rozmowy: miejsce na środek ekranu i przyciski, które do czegoś prowadzą. */
+.noChat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.noChatActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.noChat .empty {
+  font-size: 13px;
 }

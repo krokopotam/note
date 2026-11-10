@@ -364,12 +364,15 @@ button:hover {
   /* Zasoby u góry (przewijane), pliki pod nimi. */
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(96px, 30vh) minmax(0, 1fr);
+    /* Pusta lista zasobów nie ma prawa zabierać połowy telefonu. */
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .side {
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    max-height: 42vh;
+    overflow-y: auto;
   }
 
   .main {

@@ -84,9 +84,25 @@ export function ChatApp(_props: AppProps) {
         {state.addMemberOpen && <AddMember />}
 
         {active === null ? (
-          <p className={styles.empty}>
-            Wybierz rozmowę po lewej albo napisz do kogoś nowego.
-          </p>
+          <div className={styles.noChat}>
+            <p className={styles.empty}>Wybierz rozmowę z listy albo napisz do kogoś nowego.</p>
+            <div className={styles.noChatActions}>
+              {/* Na wąskim ekranie lista jest schowana — droga do niej musi być stąd. */}
+              <button
+                type="button"
+                className={styles.sideToggle}
+                aria-label="Rozmowy"
+                aria-expanded={sideOpen}
+                onClick={() => setSideOpen(true)}
+              >
+                Rozmowy
+              </button>
+              {/* Osobna etykieta: przycisk „Nowy czat" już stoi na liście rozmów. */}
+              <button type="button" className={styles.newChat} onClick={() => void state.openNewChat()}>
+                Napisz do kogoś
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <header className={styles.head}>

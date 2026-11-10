@@ -202,13 +202,20 @@
     gap: 10px;
   }
 
+  /* Pole szuka musi być czytelne, a nie ściśnięte między selektorem a „przypięte". */
   .search {
+    flex: 1 1 100%;
     min-width: 0;
+    order: -1;
   }
 
   .create,
   .search,
   .sort {
     min-height: 42px;
+  }
+
+  .card {
+    min-height: 130px;
   }
 }

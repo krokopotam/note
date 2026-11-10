@@ -57,7 +57,7 @@ export function FilesApp(_props: AppProps) {
           <p className={styles.empty}>
             {state.status === 'loading'
               ? 'Wczytuję…'
-              : 'Nie masz jeszcze żadnego zasobu. Dodaj go po lewej stronie — pliki wrzuca się do środka.'}
+              : 'Nie masz jeszcze żadnego zasobu. Dodaj go pod listą zasobów — pliki wrzuca się do środka.'}
           </p>
         ) : (
           <>
