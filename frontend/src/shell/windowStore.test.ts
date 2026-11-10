@@ -127,6 +127,23 @@ describe('window store', () => {
     expect(second.y).toBeGreaterThan(first.y);
   });
 
+  it('goes home without closing anything: apps keep running behind the bar', () => {
+    openApp('calculator');
+    openApp('notepad');
+
+    useWindows.getState().goHome();
+
+    expect(useWindows.getState().focusedKey).toBeNull();
+    expect(useWindows.getState().windows.every((win) => win.minimized)).toBe(true);
+
+    // Coming back to an app is what the dock button does: same window, still open.
+    openApp('calculator');
+    expect(useWindows.getState().focusedKey).toBe('calculator');
+    expect(useWindows.getState().windows.find((win) => win.key === 'calculator')).toMatchObject({
+      minimized: false,
+    });
+  });
+
   it('maximises and restores without losing the restored geometry', () => {
     openApp('calculator');
     useWindows.getState().move('calculator', 120, 90);

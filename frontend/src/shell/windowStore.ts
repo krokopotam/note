@@ -48,6 +48,8 @@ interface WindowStore {
   setTitle: (key: string, title: string) => void;
   toggleMinimize: (key: string) => void;
   toggleMaximize: (key: string) => void;
+  /** Phone: home is not closing — every app keeps running, only the screen is empty. */
+  goHome: () => void;
 }
 
 const CASCADE = 28;
@@ -176,6 +178,12 @@ export const useWindows = create<WindowStore>((set, get) => ({
       windows: state.windows.map((win) =>
         win.key === key ? { ...win, maximized: !win.maximized } : win,
       ),
+    })),
+
+  goHome: () =>
+    set((state) => ({
+      focusedKey: null,
+      windows: state.windows.map((win) => ({ ...win, minimized: true })),
     })),
 }));
 

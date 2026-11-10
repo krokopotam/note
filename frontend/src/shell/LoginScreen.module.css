@@ -128,3 +128,30 @@
   font-size: 12px;
   text-align: center;
 }
+
+/* --- telefon --------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  /* Klawiatura zjada połowę ekranu: karta zaczyna się u góry i sama się przewija. */
+  .screen {
+    place-items: start center;
+    padding: 20px 14px;
+    overflow-y: auto;
+  }
+
+  .card {
+    width: 100%;
+    padding: 20px 16px 16px;
+    gap: 14px;
+  }
+
+  .tab,
+  .tabActive {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .submit {
+    min-height: 48px;
+  }
+}

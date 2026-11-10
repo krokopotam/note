@@ -1,6 +1,7 @@
 # note
 
-Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami, karteczki,
+Pulpit w przeglądarce — i wersja na telefon (jedna aplikacja na ekranie, pasek na dole):
+okna, dock, launcher, kalkulator, notatnik z zakładkami, karteczki,
 pliki (drag & drop do zasobów, współdzielonych z innymi kontami) oraz czaty — rozmowy z innymi
 kontami, ze zmianą wiadomości przez 5 minut, ze zdjęciami i emotikonkami.
 Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki, pliki i układ pulpitu.
@@ -35,7 +36,25 @@ wiersza: wspólny `frontend/src/shared/RowMenu.tsx`, więc w pliku, karteczce, w
 jest ten sam. Na wierzchu zostaje tworzenie („Nowa notatka", „Dodaj zasób", „Nowy czat") i kolory
 karteczek, czyli to, co wybiera się często.
 
-Zależności idą w jednym kierunku: `http → repos → domain`, `shell → registry → apps → shared`.
+## Telefon
+
+Poniżej 760 px (`shell/viewport.ts`) to samo środowisko układa się inaczej, bez drugiego
+rozkładu kodu:
+
+- **ikony w kolejności czytania** — zapisane pozycje opisują pulpit kilka razy szerszy niż telefon,
+  więc na telefonie są przepływowe (te same ikony, ten sam porządek, przeciąganie wyłączone,
+  jedno tapnięcie otwiera);
+- **aplikacja na cały ekran** — na wierzchu jest tylko ta otwarta, pozostałe czekają w tle
+  (kropka na pasku), w nagłówku zamiast trzech kółek: „Wróć do pulpitu" i „Zamknij";
+- **pasek na dole**: Pulpit, ulubione aplikacje i „Wszystkie" (szuflada z listą wszystkiego, ta
+  sama co w launcherze); launchera po lewej nie ma w ogóle;
+- **pulpit ma wiersz działań** („Nowa notatka", „Nowa karteczka", „Nowy folder", „Wszystkie
+  aplikacje"), bo prawy przycisk myszy na telefonie nie istnieje;
+- wysokość liczona w `dvh` (pasek adresu przeglądarki), `viewport-fit=cover` + `env(safe-area-inset-*)`,
+  pola tekstu 16 px (inaczej Safari przybliża przy pisaniu), cele dotyku ≥ 40 px, a tam, gdzie
+  coś pojawiało się po najechaniu — widać to stale przy `hover: none`.
+
+## Zależności idą w jednym kierunku: `http → repos → domain`, `shell → registry → apps → shared`.
 Aplikacje nie importują shella, shell nie importuje aplikacji (tylko rejestr).
 
 ## Uruchomienie lokalne

@@ -53,3 +53,25 @@
 .logout:hover {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* --- telefon --------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .bar {
+    gap: 8px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  /* Telefon ma własny zegar w pasku systemu — powtarzanie go tu to tylko strata miejsca. */
+  .clock {
+    display: none;
+  }
+
+  .logout,
+  .user {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

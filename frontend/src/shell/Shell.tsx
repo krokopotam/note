@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppDrawer } from './AppDrawer';
 import { ContextMenu } from './ContextMenu';
 import { LoginScreen } from './LoginScreen';
 import { useAuth, watchSessionLoss } from './authStore';
@@ -7,9 +8,11 @@ import { Dock } from './Dock';
 import { Launcher } from './Launcher';
 import { TopBar } from './TopBar';
 import { startBadgePoll } from './badgeStore';
+import { useDrawer } from './drawerStore';
 import { useDesktop } from './desktopStore';
 import { WindowFrame } from './WindowFrame';
 import { useWindows } from './windowStore';
+import { usePhone } from './viewport';
 import styles from './Shell.module.css';
 
 /**
@@ -29,6 +32,8 @@ export function Shell() {
   const error = useDesktop((state) => state.error);
   const windows = useWindows((state) => state.windows);
   const focusedKey = useWindows((state) => state.focusedKey);
+  const phone = usePhone();
+  const drawerOpen = useDrawer((state) => state.open);
 
   useEffect(() => {
     void boot();
@@ -56,11 +61,15 @@ export function Shell() {
 
   if (authStatus === 'anonymous') return <LoginScreen />;
 
+  // Na telefonie widać tylko ta aplikacja, która jest na wierzchu — reszta żyje
+  // za paskiem na dole, tak jak w tle trzyma się aplikację na prawdziwym telefonie.
+  const visible = phone ? windows.filter((win) => win.key === focusedKey) : windows;
+
   return (
-    <div className={styles.shell} data-testid="shell">
+    <div className={styles.shell} data-testid="shell" data-phone={phone || undefined}>
       <Desktop />
 
-      {windows.map((win) => (
+      {visible.map((win) => (
         <WindowFrame key={win.key} win={win} focused={win.key === focusedKey} />
       ))}
 
@@ -68,6 +77,7 @@ export function Shell() {
       <Launcher />
       <Dock />
       <ContextMenu />
+      {drawerOpen && <AppDrawer />}
 
       {error && (
         <div className={styles.toast} role="alert" data-testid="error-toast">

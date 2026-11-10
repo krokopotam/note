@@ -18,10 +18,11 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
 | Czaty (1:1 i grupy, wiadomości, okno edycji 5 min, nieprzeczytane, znak na ikonie) | gotowy, działa |
 | Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
-| Build produkcyjny (`frontend/dist`, 225 kB / 73 kB gzip) | przechodzi |
+| Układ na telefon (ikony w przepływie, aplikacja na cały ekran, pasek na dole, safe area) | gotowy, testy |
+| Build produkcyjny (`frontend/dist`, 230 kB / 74 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 476 przechodzi (backend 173, frontend 303). `npm run lint` → czysto.
+Testy: `npm test` → 496 przechodzi (backend 176, frontend 320). `npm run lint` → czysto.
 
 Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
 i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
@@ -33,6 +34,21 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (telefon)
+
+- **Jeden kod, dwa układy.** `usePhone()` (`shell/viewport.ts`, 760 px) pyta `matchMedia`, a nie
+  agenta. Nie ma osobnej aplikacji mobilnej ani drugiego drzewa komponentów: `Desktop`, `IconGrid`,
+  `WindowFrame`, `Dock` i `Launcher` wiedzą o telefonie po jednej fladze.
+- **Zapisane pozycje ikon zostają deskkopowe.** Na telefonie siatka jest przepływowa — numeruje te
+  same ikony w tej samej kolejności. Próba wyświetlenia komórek `x/y` na 390 px oznaczała ikony,
+  których nie da się dosiągnąć ani przewinąć.
+- **Telefon ma jedną aplikację na ekranie, ale nic nie ginie.** `goHome()` minimalizuje wszystko
+  zamiast zamykać: okno wraca tym samym przyciskiem na dole, z tym samym stanem w środku.
+- **Szuflada „Wszystkie aplikacje" jest jedna** (`AppDrawer` + `drawerStore`) — launcher i pasek
+  telefonu otwierają to samo okno, z tymi samymi test ids.
+- **Wysokość w `dvh`, dolna krawędź w `env(safe-area-inset-bottom)`** — bez tego pole pisania w czacie
+  lądowało pod paskiem przeglądarki albo pod gestem „home".
 
 ## Decyzje (poprawka: „miniatura poprzedniego zdjęcia")
 

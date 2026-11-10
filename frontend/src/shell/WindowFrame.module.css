@@ -93,3 +93,53 @@
   overflow: auto;
   position: relative;
 }
+
+/* --- telefon: aplikacja na cały ekran ------------------------------------- */
+
+/*
+ * The sheet stops above the bottom bar (and above the phone's own gesture area),
+ * so nothing an app puts at its bottom edge — the chat's field for typing, a
+ * "save" button — hides under a thumb.
+ */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--topbar-h);
+  bottom: calc(var(--dock-band) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  background: #161c27;
+  overflow: hidden;
+}
+
+.sheetBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 0 8px;
+  background: linear-gradient(#242d3d, #1b2230);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.back,
+.sheetClose {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #dbe4f4;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.back:active,
+.sheetClose:active {
+  background: rgba(255, 255, 255, 0.18);
+}

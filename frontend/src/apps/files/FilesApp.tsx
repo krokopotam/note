@@ -87,7 +87,7 @@ export function FilesApp(_props: AppProps) {
                   }}
                 />
                 <strong>Przeciągnij pliki tutaj</strong>
-                <span>albo kliknij, aby wybrać z dysku · do {MAX_UPLOAD_MB} MB na plik</span>
+                <span>albo dotknij, żeby wybrać z dysku · do {MAX_UPLOAD_MB} MB na plik</span>
               </label>
             ) : (
               <p className={styles.readOnly}>Ten zasób jest tylko do odczytu — możesz pobierać pliki.</p>

@@ -52,3 +52,60 @@
   border: 1px solid rgba(207, 225, 255, 0.5);
   border-radius: 10px;
 }
+
+/* --- telefon: pasek na dole, rozmiar pod kciuk ----------------------------- */
+
+.tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 16, 24, 0.96);
+  z-index: 900;
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #b9c8e2;
+  font: inherit;
+  font-size: 10px;
+  padding: 4px 2px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  touch-action: manipulation;
+}
+
+.tab:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.tabOn {
+  background: rgba(88, 148, 246, 0.18);
+  color: #eaf1ff;
+}
+
+.tabGlyph {
+  position: relative;
+  display: inline-flex;
+}
+
+.tabLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

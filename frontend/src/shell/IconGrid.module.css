@@ -55,3 +55,48 @@
   padding: 2px 3px;
   text-align: center;
 }
+
+/* --- telefon: ikony w kolejności czytania --------------------------------- */
+
+/*
+ * Flow mode keeps the same icons but not the same coordinates: a saved column
+ * eight does not exist on a phone. Cells are as wide as a thumb, and the icon is
+ * a button in the flow rather than something pinned to a corner of the screen.
+ */
+.flow {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 6px;
+  min-height: 0;
+}
+
+.flow .icon {
+  position: static;
+  width: auto;
+  min-height: 76px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  gap: 6px;
+  /* Without this, dragging an icon and scrolling the desktop are the same gesture. */
+  touch-action: manipulation;
+}
+
+.flow .icon:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Długie przytrzymanie ma otwierać menu ikony, a nie systemowe „zapisz obrazek". */
+.flow .icon {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.flow .label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.15;
+}

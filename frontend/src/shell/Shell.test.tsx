@@ -1,8 +1,9 @@
 import { fireEvent, screen, within } from '@testing-library/dom';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, request, type RequestOptions } from '../api/client';
+import { clearViewportStub, stubViewport } from '../test/viewport';
 import { Shell } from './Shell';
 import { useAuth } from './authStore';
 import { desktopDefaults, useDesktop } from './desktopStore';
@@ -449,5 +450,118 @@ describe('maximised windows', () => {
 
     await userEvent.click(screen.getByTestId('dock-calculator'));
     expect(screen.getByTestId('window-calculator')).toBeInTheDocument();
+  });
+});
+
+describe('telefon', () => {
+  afterEach(() => clearViewportStub());
+
+  /** A phone the shell can measure: narrow from the very first render. */
+  const asPhone = () => stubViewport(390);
+
+  it('has no left bar, and the bottom bar offers home and everything', async () => {
+    asPhone();
+    render(<Shell />);
+    await screen.findByTestId('desktop');
+
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-phone', 'true');
+    // The left launcher is the desktop's; a phone has no room for a second bar.
+    expect(screen.queryByTestId('launcher-all')).not.toBeInTheDocument();
+
+    const bar = screen.getByTestId('phone-bar');
+    expect(within(bar).getByRole('button', { name: 'Pulpit' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Wszystkie aplikacje' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /Kalkulator/ })).toBeInTheDocument();
+  });
+
+  it('shows icons in reading order and opens one with a single tap', async () => {
+    asPhone();
+    render(<Shell />);
+    const grid = await screen.findByTestId('icon-grid-desktop');
+
+    // No saved coordinates on a phone: column eight does not exist here.
+    expect(grid).toHaveAttribute('data-flow', 'true');
+    expect(screen.getByTestId('icon-1')).not.toHaveStyle({ position: 'absolute' });
+
+    await userEvent.click(screen.getByTestId('icon-1'));
+
+    expect(await screen.findByTestId('window-calculator')).toBeInTheDocument();
+  });
+
+  it('opens an app full screen with a way back instead of window buttons', async () => {
+    asPhone();
+    render(<Shell />);
+    await userEvent.click(await screen.findByTestId('icon-1'));
+
+    const sheet = await screen.findByTestId('window-calculator');
+    expect(within(sheet).getByRole('button', { name: 'Wróć do pulpitu' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Zamknij' })).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Maksymalizuj' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Zminimalizuj' })).not.toBeInTheDocument();
+  });
+
+  it('goes home but keeps the app, and brings it back from the bar', async () => {
+    asPhone();
+    render(<Shell />);
+    await userEvent.click(await screen.findByTestId('icon-1'));
+    await screen.findByTestId('window-calculator');
+
+    await userEvent.click(screen.getByTestId('phone-home'));
+
+    expect(screen.queryByTestId('window-calculator')).not.toBeInTheDocument();
+    expect(useWindows.getState().windows.map((win) => win.key)).toEqual(['calculator']);
+
+    await userEvent.click(screen.getByTestId('dock-calculator'));
+
+    expect(await screen.findByTestId('window-calculator')).toBeInTheDocument();
+  });
+
+  it('shows only the application on top, the others wait behind the bar', async () => {
+    asPhone();
+    render(<Shell />);
+    await userEvent.click(await screen.findByTestId('icon-1'));
+    await screen.findByTestId('window-calculator');
+
+    await userEvent.click(screen.getByTestId('icon-2'));
+
+    expect(await screen.findByTestId('window-notepad')).toBeInTheDocument();
+    expect(screen.queryByTestId('window-calculator')).not.toBeInTheDocument();
+    expect(useWindows.getState().windows.map((win) => win.key)).toEqual(['calculator', 'notepad']);
+  });
+
+  it('reaches every installed app from the bottom bar', async () => {
+    asPhone();
+    render(<Shell />);
+    await screen.findByTestId('desktop');
+
+    await userEvent.click(screen.getByTestId('phone-drawer'));
+    const drawer = await screen.findByRole('dialog', { name: 'Wszystkie aplikacje' });
+
+    await userEvent.click(within(drawer).getByTestId('appgrid-stickies'));
+
+    expect(await screen.findByTestId('window-stickies')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Wszystkie aplikacje' })).not.toBeInTheDocument();
+  });
+
+  it('creates things without a right mouse button', async () => {
+    asPhone();
+    render(<Shell />);
+    const actions = await screen.findByTestId('phone-actions');
+
+    await userEvent.click(within(actions).getByRole('button', { name: 'Nowa notatka' }));
+
+    expect(mockedRequest).toHaveBeenCalledWith('/notes', { method: 'POST', body: { body: '' } });
+    expect(await screen.findByTestId('window-notepad')).toBeInTheDocument();
+  });
+
+  it('turns into a desktop again when the screen grows', async () => {
+    const viewport = asPhone();
+    render(<Shell />);
+    await screen.findByTestId('phone-bar');
+
+    act(() => viewport.resize(1200));
+
+    expect(await screen.findByLabelText('Pasek aplikacji')).toBeInTheDocument();
+    expect(screen.queryByTestId('phone-bar')).not.toBeInTheDocument();
   });
 });

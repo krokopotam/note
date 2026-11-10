@@ -19,6 +19,19 @@ body,
   margin: 0;
 }
 
+/*
+ * Na telefonie 100% to nie to samo co ekran: pasek adresu przeglądarki znika i
+ * pojawia się przy przewijaniu, więc stała wysokość albo tnie treść, albo zostawia
+ * pusty pas. `dvh` liczy ekran taki, jaki jest w tej chwili.
+ */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
 body {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-size: 14px;
@@ -48,4 +61,32 @@ button {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/*
+ * Telefon: inne proporcje interfejsu. Górny pasek jest odrobinę wyższy (mieści
+ * tytuł aplikacji), lewego launcher-a nie ma wcale, a dół to pasek aplikacji, pod
+ * którym liczy się jeszcze safe area. JS (windowStore, grid.ts) czyta te same
+ * liczby ze stałych w shell/grid.ts — wartości muszą się zgadzać.
+ */
+@media (max-width: 760px) {
+  :root {
+    --topbar-h: 40px;
+    --launcher-w: 0px;
+    --dock-band: 64px;
+  }
+
+  body {
+    font-size: 15px;
+    /* Podwójne tapnięcie nie może przybliżać strony — to aplikacja ma rozmiar. */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Poniżej 16 px Safari przybliża ekran przy każdym wpisaniu w pole. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## 2026-11-10 — wersja na telefon
+
+Ten sam kod, inne ułożenie: poniżej 760 px shell przestaje udawać desktop (`shell/viewport.ts`,
+`usePhone()`), zamiast drugiej aplikacji w kodzie.
+
+- **Ikony**: `IconGrid` tryb `flow` — kolejność czytania zamiast zapisanych komórek (kolumna ósma
+  nie istnieje na ekranie, w którym są cztery), przeciąganie wyłączone, jedno tapnięcie otwiera.
+  Siatka `auto-fill minmax(80px, 1fr)`.
+- **Okna**: na telefonie renderowana jest tylko aplikacja na wierzchu (`Shell`), jako arkusz od
+  górnego paska do dolnego; w nagłówku „Wróć do pulpitu" (`goHome()` — nic się nie zamyka, aplikacje
+  czekają w tle) i „Zamknij". Brak przeciągania i brak kolorowych kółek.
+- **Pasek na dole** (`Dock` → `PhoneBar`): Pulpit + ulubione (ikona, nazwa, znak nieprzeczytanych)
+  + „Wszystkie aplikacje". Szuflada z listą to teraz osobny `AppDrawer` + `drawerStore`, z którego
+  korzystają i launcher, i telefon.
+- **Launcher**: na telefonie nie istnieje; tworzenie rzeczy dostaje wiersz przycisków na pulpicie,
+  bo nie ma prawego przycisku myszy (długie przytrzymanie ikony dalej otwiera jej menu).
+- **Reszta**: `dvh` zamiast `%` (pasek adresu), `viewport-fit=cover` + `env(safe-area-inset-bottom)`,
+  `--launcher-w: 0`, `--dock-band: 64`, `--topbar-h: 40`, pola tekstu 16 px (Safari nie przybliża),
+  zegar w górnym pasku znika (telefon ma swój), chip przy wiadomości widoczny stale przy `hover: none`,
+  klawiatura kalkulatora i karteczki większe, notatnik i pliki układają się w jednej kolumnie.
+- Testy: frontend 320 (+13: `viewport`, `goHome`, osiem scenariuszy telefonu w `Shell`),
+  helper `test/viewport.ts` (fałszywy `matchMedia`, który reaguje na zmianę szerokości).
+
 ## 2026-11-10 — „wylałem zdjęcie, a pojawiła się miniatura poprzedniego"
 
 Nie zniknęło nic po stronie danych: to przeglądarka pokazała stary obraz z własnej pamięci.

@@ -23,9 +23,18 @@ interface IconGridProps {
   onOpen: (item: DesktopItem) => void;
   /** Empty space to keep below the icons, in rows. */
   minRows?: number;
+  /**
+   * Reading order instead of stored cells, and one tap instead of a double click.
+   *
+   * Saved positions describe a desktop many times wider than a phone: an icon in
+   * column eight simply does not exist on a screen that fits four. So on a phone
+   * the same icons are laid out in the order they were placed, and dragging —
+   * which would fight the scroll of the screen — is off.
+   */
+  flow?: boolean;
 }
 
-export function IconGrid({ parentId, items, onOpen, minRows = 5 }: IconGridProps) {
+export function IconGrid({ parentId, items, onOpen, minRows = 5, flow = false }: IconGridProps) {
   const moveItem = useDesktop((state) => state.moveItem);
   const rename = useDesktop((state) => state.rename);
   const remove = useDesktop((state) => state.remove);
@@ -68,14 +77,16 @@ export function IconGrid({ parentId, items, onOpen, minRows = 5 }: IconGridProps
   return (
     <div
       ref={gridRef}
-      className={styles.grid}
-      style={{ minHeight: minRows * CELL.height, minWidth: 6 * CELL.width }}
+      className={flow ? `${styles.grid} ${styles.flow}` : styles.grid}
+      style={{ minHeight: minRows * CELL.height, minWidth: flow ? undefined : 6 * CELL.width }}
       data-testid={`icon-grid-${parentId ?? 'desktop'}`}
+      data-flow={flow || undefined}
     >
       {siblings.map((item) => (
         <Icon
           key={item.id}
           item={item}
+          flow={flow}
           renaming={renamingId === item.id}
           onOpen={() => onOpen(item)}
           onRename={(name) => {
@@ -93,6 +104,7 @@ export function IconGrid({ parentId, items, onOpen, minRows = 5 }: IconGridProps
 
 interface IconProps {
   item: DesktopItem;
+  flow: boolean;
   renaming: boolean;
   onOpen: () => void;
   onRename: (name: string) => void;
@@ -100,9 +112,9 @@ interface IconProps {
   onMenu: (event: React.MouseEvent) => void;
 }
 
-function Icon({ item, renaming, onOpen, onRename, onDrop, onMenu }: IconProps) {
+function Icon({ item, flow, renaming, onOpen, onRename, onDrop, onMenu }: IconProps) {
   const { delta, dragging, onPointerDown } = usePointerDrag({
-    enabled: () => !renaming,
+    enabled: () => !renaming && !flow,
     onEnd: (move) => onDrop(move.clientX, move.clientY),
   });
 
@@ -113,13 +125,18 @@ function Icon({ item, renaming, onOpen, onRename, onDrop, onMenu }: IconProps) {
     <button
       type="button"
       className={dragging ? `${styles.icon} ${styles.dragging}` : styles.icon}
-      style={{
-        left: item.x * CELL.width,
-        top: item.y * CELL.height,
-        transform: delta ? `translate(${delta.dx}px, ${delta.dy}px)` : undefined,
-      }}
+      style={
+        flow
+          ? undefined
+          : {
+              left: item.x * CELL.width,
+              top: item.y * CELL.height,
+              transform: delta ? `translate(${delta.dx}px, ${delta.dy}px)` : undefined,
+            }
+      }
       onPointerDown={onPointerDown}
-      onDoubleClick={onOpen}
+      onClick={flow ? onOpen : undefined}
+      onDoubleClick={flow ? undefined : onOpen}
       onContextMenu={onMenu}
       data-testid={`icon-${item.id}`}
       data-kind={item.kind}

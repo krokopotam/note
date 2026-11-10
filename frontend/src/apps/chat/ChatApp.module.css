@@ -653,3 +653,52 @@ button:disabled {
     align-items: center;
   }
 }
+
+/* --- telefon --------------------------------------------------------------- */
+
+/*
+ * Na telefonie okno czatu jest całą szufladą, więc liczy się głównie to, czym się
+ * w nie klika: narzędzia i wysyłka muszą trafić pod kciuk, a dymki nie mogą
+ * wychodzić poza ekran.
+ */
+@media (max-width: 760px) {
+  .tool,
+  .send {
+    flex-basis: 42px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .thumb {
+    max-width: min(220px, 68vw);
+    max-height: 180px;
+  }
+
+  .pendingThumb {
+    width: 56px;
+    height: 56px;
+  }
+
+  .writing {
+    padding: 0 8px 8px;
+  }
+
+  .thread {
+    padding: 4px 2px 6px 0;
+  }
+}
+
+/* Na ekranie dotykowym nie ma „spojrzenia": chip z czasem i kropkami jest widoczny
+   cały czas, bo inaczej dałoby się go tylko zgadnąć. */
+@media (hover: none) {
+  .tools {
+    opacity: 1;
+    background: rgba(10, 16, 26, 0.92);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .message {
+    /* Kropki obok bańki muszą trafić w palec, nie w piksel. */
+    min-height: 44px;
+  }
+}

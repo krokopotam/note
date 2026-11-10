@@ -83,3 +83,23 @@
   font-size: 18px;
   font-weight: 700;
 }
+
+/* --- telefon --------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  /* Klawisze pod kciuk: wyższe, o wiele milimetrów więcej na pudło. */
+  .key {
+    min-height: 56px;
+    font-size: 20px;
+    border-radius: 12px;
+  }
+
+  .display {
+    font-size: 38px;
+  }
+
+  .calc {
+    padding: 8px;
+    gap: 8px;
+  }
+}

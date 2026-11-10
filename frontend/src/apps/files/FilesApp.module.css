@@ -357,3 +357,50 @@ button {
 button:hover {
   border-color: rgba(88, 148, 246, 0.6);
 }
+
+/* --- telefon --------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  /* Zasoby u góry (przewijane), pliki pod nimi. */
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(96px, 30vh) minmax(0, 1fr);
+  }
+
+  .side {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .main {
+    padding: 10px;
+  }
+
+  .search {
+    max-width: none;
+  }
+
+  .resource,
+  .resourceOn {
+    padding: 10px 8px;
+  }
+
+  .dropzone {
+    padding: 16px 10px;
+  }
+
+  /* Wiersz pliku: nazwa i kropki w jednym rzędzie, daty pod spodem. */
+  .file {
+    flex-wrap: wrap;
+    padding: 10px 2px;
+  }
+
+  .fileMeta {
+    font-size: 11px;
+    color: #8d9cb6;
+  }
+
+  .upload {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

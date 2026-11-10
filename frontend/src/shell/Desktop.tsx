@@ -2,9 +2,11 @@ import { APPS } from '@note/shared/manifest';
 import { request } from '../api/client';
 import type { DesktopItem, Note, Sticky } from '../api/types';
 import { useDesktop } from './desktopStore';
+import { useDrawer } from './drawerStore';
 import { IconGrid } from './IconGrid';
 import { openApp, openDesktopItem } from './openApp';
 import { useContextMenu } from './contextMenuStore';
+import { usePhone } from './viewport';
 import styles from './Desktop.module.css';
 
 /**
@@ -19,6 +21,8 @@ export function Desktop() {
   const createFolder = useDesktop((state) => state.createFolder);
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
+  const phone = usePhone();
+  const openDrawer = useDrawer((state) => state.toggle);
 
   const newNote = async () => {
     const note = await request<Note>('/notes', { method: 'POST', body: { body: '' } });
@@ -51,14 +55,37 @@ export function Desktop() {
 
   return (
     <div
-      className={styles.desktop}
+      className={phone ? `${styles.desktop} ${styles.phone}` : styles.desktop}
       onContextMenu={onContextMenu}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) closeMenu();
       }}
       data-testid="desktop"
+      data-phone={phone || undefined}
     >
-      <IconGrid parentId={null} items={items} minRows={7} onOpen={(item: DesktopItem) => openDesktopItem(item)} />
+      <IconGrid
+        parentId={null}
+        items={items}
+        minRows={phone ? 0 : 7}
+        flow={phone}
+        onOpen={(item: DesktopItem) => openDesktopItem(item)}
+      />
+      {phone && (
+        <div className={styles.actions} data-testid="phone-actions">
+          <button type="button" onClick={() => void newNote()}>
+            Nowa notatka
+          </button>
+          <button type="button" onClick={() => void newSticky()}>
+            Nowa karteczka
+          </button>
+          <button type="button" onClick={() => void createFolder()}>
+            Nowy folder
+          </button>
+          <button type="button" onClick={openDrawer}>
+            Wszystkie aplikacje
+          </button>
+        </div>
+      )}
       {items.length === 0 && (
         <div className={styles.empty}>
           <p>Pulpit jest pusty.</p>

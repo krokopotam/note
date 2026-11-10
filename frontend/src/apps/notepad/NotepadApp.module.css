@@ -195,3 +195,50 @@
   color: #93a2bd;
 }
 
+
+/* --- telefon --------------------------------------------------------------- */
+
+/*
+ * Dwie kolumny nie mieszczą się na 360 px. Lista zostaje u góry (ograniczona,
+ * żeby nie zjadła ekranu), a pod nią to, co się właśnie czyta albo pisze.
+ */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(120px, 34vh) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .search {
+    flex: 1 1 140px;
+    width: auto;
+  }
+
+  .sort,
+  .new {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .row {
+    padding: 10px;
+  }
+
+  .tabButton {
+    max-width: 40vw;
+    padding: 8px;
+  }
+
+  .editor {
+    font-size: 16px;
+  }
+}

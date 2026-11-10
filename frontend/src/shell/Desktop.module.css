@@ -28,3 +28,42 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* --- telefon: pulpit bez lewego paska, z paskiem na dole -------------------- */
+
+.phone {
+  left: 0;
+  top: var(--topbar-h);
+  /* Pasek na dole nie leży NA pulpicie: ikony i przyciski muszą się zmieścić nad nim. */
+  bottom: calc(var(--dock-band) + env(safe-area-inset-bottom, 0px));
+  padding: 10px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tworzenie rzeczy nie może zależeć od prawego przycisku myszy. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-bottom: 8px;
+}
+
+.actions button {
+  flex: 1 1 auto;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #eaf0fb;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.actions button:active {
+  background: rgba(255, 255, 255, 0.18);
+}
