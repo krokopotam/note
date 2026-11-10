@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { notesApi } from './notesApi';
-import type { Note, NoteRevision, SortOrder } from '../../api/types';
+import type { Note, SortOrder } from '../../api/types';
 
 /**
  * Notepad state.
  *
- * Three things are persisted by the backend and one is not:
- *  - notes and their revision history (notes / note_revisions),
+ * Two things are persisted by the backend and one is not:
+ *  - the notes themselves (notes) — the current text only, the notepad keeps no history,
  *  - the open tabs and the active one (notepad_tabs),
  *  - the text currently being typed — only here, until the autosave fires.
  *
@@ -31,7 +31,6 @@ interface NotepadStore {
   saving: boolean;
   /** True when the note list was reloaded by search/sort (drives the empty state). */
   listLoaded: boolean;
-  revisions: NoteRevision[];
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
 
@@ -46,7 +45,6 @@ interface NotepadStore {
   save: () => Promise<void>;
   rename: (title: string) => Promise<void>;
   removeNote: (id: number) => Promise<void>;
-  restoreRevision: (revisionId: number) => Promise<void>;
 }
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -65,7 +63,6 @@ export const notepadDefaults: Pick<
   | 'dirty'
   | 'saving'
   | 'listLoaded'
-  | 'revisions'
   | 'status'
   | 'error'
 > = {
@@ -80,7 +77,6 @@ export const notepadDefaults: Pick<
   dirty: false,
   saving: false,
   listLoaded: false,
-  revisions: [],
   status: 'idle',
   error: null,
 };
@@ -147,7 +143,6 @@ export const useNotepad = create<NotepadStore>((set, get) => ({
         activeNoteId: note.id,
         draft: note.body,
         dirty: false,
-        revisions: [],
       });
       await persistSession(tabs, note.id);
       await get().refresh();
@@ -159,13 +154,12 @@ export const useNotepad = create<NotepadStore>((set, get) => ({
   openNote: async (id) => {
     const cached = get().byId[id];
     const tabs = get().tabs.includes(id) ? get().tabs : [...get().tabs, id];
-    set({ activeNoteId: id, tabs, draft: cached?.body ?? '', dirty: false, revisions: [] });
+    set({ activeNoteId: id, tabs, draft: cached?.body ?? '', dirty: false });
     void persistSession(tabs, id);
 
     try {
       const note = await notesApi.get(id);
       set({ byId: { ...get().byId, [id]: note }, draft: get().dirty ? get().draft : note.body });
-      await loadRevisionsInto(set, id);
     } catch (error) {
       set({ error: describe(error) });
     }
@@ -178,7 +172,7 @@ export const useNotepad = create<NotepadStore>((set, get) => ({
     if (activeNoteId === id) {
       activeNoteId = tabs[tabs.length - 1] ?? null;
       const next = activeNoteId !== null ? get().byId[activeNoteId] : null;
-      set({ tabs, activeNoteId, draft: next?.body ?? '', dirty: false, revisions: [] });
+      set({ tabs, activeNoteId, draft: next?.body ?? '', dirty: false });
       void persistSession(tabs, activeNoteId);
       if (activeNoteId !== null) void get().openNote(activeNoteId);
       return;
@@ -246,7 +240,6 @@ export const useNotepad = create<NotepadStore>((set, get) => ({
         activeNoteId,
         draft: activeNoteId !== null ? (byId[activeNoteId]?.body ?? '') : '',
         dirty: false,
-        revisions: [],
         notes: get().notes.filter((note) => note.id !== id),
         total: Math.max(0, get().total - 1),
       });
@@ -256,22 +249,6 @@ export const useNotepad = create<NotepadStore>((set, get) => ({
     }
   },
 
-  restoreRevision: async (revisionId) => {
-    const id = get().activeNoteId;
-    if (id === null) return;
-    try {
-      const restored = await notesApi.restore(id, revisionId);
-      set({
-        byId: { ...get().byId, [id]: restored },
-        draft: restored.body,
-        dirty: false,
-        notes: get().notes.map((note) => (note.id === id ? restored : note)),
-      });
-      await loadRevisionsInto(set, id);
-    } catch (error) {
-      set({ error: describe(error) });
-    }
-  },
 }));
 
 /** Drop any pending autosave; used by tests and by unmounting the app. */
@@ -292,17 +269,6 @@ async function persistSession(tabs: number[], activeNoteId: number | null) {
   } catch {
     // A failed session write must not interrupt typing; the tabs come back on the
     // next successful save.
-  }
-}
-
-async function loadRevisionsInto(
-  set: (partial: Partial<NotepadStore>) => void,
-  noteId: number,
-) {
-  try {
-    set({ revisions: await notesApi.revisions(noteId) });
-  } catch (error) {
-    set({ revisions: [], error: describe(error) });
   }
 }
 

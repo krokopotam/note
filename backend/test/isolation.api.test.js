@@ -53,22 +53,6 @@ describe('notes', () => {
     expect((await ala.api.get(`/api/notes/${id}`)).body).toMatchObject({ body: 'treść' });
   });
 
-  it('keeps revision history out of reach, including restores', async () => {
-    const { ala, ola } = await twoAccounts();
-
-    const note = await ala.api.post('/api/notes').send({ title: 'v1', body: 'pierwsza' });
-    await ala.api.patch(`/api/notes/${note.body.id}`).send({ body: 'druga' });
-    const revisions = await ala.api.get(`/api/notes/${note.body.id}/revisions`);
-    expect(revisions.body).toHaveLength(1);
-
-    expect((await ola.api.get(`/api/notes/${note.body.id}/revisions`)).status).toBe(404);
-    expect(
-      (await ola.api.post(`/api/notes/${note.body.id}/revisions/${revisions.body[0].id}/restore`))
-        .status,
-    ).toBe(404);
-
-    expect((await ala.api.get(`/api/notes/${note.body.id}`)).body.body).toBe('druga');
-  });
 
   it('lets two accounts keep the same title', async () => {
     const { ala, ola } = await twoAccounts();

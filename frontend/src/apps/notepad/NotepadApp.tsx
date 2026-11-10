@@ -6,7 +6,7 @@ import type { AppProps } from '../../shell/registry';
 import styles from './NotepadApp.module.css';
 
 /**
- * Notepad: list + tabs + editor + history.
+ * Notepad: list + tabs + editor.
  *
  * The component reads from the store and forwards clicks; all decisions (what is
  * dirty, when to save, what a deleted tab means) live in notepadStore, which is
@@ -146,28 +146,6 @@ export function NotepadApp({ payload }: AppProps) {
         )}
       </main>
 
-      <aside className={styles.history}>
-        <h2 className={styles.historyTitle}>Historia</h2>
-        {state.revisions.length === 0 ? (
-          <p className={styles.historyEmpty}>Na razie czysto — każda zmiana tu trafi.</p>
-        ) : (
-          <ul className={styles.historyList}>
-            {state.revisions.map((revision) => (
-              <li key={revision.id} className={styles.historyItem}>
-                <span className={styles.rowStamp}>{formatStamp(revision.created_at)}</span>
-                <span className={styles.rowPreview}>{preview(revision.body, 40)}</span>
-                <button
-                  type="button"
-                  onClick={() => void state.restoreRevision(revision.id)}
-                  data-testid={`restore-${revision.id}`}
-                >
-                  Przywróć
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
     </div>
   );
 }

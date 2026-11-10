@@ -35,14 +35,6 @@ export const NoteSchema = z.object({
   updated_at: z.string(),
 });
 
-export const NoteRevisionSchema = z.object({
-  id: z.number().int(),
-  note_id: z.number().int(),
-  title: z.string(),
-  body: z.string(),
-  created_at: z.string(),
-});
-
 export const StickySchema = z.object({
   id: z.number().int(),
   body: z.string(),

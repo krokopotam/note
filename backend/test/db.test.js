@@ -31,13 +31,18 @@ describe('database bootstrap', () => {
         'file_resource_members',
         'files',
         'messages',
-        'note_revisions',
         'notes',
         'notepad_state',
         'notepad_tabs',
         'stickies',
       ]),
     );
+  });
+
+  it('drops the note history table', () => {
+    // Historia notatek została wycofana (migracja 007); migracje wczesniej ją tworzyły,
+    // więc sprawdzamy efekt na liscie tabel, nie na pliku migracji.
+    expect(tables(openDb(':memory:'))).not.toContain('note_revisions');
   });
 
   it('creates the folder holding the database file', () => {
@@ -67,6 +72,7 @@ describe('database bootstrap', () => {
       { version: '004_files_icon.sql' },
       { version: '005_chat.sql' },
       { version: '006_chat_icon.sql' },
+      { version: '007_drop_note_revisions.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -117,6 +123,7 @@ describe('upgrading a database that predates accounts', () => {
       '004_files_icon.sql',
       '005_chat.sql',
       '006_chat_icon.sql',
+      '007_drop_note_revisions.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');

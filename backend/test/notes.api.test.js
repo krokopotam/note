@@ -60,20 +60,17 @@ describe('notes API', () => {
     expect(res.body.error.code).toBe('invalid_query');
   });
 
-  it('exposes history and restores a revision', async () => {
+  it('keeps only the newest version of a note', async () => {
     const { api } = await makeSignedApp();
     const created = await api.post('/api/notes').send({ title: 'Dziennik', body: 'v1' });
     const id = created.body.id;
 
     await api.patch(`/api/notes/${id}`).send({ body: 'v2' });
-    await api.patch(`/api/notes/${id}`).send({ body: 'v3' });
+    const last = await api.patch(`/api/notes/${id}`).send({ body: 'v3' });
 
-    const revisions = await api.get(`/api/notes/${id}/revisions`);
-    expect(revisions.body.map((revision) => revision.body)).toEqual(['v2', 'v1']);
-
-    const restored = await api.post(`/api/notes/${id}/revisions/${revisions.body[1].id}/restore`);
-    expect(restored.status).toBe(200);
-    expect(restored.body.body).toBe('v1');
+    expect(last.body.body).toBe('v3');
+    // There is no history endpoint any more — the notepad shows today's text only.
+    expect((await api.get(`/api/notes/${id}/revisions`)).status).toBe(404);
   });
 
   it('deletes a note and then reports 404 with the error contract', async () => {

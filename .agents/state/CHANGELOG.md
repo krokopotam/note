@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 2026-11-10 — notatnik bez historii: kasujemy `note_revisions`
+
+- Historia notatek wyszła z aplikacji: zniknęła panel „Historia” z okna, endpointy
+  `GET /api/notes/:id/revisions` i `POST /api/notes/:id/revisions/:revId/restore`, `listRevisions`
+  i `restoreRevision` w repozytorium oraz zapisywanie wersji w `updateNote` — zapis to teraz jeden
+  `UPDATE`, autozapis nie produkuje już wpisów.
+- Migracja `007_drop_note_revisions.sql` (`DROP TABLE IF EXISTS note_revisions`) — **kasuje dane**,
+  jako jedyna w projekcie. Przed nią kopia bazy; po niej w bazie zostaje to, co widoczne w notatniku.
+- Frontend: `revisions`/`restoreRevision` ze `notepadStore`, `revisions`+`restore` z `notesApi`,
+  `NoteRevisionSchema` ze `shared/schemas.js`, typ `NoteRevision` z `api/types.ts`; siatka okna
+  dwukolumnowa (260px lista + editor), CSS `.history*` usunięty.
+- `.status` w stopce notatnika dostał wreszcie własną regułę CSS — klasa była używana, ale nigdy
+  niezdefiniowana (historycznie — span bez stylu).
+- Testy: 394 (backend 147, frontend 247). Zostały testy „nie ma już endpointu historii” i
+  „tabela `note_revisions` nie istnieje po migracjach”, żeby nikt jej odtworzył bez decyzji.
+
 ## 2026-11-10 — akcje wiersza chowają się pod trzy kropki
 
 - Nowy `frontend/src/shared/RowMenu.tsx`: akcje wiersza po prawej stronie, pod przyciskiem z trzema

@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 Projekt: **note** — pulpit w przeglądarce (okna, dock, launcher) z aplikacjami: kalkulator,
-notatnik (wiele zakładek + historia + wyszukiwarka), karteczki, pliki (wrzucanie, pobieranie,
+notatnik (wiele zakładek + wyszukiwarka), karteczki, pliki (wrzucanie, pobieranie,
 współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomości do 5 minut).
 
 ## Stan
@@ -12,14 +12,14 @@ współdzielenie zasobów między kontami) i czaty (rozmowy 1:1, edycja wiadomo�
 | Konta: rejestracja, logowanie, sesja 10 dni, dane oddzielone po `user_id` | gotowy, działa |
 | Shell pulpitu (siatka ikon, foldery, okna, dock, launcher, menu) | gotowy, testy jednostkowe i integracyjne |
 | Kalkulator | gotowy (logika jako czyste funkcje + klawiatura) |
-| Notatnik (zakładki, autosave, historia, szukanie, sortowanie) | gotowy |
+| Notatnik (zakładki, autosave, szukanie, sortowanie) | gotowy |
 | Karteczki (CRUD, kolory, przypinanie, szukanie, sortowanie) | gotowy |
 | Pliki (zasoby, drag & drop, pobieranie, zmiana nazw, udostępnianie read/edit) | gotowy, działa |
 | Czaty (rozmowy 1:1, wiadomości, okno edycji 5 min, nieprzeczytane) | gotowy, działa |
 | Build produkcyjny (`frontend/dist`, 213 kB / 68 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 396 przechodzi (backend 148, frontend 248). `npm run lint` → czysto.
+Testy: `npm test` → 394 przechodzą (backend 147, frontend 247). `npm run lint` → czysto.
 
 Migracje `005_chat.sql` + `006_chat_icon.sql` przećwiczone na **kopii produkcyjnej bazy**
 (`db.backup()` na serwerze → ściągnięte → `openDb` lokalnie): dane nietknięte, każde z trzech kont
@@ -81,6 +81,11 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   Jeden proces, jedno żądanie, nic do odtworzenia po restarcie; `?after=<id>` niesie tylko to, co nowe.
 - **Przeczytane = pobrane.** Znacznik `conversation_members.last_read_at` aktualizuje się przy odczycie
   wiadomości, więc licznik nieprzeczytanych jest liczony w bazie i drugi okienko widzi to samo.
+- **Notatnik nie ma historii** (migracja `007_drop_note_revisions.sql` kasuje tabelę `note_revisions`).
+  Historia była zgadywanką: autozapis co 500 ms, każdy skuteczny zapis dodawał wpis, a lista „Historia”
+  zapełniała się wersjami, których nikt nie otwierał. Notatka to teraz dokładnie to, co w polu tekstowym —
+  jeden `UPDATE` i nic obok. Świadomie **nieodwracalne**: przed wdrożeniem kopia bazy ląduje w
+  `/home/ubuntu/backups`, tam leży `note-*.db`.
 
 ## Konwencje
 
@@ -108,5 +113,5 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - Nazwa pliku jest etykietą w bazie — dwa pliki w zasobie mogą nazywać się tak samo (rozróżnia je data).
 - Czaty są tylko 1:1 — nie ma grup ani kanałów; nie ma też szukania w wiadomościach ani powiadomień,
   gdy okno jest zamknięte (odpytywanie żyje razem z oknem).
-- Usunięta wiadomość znika bez powrotu (brak kosza), a edytowana nie zachowuje poprzedniej wersji —
-  w przeciwieństwie do notatek, czat nie ma historii.
+- Usunięta wiadomość znika bez powrotu (brak kosza), a edytowana nie zachowuje poprzedniej wersji.
+  Notatki też nie mają historii — patrz decyzja poniżej.

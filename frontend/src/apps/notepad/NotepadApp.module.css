@@ -1,6 +1,6 @@
 .app {
   display: grid;
-  grid-template-columns: 260px 1fr 220px;
+  grid-template-columns: 260px 1fr;
   height: 100%;
   min-height: 320px;
   background: #161c27;
@@ -88,8 +88,7 @@
 }
 
 .empty,
-.placeholder,
-.historyEmpty {
+.placeholder {
   padding: 12px;
   font-size: 12px;
   color: #8d9cb6;
@@ -196,46 +195,3 @@
   color: #93a2bd;
 }
 
-.history {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: auto;
-  padding: 8px;
-}
-
-.historyTitle {
-  margin: 0 0 8px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: #8b9ab4;
-}
-
-.historyList {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.historyItem {
-  display: grid;
-  gap: 3px;
-  padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 6px;
-  background: #131a26;
-}
-
-.historyItem button {
-  justify-self: start;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 5px;
-  background: transparent;
-  color: #cfe1ff;
-  font: inherit;
-  font-size: 11px;
-  padding: 2px 7px;
-  cursor: pointer;
-}

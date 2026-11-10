@@ -14,7 +14,6 @@ import type {
   MessagePageSchema,
   MessageSchema,
   NotePageSchema,
-  NoteRevisionSchema,
   NotepadSessionSchema,
   NoteSchema,
   ResourceDetailSchema,
@@ -32,7 +31,6 @@ import type {
  * of failing at runtime in a browser.
  */
 export type Note = z.infer<typeof NoteSchema>;
-export type NoteRevision = z.infer<typeof NoteRevisionSchema>;
 export type NotePage = z.infer<typeof NotePageSchema>;
 export type Sticky = z.infer<typeof StickySchema>;
 export type StickyPage = z.infer<typeof StickyPageSchema>;

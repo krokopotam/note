@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createNote,
-  deleteNote,
-  getNote,
-  listNotes,
-  listRevisions,
-  restoreRevision,
-  updateNote,
-} from '../src/repos/notes.js';
+import { createNote, deleteNote, getNote, listNotes, updateNote } from '../src/repos/notes.js';
 import { makeDbOwned, T } from './helpers.js';
 
 describe('notes repository', () => {
@@ -42,38 +34,21 @@ describe('notes repository', () => {
     expect(note.title.endsWith('…')).toBe(true);
   });
 
-  it('snapshots the replaced version on every effective change', () => {
+  it('overwrites the note and moves its update time', () => {
     const { db, owner } = makeDbOwned();
     const note = createNote(db, owner, { title: 'v1', body: 'pierwsza treść', now: T.t1 });
     updateNote(db, owner, note.id, { body: 'druga treść', now: T.t2 });
 
-    const revisions = listRevisions(db, owner, note.id);
-    expect(revisions).toHaveLength(1);
-    // The revision holds what the note used to contain, stamped with the old update time.
-    expect(revisions[0]).toMatchObject({ title: 'v1', body: 'pierwsza treść', created_at: T.t1 });
+    // There is exactly one version of a note: the one it holds now.
     expect(getNote(db, owner, note.id)).toMatchObject({ body: 'druga treść', updated_at: T.t2 });
   });
 
-  it('does not write a revision when an autosave changes nothing', () => {
+  it('leaves the note alone when an autosave changes nothing', () => {
     const { db, owner } = makeDbOwned();
     const note = createNote(db, owner, { title: 'Bez zmian', body: 'a', now: T.t1 });
     const after = updateNote(db, owner, note.id, { title: 'Bez zmian', body: 'a', now: T.t3 });
 
-    expect(listRevisions(db, owner, note.id)).toEqual([]);
     expect(after.updated_at).toBe(T.t1);
-  });
-
-  it('restores a revision and keeps the version it replaced', () => {
-    const { db, owner } = makeDbOwned();
-    const note = createNote(db, owner, { title: 'v1', body: 'stara', now: T.t1 });
-    updateNote(db, owner, note.id, { body: 'nowa', now: T.t2 });
-    const revisionId = listRevisions(db, owner, note.id)[0].id;
-
-    const restored = restoreRevision(db, owner, note.id, revisionId, T.t4);
-
-    expect(restored.body).toBe('stara');
-    // Undo of the restore is possible: the "nowa" state was snapshotted too.
-    expect(listRevisions(db, owner, note.id).map((r) => r.body)).toEqual(['nowa', 'stara']);
   });
 
   it('searches keywords across title and body, case-insensitively', () => {
@@ -143,7 +118,7 @@ describe('notes repository', () => {
     expect(found.items).toHaveLength(1);
   });
 
-  it('cascades revisions and tabs when a note is deleted', () => {
+  it('cascades tabs when a note is deleted', () => {
     const { db, owner } = makeDbOwned();
     const note = createNote(db, owner, { title: 'Do usunięcia', body: 'x', now: T.t1 });
     updateNote(db, owner, note.id, { body: 'y', now: T.t2 });
@@ -152,7 +127,6 @@ describe('notes repository', () => {
     expect(deleteNote(db, owner, note.id)).toBe(true);
 
     expect(getNote(db, owner, note.id)).toBeUndefined();
-    expect(db.prepare('SELECT COUNT(*) AS n FROM note_revisions').get().n).toBe(0);
     expect(db.prepare('SELECT COUNT(*) AS n FROM notepad_tabs').get().n).toBe(0);
     expect(deleteNote(db, owner, note.id)).toBe(false);
   });
@@ -160,6 +134,5 @@ describe('notes repository', () => {
   it('returns null when updating an unknown note', () => {
     const { db, owner } = makeDbOwned();
     expect(updateNote(db, owner, 999, { body: 'x' })).toBeNull();
-    expect(listRevisions(db, owner, 999)).toBeNull();
   });
 });

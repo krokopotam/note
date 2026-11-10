@@ -69,7 +69,7 @@ export function touchLogin(db, userId, now = nowIso()) {
 }
 
 /**
- * Delete an account. Sessions, notes (and their revisions), stickies, icons,
+ * Delete an account. Sessions, notes, stickies, icons,
  * favourites and the notepad session all follow through ON DELETE CASCADE —
  * the counts are read first so the CLI can say what disappeared.
  *
@@ -99,8 +99,7 @@ export function deleteUser(db, userId) {
 
 /**
  * Move every piece of content from one account to another (CLI: "adopt the data
- * that predates accounts"). Notes come with their revisions because revisions are
- * reached through their note.
+ * that predates accounts").
  */
 export function adoptDataFrom(db, fromUserId, toUserId) {
   const move = (table) => db.prepare(`UPDATE ${table} SET user_id = ? WHERE user_id = ?`);

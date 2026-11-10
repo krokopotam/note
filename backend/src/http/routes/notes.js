@@ -5,15 +5,7 @@ import {
   parseOrThrow,
 } from '@note/shared';
 import { HttpError } from '../../domain/errors.js';
-import {
-  createNote,
-  deleteNote,
-  getNote,
-  listNotes,
-  listRevisions,
-  restoreRevision,
-  updateNote,
-} from '../../repos/notes.js';
+import { createNote, deleteNote, getNote, listNotes, updateNote } from '../../repos/notes.js';
 import { parseListQuery } from '../middleware.js';
 
 /** @param {import('better-sqlite3').Database} db */
@@ -56,18 +48,6 @@ export function notesRouter(db) {
       throw new HttpError(404, 'not_found', 'note does not exist');
     }
     res.status(204).end();
-  });
-
-  router.get('/:id/revisions', (req, res) => {
-    const revisions = listRevisions(db, req.userId, idOf(req.params.id));
-    if (revisions === null) throw new HttpError(404, 'not_found', 'note does not exist');
-    res.json(revisions);
-  });
-
-  router.post('/:id/revisions/:revisionId/restore', (req, res) => {
-    const note = restoreRevision(db, req.userId, idOf(req.params.id), idOf(req.params.revisionId));
-    if (!note) throw new HttpError(404, 'not_found', 'note does not exist');
-    res.json(note);
   });
 
   return router;

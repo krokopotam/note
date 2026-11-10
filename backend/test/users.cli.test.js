@@ -127,7 +127,6 @@ describe('users CLI', () => {
     expect((await ctx.api.get('/api/notes')).body.items.map((note) => note.title)).toEqual(['Ala']);
     expect(db.prepare('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?').get(ola.id).n).toBe(0);
     expect(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').get(ola.id).n).toBe(0);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM note_revisions').get().n).toBe(0);
   });
 
   it('says so when the account does not exist', () => {

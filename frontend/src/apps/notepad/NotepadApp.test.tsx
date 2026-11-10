@@ -15,8 +15,6 @@ vi.mock('./notesApi', () => ({
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
-    revisions: vi.fn(),
-    restore: vi.fn(),
     session: vi.fn(),
     saveSession: vi.fn(),
   },
@@ -43,7 +41,6 @@ beforeEach(() => {
   api.list.mockResolvedValue({ items: [note(1), note(2)], total: 2 });
   api.session.mockResolvedValue({ tabs: [1], active_note_id: 1 });
   api.get.mockResolvedValue(note(1));
-  api.revisions.mockResolvedValue([]);
   api.saveSession.mockResolvedValue({ tabs: [1], active_note_id: 1 });
   api.update.mockResolvedValue(note(1, { body: 'nowe' }));
 });
@@ -155,21 +152,6 @@ describe('notepad window', () => {
 
     await userEvent.tab();
     expect(api.update).toHaveBeenCalledWith(1, { title: 'Nowy tytuł' });
-  });
-
-  it('lists history and restores a revision into the editor', async () => {
-    api.revisions.mockResolvedValue([
-      { id: 11, note_id: 1, title: 'Notatka 1', body: 'starsza wersja', created_at: '2026-01-01T00:00:00.000Z' },
-    ]);
-    api.restore.mockResolvedValue(note(1, { body: 'starsza wersja' }));
-
-    renderNotepad();
-    const restore = await screen.findByTestId('restore-11');
-
-    await userEvent.click(restore);
-
-    expect(api.restore).toHaveBeenCalledWith(1, 11);
-    expect(await screen.findByTestId('editor')).toHaveValue('starsza wersja');
   });
 
   it('deletes the note and switches to the remaining tab', async () => {

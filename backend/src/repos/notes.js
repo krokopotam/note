@@ -1,4 +1,3 @@
-import { HttpError } from '../domain/errors.js';
 import { keywordFilter, orderBySql } from '../domain/query.js';
 import { deriveTitle } from '../domain/noteTitle.js';
 import { assertUserId } from '../domain/scope.js';
@@ -49,10 +48,11 @@ export function createNote(db, userId, { title, body = '', now = nowIso() } = {}
 }
 
 /**
- * Save a note, snapshotting the state it replaces.
+ * Save a note. What is written replaces what was there — the notepad keeps no
+ * history, so a save is one UPDATE and nothing else.
  *
- * History is written only when content actually changed, so an autosave firing
- * on an untouched note cannot add noise to the revision list.
+ * A save of unchanged text is a no-op: autosave fires on a timer, and it must not
+ * pretend the note moved.
  *
  * @returns {object|null} updated row, or null when the id is not this user's
  */
@@ -62,20 +62,12 @@ export function updateNote(db, userId, id, { title, body, now = nowIso() }) {
 
   const nextTitle = title !== undefined ? title.trim() : current.title;
   const nextBody = body !== undefined ? body : current.body;
-  const changed = nextTitle !== current.title || nextBody !== current.body;
+  if (nextTitle === current.title && nextBody === current.body) return current;
 
-  if (!changed) return current;
-
-  return db.transaction(() => {
-    db.prepare(
-      `INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (@id, @t, @b, @at)`,
-    ).run({ id, t: current.title, b: current.body, at: current.updated_at });
-
-    db.prepare(
-      'UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id AND user_id = @user',
-    ).run({ id, user: current.user_id, t: nextTitle, b: nextBody, u: now });
-    return getNote(db, userId, id);
-  })();
+  db.prepare(
+    'UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id AND user_id = @user',
+  ).run({ id, user: current.user_id, t: nextTitle, b: nextBody, u: now });
+  return getNote(db, userId, id);
 }
 
 export function deleteNote(db, userId, id) {
@@ -85,34 +77,4 @@ export function deleteNote(db, userId, id) {
   );
 }
 
-export function listRevisions(db, userId, noteId, { limit = 50 } = {}) {
-  if (!getNote(db, userId, noteId)) return null;
-  return db
-    .prepare('SELECT * FROM note_revisions WHERE note_id = @noteId ORDER BY id DESC LIMIT @limit')
-    .all({ noteId, limit });
-}
 
-/**
- * Roll a note back to one of its revisions. The version being replaced is
- * snapshotted first, so a restore is itself undoable.
- */
-export function restoreRevision(db, userId, noteId, revisionId, now = nowIso()) {
-  const note = getNote(db, userId, noteId);
-  if (!note) return null;
-
-  const revision = db
-    .prepare('SELECT * FROM note_revisions WHERE id = ? AND note_id = ?')
-    .get(revisionId, noteId);
-  if (!revision) throw new HttpError(404, 'revision_not_found', `revision ${revisionId} not found`);
-
-  return db.transaction(() => {
-    db.prepare(
-      `INSERT INTO note_revisions (note_id, title, body, created_at) VALUES (@id, @t, @b, @at)`,
-    ).run({ id: noteId, t: note.title, b: note.body, at: note.updated_at });
-
-    db.prepare(
-      'UPDATE notes SET title = @t, body = @b, updated_at = @u WHERE id = @id AND user_id = @user',
-    ).run({ id: noteId, user: note.user_id, t: revision.title, b: revision.body, u: now });
-    return getNote(db, userId, noteId);
-  })();
-}

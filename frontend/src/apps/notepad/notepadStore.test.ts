@@ -10,8 +10,6 @@ vi.mock('./notesApi', () => ({
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
-    revisions: vi.fn(),
-    restore: vi.fn(),
     session: vi.fn(),
     saveSession: vi.fn(),
   },
@@ -31,7 +29,6 @@ const note = (id: number, overrides: Partial<Note> = {}): Note => ({
 function stubEmptyApi() {
   api.list.mockResolvedValue({ items: [], total: 0 });
   api.session.mockResolvedValue({ tabs: [], active_note_id: null });
-  api.revisions.mockResolvedValue([]);
   api.saveSession.mockResolvedValue({ tabs: [], active_note_id: null });
 }
 
@@ -259,17 +256,14 @@ describe('creating, renaming and deleting', () => {
     expect(api.saveSession).toHaveBeenCalledWith({ tabs: [2], active_note_id: 2 });
   });
 
-  it('restores a revision and reloads the history', async () => {
-    useNotepad.setState({ activeNoteId: 1, byId: { 1: note(1) }, draft: 'zepsute' });
-    api.restore.mockResolvedValue(note(1, { body: 'sprzed zmian' }));
-    api.revisions.mockResolvedValue([
-      { id: 5, note_id: 1, title: 'Notatka 1', body: 'starsze', created_at: '2026-01-01T00:00:00.000Z' },
-    ]);
+  it('an unopened note list is empty, and the app has no history to load', async () => {
+    stubEmptyApi();
 
-    await useNotepad.getState().restoreRevision(5);
+    await useNotepad.getState().init();
 
-    expect(api.restore).toHaveBeenCalledWith(1, 5);
-    expect(useNotepad.getState().draft).toBe('sprzed zmian');
-    expect(useNotepad.getState().revisions.map((revision) => revision.id)).toEqual([5]);
+    expect(api.list).toHaveBeenCalled();
+    expect(api.session).toHaveBeenCalled();
+    expect(useNotepad.getState().notes).toEqual([]);
+    expect(Object.keys(useNotepad.getState())).not.toContain('revisions');
   });
 });

@@ -1,5 +1,5 @@
 import { queryString, request } from '../../api/client';
-import type { Note, NotePage, NoteRevision, NotepadSession, SortOrder } from '../../api/types';
+import type { Note, NotePage, NotepadSession, SortOrder } from '../../api/types';
 
 /**
  * Every call the notepad makes, in one file.
@@ -20,11 +20,6 @@ export const notesApi = {
     request<Note>(`/notes/${id}`, { method: 'PATCH', body: patch }),
 
   remove: (id: number) => request<void>(`/notes/${id}`, { method: 'DELETE' }),
-
-  revisions: (id: number) => request<NoteRevision[]>(`/notes/${id}/revisions`),
-
-  restore: (id: number, revisionId: number) =>
-    request<Note>(`/notes/${id}/revisions/${revisionId}/restore`, { method: 'POST' }),
 
   session: () => request<NotepadSession>('/session/notepad'),
 

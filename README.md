@@ -1,6 +1,6 @@
 # note
 
-Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami i historią, karteczki,
+Pulpit w przeglądarce: okna, dock, launcher, kalkulator, notatnik z zakładkami, karteczki,
 pliki (drag & drop do zasobów, współdzielonych z innymi kontami) oraz czaty — rozmowy z innymi
 kontami, ze zmianą wiadomości przez 5 minut od jej napisania.
 Konta z własną przestrzenią: każdy widzi tylko swoje notatki, karteczki, pliki i układ pulpitu.
@@ -67,9 +67,7 @@ przez role/etykiety, więc zmiana CSS albo markupu nie przewraca testów.
 | POST | `/api/auth/logout` | wyloguj (zawsze 204) |
 | GET | `/api/auth/me` | kto jest zalogowany (401 dla anonimowego) |
 | GET | `/api/notes?q=&sort=&limit=&offset=` | szukaj słów kluczowych, sortuj po dacie/tytule |
-| POST/PATCH/DELETE | `/api/notes[/:id]` | zapis notatki (każda zmiana = wpis w historii) |
-| GET | `/api/notes/:id/revisions` | historia |
-| POST | `/api/notes/:id/revisions/:revId/restore` | przywróć wersję (przywracanie też jest cofalne) |
+| POST/PATCH/DELETE | `/api/notes[/:id]` | zapis notatki (nadpisuje bieżącą wersję — historii nie ma) |
 | GET/PUT | `/api/session/notepad` | otwarte zakładki i aktywna notatka |
 | GET/POST/PATCH/DELETE | `/api/stickies[/:id]` | karteczki, `?pinned=true`, `q`, `sort` |
 | GET/POST/PATCH/DELETE | `/api/desktop/items[/:id]` | ikony i foldery wraz z pozycjami w siatce |
