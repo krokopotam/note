@@ -4,7 +4,7 @@
  */
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { APPS, REMEMBER_DAYS, SESSION_HOURS } from '@note/shared';
+import { APPS, GAMES, GAMES_FOLDER, REMEMBER_DAYS, SESSION_HOURS, isGame } from '@note/shared';
 import { authThrottle } from '../src/http/auth.js';
 import { newSessionToken } from '../src/domain/tokens.js';
 import { createSession } from '../src/repos/sessions.js';
@@ -96,8 +96,17 @@ describe('registration', () => {
     const items = (await agent.get('/api/desktop/items')).body.items;
     expect(items.map((item) => item.app_id)).toEqual(expect.arrayContaining(APPS.map((a) => a.id)));
 
+    // Gierek nie ma na paskach — leżą w osobnym folderze, żeby nie zagradzać pulpitu.
+    const games = items.find((item) => item.kind === 'folder' && item.name === GAMES_FOLDER);
+    expect(games).toBeTruthy();
+    expect(
+      items.filter((item) => item.parent_id === games.id).map((item) => item.app_id),
+    ).toEqual(expect.arrayContaining(GAMES.map((game) => game.id)));
+
     const favorites = (await agent.get('/api/desktop/favorites')).body.slots;
-    expect(favorites.find((slot) => slot.slot === 'dock').app_ids).toEqual(APPS.map((a) => a.id));
+    expect(favorites.find((slot) => slot.slot === 'dock').app_ids).toEqual(
+      APPS.filter((app) => !isGame(app.id)).map((app) => app.id),
+    );
 
     // ...and something to open, otherwise the first screen is a blank desk.
     expect((await agent.get('/api/notes')).body.total).toBeGreaterThan(0);

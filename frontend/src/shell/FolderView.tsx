@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useDesktop } from './desktopStore';
+import { usePhone } from './viewport';
 import { IconGrid } from './IconGrid';
 import { openDesktopItem, openFolder } from './openApp';
 import { useWindows } from './windowStore';
@@ -15,6 +16,7 @@ import styles from './FolderView.module.css';
 export function FolderView({ windowKey, payload }: AppProps) {
   const folderId = Number(payload.folderId);
   const items = useDesktop((state) => state.items);
+  const phone = usePhone();
   const setTitle = useWindows((state) => state.setTitle);
 
   const folder = items.find((item) => item.id === folderId);
@@ -34,6 +36,9 @@ export function FolderView({ windowKey, payload }: AppProps) {
         parentId={folderId}
         items={items}
         minRows={3}
+        // Na telefonie zapisane komórki są bez znaczenia (patrz pulpit), a otwiera
+        // jedno tapnięcie — folder zachowuje się jak ekran, nie jak biurko.
+        flow={phone}
         onOpen={(item) => (item.kind === 'folder' ? openFolder(item) : openDesktopItem(item))}
       />
     </div>

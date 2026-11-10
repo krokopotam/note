@@ -1,0 +1,28 @@
+.grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 1px;
+  padding: 3px;
+}
+
+.empty {
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 2px;
+}
+
+.body {
+  background: #4ec97f;
+  border-radius: 3px;
+}
+
+.head {
+  background: #b6ff8f;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(182, 255, 143, 0.5);
+}
+
+.food {
+  background: #ff5d5d;
+  border-radius: 50%;
+}

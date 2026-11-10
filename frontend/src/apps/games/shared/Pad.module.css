@@ -1,0 +1,43 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cross {
+  display: grid;
+  grid-template-areas:
+    '. up .'
+    'left down right';
+  gap: 6px;
+}
+
+.key,
+.keyWide {
+  min-width: 58px;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6edfa;
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.keyWide {
+  min-width: 72px;
+  font-size: 13px;
+}
+
+.key:active,
+.keyWide:active {
+  background: rgba(120, 160, 255, 0.35);
+}
+
+.side {
+  display: flex;
+  gap: 6px;
+}

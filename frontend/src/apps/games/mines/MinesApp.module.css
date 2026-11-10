@@ -1,0 +1,62 @@
+.cell {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e9effa;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.open {
+  background: #0a1017;
+  cursor: default;
+}
+
+.number {
+  cursor: default;
+}
+
+.boom {
+  background: #7c2430;
+}
+
+.picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.picker select {
+  min-height: 32px;
+}
+
+/* Numbers and flags have to stay readable on a 14-column field on a phone. */
+@media (max-width: 760px) {
+  .cell {
+    font-size: 13px;
+    border-radius: 4px;
+  }
+
+  .picker {
+    flex: 1 1 100%;
+  }
+}
+
+/* Siatka wypełnia planszę od krawędzi do krawędzi; wiersze i kolumny podaje komponent. */
+.grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  padding: 4px;
+}

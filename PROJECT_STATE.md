@@ -19,10 +19,12 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Czaty (1:1 i grupy, wiadomości, okno edycji 5 min, nieprzeczytane, znak na ikonie) | gotowy, działa |
 | Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
 | Układ na telefon (ikony w przepływie, aplikacja na cały ekran, pasek na dole, safe area) | gotowy, testy |
-| Build produkcyjny (`frontend/dist`, 230 kB / 74 kB gzip) | przechodzi |
+| Notatnik na telefonie (osobny ekran listy i osobny ekran notatki) | gotowy, działa |
+| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk (folder „Gry") | gotowy, działa |
+| Build produkcyjny (`frontend/dist`, 263 kB / 85 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 496 przechodzi (backend 176, frontend 320). `npm run lint` → czysto.
+Testy: `npm test` → 580 przechodzi (backend 180, frontend 400). `npm run lint` → czysto.
 
 Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
 i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
@@ -34,6 +36,29 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (gry)
+
+- **Frontend tylko, zero bazy.** Runda jest wortha tyle, ile trwa okno; nie ma tabeli `games` ani
+  endpointów, więc nie ma też czego synchronizować ani co zepsuć migracją. `APPS` wystarczy, żeby
+  istniały jako ikony i okna.
+- **Folder „Gry", nie pasek.** Siedem ikon w `favorites` przykryłoby cztery aplikacje, dla których
+  pulpit istnieje (`seedUser` odkłada gry do foldera, `011_games.sql` robi to samo na starych kontach).
+- **Logika jako czyste funkcje z `Rng` podanym z zewnątrz** (`snake.ts`, `tetris.ts`, `bubbles.ts`,
+  `twentyforty.ts`, `mines.ts`, `memory.ts`, `tictactoe.ts`). Test widzi dokładnie tę partię, a wideoki
+  tylko przeklikują planszę — tak jak w notatniku i kalkulatorze.
+- **Plansze z DOM i SVG, bez canvasu** — to samo, co widzi test (jsdom nie ma `getContext`), i skalują
+  się razem z oknem (`grid-template-columns`, `viewBox`) zamiast przewijać.
+- **Wysokość okna jest w ramie** (`WindowFrame` → `height: win.height`). Wszystkie aplikacje są napisane
+  `height: 100%`, więc bez tego okno miało tyle, ile wypadło z treści: gry bez treści znikały. Plansza
+  bierze największe pudełko o swoim kształcie przez `--ratio` + `boardStyle()` (jednostki kontenera,
+  z zapasem w `@supports`).
+- **Saper rozkłada miny po pierwszym kliknięciu**, więc opening ruch nigdy nie jest miną i zawsze
+  otwiera kawał pola.
+- **Kółko i krzyżyk: minimax (negamax).** Test „trudny przeciwnik zamyka linię" złapał prawdziwy błąd —
+  brak negacji na poziomie rekurencji sprawiał, że komputer maksymalizował wynik przeciwnika.
+- **Klawisze słucha plansza**, nie `window`: okna nie podsłuchują się nawzajem. Kierunki ma też krzyż
+  pod planszą (`shared/Pad.tsx`, `onPointerDown`), a 2048 i wężyk swipe.
 
 ## Decyzje (telefon)
 

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { APPS } from '@note/shared';
+import { APPS, GAMES, GAMES_FOLDER, isGame } from '@note/shared';
 import { LOCKED_HASH, isLocked } from '../src/domain/passwords.js';
 import { migrate, openDb } from '../src/db/index.js';
 import { seedUser } from '../src/repos/seed.js';
@@ -86,7 +86,7 @@ describe('database bootstrap', () => {
       .readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith('.sql'))
       .sort()
-      .filter((name) => name !== '010_no_reused_ids.sql');
+      .filter((name) => name !== '010_no_reused_ids.sql' && name !== '011_games.sql');
     files.forEach((name) => {
       db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
       db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(name, 'kiedyś');
@@ -105,7 +105,7 @@ describe('database bootstrap', () => {
     const last = put('b');
     db.prepare('DELETE FROM files WHERE id = ?').run(last);
 
-    expect(migrate(db)).toEqual(['010_no_reused_ids.sql']);
+    expect(migrate(db)).toEqual(['010_no_reused_ids.sql', '011_games.sql']);
 
     const columns = db.prepare('PRAGMA table_info(files)').all().map((c) => c.name);
     expect(columns).toEqual(
@@ -165,6 +165,7 @@ describe('database bootstrap', () => {
       { version: '008_chat_sync.sql' },
       { version: '009_chat_media.sql' },
       { version: '010_no_reused_ids.sql' },
+      { version: '011_games.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -219,6 +220,7 @@ describe('upgrading a database that predates accounts', () => {
       '008_chat_sync.sql',
       '009_chat_media.sql',
       '010_no_reused_ids.sql',
+      '011_games.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');
@@ -328,9 +330,78 @@ describe('upgrading a database that predates accounts', () => {
   });
 });
 
+describe('migracja 011 — folder z grami dla starych kont', () => {
+  /** Cofa bazę do stanu sprzed migracji, nie ruszając reszty pulpitu. */
+  function pretendNoGamesFolder(db, owner) {
+    db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
+    for (const game of GAMES) {
+      db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND app_id = ?').run(owner, game.id);
+    }
+    db.prepare("DELETE FROM schema_migrations WHERE version = '011_games.sql'").run();
+  }
+
+  it('adds the folder and all seven icons under it', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS.filter((app) => !isGame(app.id)));
+    pretendNoGamesFolder(db, owner);
+
+    expect(migrate(db)).toContain('011_games.sql');
+
+    const folder = db
+      .prepare("SELECT * FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = ?")
+      .get(owner, GAMES_FOLDER);
+    expect(folder).toBeTruthy();
+    expect(
+      db
+        .prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND parent_id = ?')
+        .get(owner, folder.id).n,
+    ).toBe(GAMES.length);
+  });
+
+  it('lands in a free row, not on top of what the account already had', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS.filter((app) => !isGame(app.id)));
+    pretendNoGamesFolder(db, owner);
+    const taken = new Set(
+      db
+        .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND parent_id IS NULL')
+        .all(owner)
+        .map((row) => `${row.x},${row.y}`),
+    );
+
+    migrate(db);
+
+    const free = db
+      .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND kind = ? AND parent_id IS NULL')
+      .all(owner, 'folder');
+    expect(free).toHaveLength(1);
+    expect(taken.has(`${free[0].x},${free[0].y}`)).toBe(false);
+  });
+
+  it('leaves an existing games folder alone when run again', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    const before = db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n;
+    // Folder jest na miejscu, a migracja udaje niedokończoną.
+    db.prepare("DELETE FROM schema_migrations WHERE version = '011_games.sql'").run();
+
+    migrate(db);
+
+    expect(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND name = 'Gry'")
+        .get(owner).n,
+    ).toBe(1);
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n,
+    ).toBe(before);
+  });
+});
+
 describe('seedUser', () => {
   it('places one icon per app, a folder, and fills both favourite slots', () => {
     const { db, owner } = makeDbOwned();
+    const work = APPS.filter((app) => !isGame(app.id));
 
     seedUser(db, owner, APPS);
 
@@ -338,8 +409,8 @@ describe('seedUser', () => {
       .prepare('SELECT * FROM desktop_items WHERE user_id = ? ORDER BY id')
       .all(owner);
     const appIcons = items.filter((item) => item.kind === 'app' && item.parent_id === null);
-    expect(appIcons.map((item) => item.app_id)).toEqual(APPS.map((app) => app.id));
-    expect(appIcons.map((item) => item.name)).toEqual(APPS.map((app) => app.title));
+    expect(appIcons.map((item) => item.app_id)).toEqual(work.map((app) => app.id));
+    expect(appIcons.map((item) => item.name)).toEqual(work.map((app) => app.title));
     expect(items.some((item) => item.kind === 'folder')).toBe(true);
 
     const dock = db
@@ -348,11 +419,37 @@ describe('seedUser', () => {
       )
       .all(owner)
       .map((row) => row.app_id);
-    expect(dock).toEqual(APPS.map((app) => app.id));
+    expect(dock).toEqual(work.map((app) => app.id));
 
     // A starter desktop is useless without something to open.
     expect(db.prepare('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?').get(owner).n).toBe(1);
     expect(db.prepare('SELECT COUNT(*) AS n FROM stickies WHERE user_id = ?').get(owner).n).toBe(1);
+  });
+
+  it('puts the games in their own folder, off the bars', () => {
+    const { db, owner } = makeDbOwned();
+
+    seedUser(db, owner, APPS);
+
+    const folder = db
+      .prepare("SELECT * FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = ?")
+      .get(owner, GAMES_FOLDER);
+    expect(folder).toBeTruthy();
+
+    const inside = db
+      .prepare('SELECT app_id FROM desktop_items WHERE user_id = ? AND parent_id = ? ORDER BY id')
+      .all(owner, folder.id)
+      .map((row) => row.app_id);
+    expect(inside).toEqual(GAMES.map((game) => game.id));
+
+    // Seven more icons on the dock would bury the applications it is there for.
+    for (const slot of ['dock', 'launcher']) {
+      const bar = db
+        .prepare('SELECT app_id FROM favorites WHERE user_id = ? AND slot = ?')
+        .all(owner, slot)
+        .map((row) => row.app_id);
+      expect(bar.filter((id) => isGame(id))).toEqual([]);
+    }
   });
 
   it('seeds each account separately, never a second time for the same one', () => {

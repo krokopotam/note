@@ -29,9 +29,17 @@ export function WindowFrame({ win, focused }: { win: WindowState; focused: boole
   const View = resolveView(win.appId);
   // While maximized the frame carries no geometry at all: the stylesheet owns it,
   // so the window fills the safe area instead of hiding under the shell bars.
+  // Height belongs here too: every app is written as `height: 100%`, so without it
+  // a window collapsed to whatever its content happened to be (a game board with no
+  // content of its own showed no board at all).
   const geometry = win.maximized
     ? {}
-    : { left: win.x + (delta?.dx ?? 0), top: win.y + (delta?.dy ?? 0), width: win.width };
+    : {
+        left: win.x + (delta?.dx ?? 0),
+        top: win.y + (delta?.dy ?? 0),
+        width: win.width,
+        height: win.height,
+      };
 
   if (win.minimized) return null;
 

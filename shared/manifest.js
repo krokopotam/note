@@ -62,12 +62,38 @@ export const SORT_ORDERS = [
  * an application means one entry here, one folder in frontend/src/apps and one
  * line in the frontend component map.
  */
+// --- gierki -----------------------------------------------------------------
+
+/**
+ * Short games, all of them frontend-only: no table, no endpoint, nothing to
+ * synchronise. A round is worth losing when the window closes.
+ *
+ * They live in one folder on the desktop (`GAMES_FOLDER`) rather than in the icon
+ * grid and the quick bars, because a desktop is not an arcade and seven icons
+ * would push the four real applications off the screen.
+ */
+export const GAMES_FOLDER = 'Gry';
+
+export const GAMES = [
+  { id: 'snake', title: 'Wężyk', width: 420, height: 640 },
+  { id: 'tetris', title: 'Tetris', width: 400, height: 700 },
+  { id: 'bubbles', title: 'Bąbelki', width: 460, height: 660 },
+  { id: 'twentyforty', title: '2048', width: 460, height: 660 },
+  { id: 'mines', title: 'Saper', width: 560, height: 640 },
+  { id: 'memory', title: 'Pamięć', width: 480, height: 640 },
+  { id: 'tictactoe', title: 'Kółko i krzyżyk', width: 440, height: 600 },
+];
+
+/** @param {string} id */
+export const isGame = (id) => GAMES.some((game) => game.id === id);
+
 export const APPS = [
   { id: 'calculator', title: 'Kalkulator', width: 320, height: 470 },
   { id: 'notepad', title: 'Notatnik', width: 960, height: 640 },
   { id: 'stickies', title: 'Karteczki', width: 820, height: 600 },
   { id: 'files', title: 'Pliki', width: 900, height: 620 },
   { id: 'chat', title: 'Czaty', width: 900, height: 640 },
+  ...GAMES,
 ];
 
 // --- pliki ------------------------------------------------------------------

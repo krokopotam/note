@@ -99,6 +99,99 @@ export function FilesIcon({ size = 48 }: IconProps) {
   );
 }
 
+/**
+ * Seven game glyphs. They share one visual trick — a dark plate with the thing
+ * itself on it — so a row of them reads as one family in the Gry folder.
+ */
+const plate = () => <rect x="7" y="7" width="34" height="34" rx="8" fill="#1d2637" />;
+
+export function SnakeIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <path
+        d="M14 34h8v-8h8v-8h8"
+        stroke="#4ec97f"
+        strokeWidth="5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="36" cy="16" r="3.4" fill="#b6ff8f" />
+      <circle cx="14" cy="16" r="4" fill="#ff5d5d" />
+    </svg>
+  );
+}
+
+export function TetrisIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <rect x="13" y="25" width="9" height="9" rx="2" fill="#4cc3ff" />
+      <rect x="22" y="25" width="9" height="9" rx="2" fill="#4cc3ff" />
+      <rect x="22" y="16" width="9" height="9" rx="2" fill="#4cc3ff" />
+      <rect x="31" y="16" width="9" height="9" rx="2" fill="#4cc3ff" />
+      <rect x="13" y="34" width="22" height="5" rx="2" fill="#ffd83d" />
+    </svg>
+  );
+}
+
+export function BubblesIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <circle cx="17" cy="17" r="6" fill="#ff5d5d" />
+      <circle cx="30" cy="17" r="6" fill="#4cc3ff" />
+      <circle cx="23" cy="28" r="6" fill="#ffd83d" />
+      <circle cx="24" cy="38" r="4.5" fill="#5ddc7f" />
+    </svg>
+  );
+}
+
+export function TilesIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <rect x="12" y="12" width="11" height="11" rx="3" fill="#e9e2d0" />
+      <rect x="25" y="12" width="11" height="11" rx="3" fill="#f0a97a" />
+      <rect x="12" y="25" width="11" height="11" rx="3" fill="#edc22e" />
+      <rect x="25" y="25" width="11" height="11" rx="3" fill="#59d97f" />
+    </svg>
+  );
+}
+
+export function MinesIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <circle cx="24" cy="26" r="9" fill="#e9effa" />
+      <path d="M24 12v6M24 34v6M10 26h6M32 26h6M14 16l4 4M34 16l-4 4M14 36l4-4M34 36l-4-4" stroke="#e9effa" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="21" cy="23" r="2.4" fill="#8f9bb3" />
+    </svg>
+  );
+}
+
+export function MemoryIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <rect x="12" y="13" width="12" height="22" rx="3" fill="#f2f5fc" />
+      <rect x="26" y="13" width="12" height="22" rx="3" fill="#2f6fed" />
+      <circle cx="18" cy="24" r="3.4" fill="#ff8a5c" />
+    </svg>
+  );
+}
+
+export function TicTacToeIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <path d="M20 12v24M28 12v24M12 20h24M12 28h24" stroke="#4a5772" strokeWidth="2" strokeLinecap="round" />
+      <path d="M13 13l5 5M18 13l-5 5" stroke="#6fb0ff" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="33" cy="33" r="3.6" fill="none" stroke="#ffb46f" strokeWidth="2.6" />
+    </svg>
+  );
+}
+
 export function UnknownAppIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

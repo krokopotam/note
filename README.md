@@ -187,6 +187,33 @@ Limit pliku to 100 MB (`MAX_UPLOAD_MB`). Upload idzie strumieniowo na dysk — c
 buforowane w pamięci procesu, więc kilka dużych wysłań naraz nie podnosi RAM-u. W nginx blok
 `/api/files/` ma osobno `client_max_body_size 105m` i `proxy_request_buffering off`.
 
+## Gry
+
+Siedem krótkich gierek mieszka w folderze **Gry** na pulpicie: Wężyk, Tetris, Bąbelki, 2048,
+Saper, Pamięć i Kółko i krzyżyk.
+
+```
+frontend/src/apps/games/<gra>/
+   ├── <gra>.ts          czyste funkcje: plansza, ruch, koniec gry (bez Reacta)
+   ├── <gra>.test.ts     logika na sztywno, z ziarnem losowości podanym z zewnątrz
+   ├── <Gra>App.tsx      widok: plansza, wynik, sterowanie
+   └── <Gra>App.module.css
+```
+
+- **Nic nie idzie do bazy.** Runda żyje w oknie i tyle — brak tabel, endpointów i rzeczy,
+  które można by zepsuć albo zgubić. `shared/manifest.js` zna je tylko po to, żeby istniały
+  jako aplikacje i ikony.
+- **Losowanie z zewnątrz.** Każda gra dostaje `Rng` (`shared/random.ts`, mulberry32), więc test
+  odtwarza dokładnie tę partię, a nie „jakoś tak wyszło".
+- **Sterowanie pod klawiaturą i pod palcem.** Kierunki: strzałki oraz krzyż pod planszą (`shared/Pad.tsx`),
+  w 2048 i wężyku dodatkowo swipe. Bąbelki celują kursorem lub palcem i strzelają puszczeniem.
+  Klawisze słucha tylko plansza (ma `tabIndex`), więc nie podsłuchuje innych okien.
+- **Skala, nie przewijanie.** Plansze rysują się na CSS Grid i SVG z `viewBox`, więc mieszczą się
+  w oknie o każdej szerokości — na telefonie też, bez suwaków.
+- Saper pierwszego kliknięcia nie zabija: miny są rozkładane dopiero po nim, poza klikniętym polem
+  i jego sąsiedztwem. Kółko i krzyżyk ma przeciwnika „łatwy" (losuje, wygrywa jeśli może) i „trudny"
+  (minimax, nie do pokonania — najwyższy wynik to remis).
+
 ## Konta
 
 ```bash
@@ -206,11 +233,13 @@ odzetnieć dawne notatki bez logowania się "w czyjeś konto".
 
 ## Dodanie aplikacji
 
-1. wpis w `shared/manifest.js` (`APPS`),
+1. wpis w `shared/manifest.js` (`APPS`; gra additionally w `GAMES`, wtedy ląduje w folderze „Gry"
+   zamiast na pulpicie i paskach),
 2. folder `frontend/src/apps/<id>/` z komponentem i własnym `*.test.tsx`,
 3. jedna linia w `APP_VIEWS` (i jedna w ikonie) w `frontend/src/shell/registry.tsx`,
 4. migracja dokładająca ikonę na **istniejące** pulpity — inaczej nikt, kto już sobie poukładał
-   pulpit, nie miałby czym otworzyć nowej aplikacji (patrz `004_files_icon.sql`).
+   pulpit, nie miałby czym otworzyć nowej aplikacji (patrz `004_files_icon.sql`, a dla gierek
+   `011_games.sql`, które dokładają cały folder).
 
 Ikona wskazująca na usuniętą aplikację nie wywali pulpitu — dostajesz okno z komunikatem.
 

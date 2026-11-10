@@ -1,0 +1,53 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  /* Tile text scales with the board, not with the page. */
+  container-type: inline-size;
+}
+
+.slot {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tile,
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 9cqw;
+  font-variant-numeric: tabular-nums;
+  color: #14202f;
+}
+
+.pop {
+  animation: pop 120ms ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.86);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.tile2 { background: #e9e2d0; }
+.tile4 { background: #e4d6b8; }
+.tile8 { background: #f0a97a; color: #fff; }
+.tile16 { background: #f0845f; color: #fff; }
+.tile32 { background: #f4685e; color: #fff; }
+.tile64 { background: #f04b3c; color: #fff; }
+.tile128 { background: #edc964; color: #fff; }
+.tile256 { background: #edc550; color: #fff; }
+.tile512 { background: #edc22e; color: #fff; }
+.tile1024 { background: #61c3ff; color: #fff; }
+.tile2048 { background: #59d97f; color: #fff; }
+.tileBig { background: #4cc3ff; color: #fff; }

@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## 2026-11-10 — folder z gierkami (7)
+
+Siedem krótkich gierek w jednym folderze na pulpicie: Wężyk, Tetris, Bąbelki (bubble shooter), 2048,
+Saper, Pamięć, Kółko i krzyżyk. Frontend tylko — bez tabel, endpointów i synchronizacji.
+
+- **`frontend/src/apps/games/<gra>/`**: logika w czystych funkcjach (`snake.ts`, `tetris.ts`,
+  `bubbles.ts`, `twentyforty.ts`, `mines.ts`, `memory.ts`, `tictactoe.ts`) + widok + test logiki
+  i test klikania. Losowanie wchodzi z zewnątrz jako `Rng` (`shared/random.ts`, mulberry32), więc
+  test odtwarza konkretną partię zamiast modlić się o szczęście.
+- **`shared/Pad.tsx`**: krzyż kierunków (`onPointerDown`, nie `onClick` — przytrzymanie ma działać)
+  i `useSwipe` (24 px progu, gest bez początku ignorowany). Klawiatura podsłuchuje tylko planszę
+  (`tabIndex` na planszy), więc inne okna nie gubią klawiszy.
+- **Plansze z CSS Grid i SVG** (`viewBox`), nie z canvasu: test widzi to samo co gracz, a plansza
+  skaluje się do okna zamiast przewijać. Bąbelki rysują linię celowania z tej samej symulacji, z której
+  leci strzał (`aimPath`), więc celownik nie kłamie.
+- **Saper**: miny rozkładane po pierwszym kliknięciu, poza nim i jego sąsiedztwem; flaga prawym
+  przyciskiem albo trybem „Flaga" (telefon). **Kółko i krzyżyk**: łatwy (losuje, wygrywa jeśli może)
+  i trudny (minimax).
+- **`shared/manifest.js`**: `GAMES`, `GAMES_FOLDER = 'Gry'`, `isGame()`; `APPS` zawiera je wszystkie,
+  więc rejestr, szuflada aplikacji i walidacja ikon działają bez zmian. `seedUser` odkłada gry do
+  foldera i **nie** wkłada ich na dock/launcher. Migracja `011_games.sql` dokłada folder „Gry"
+  (w wolnym wierszu pod ostatnią rzeczą na pulpicie) i siedem ikon pod nim; oba wstawki pilnują
+  `NOT EXISTS`, więc powtórka nic nie mnoży.
+- Błędy złapane po drodze: minimax bez negacji na rekurencji (komputer maksimalizował wynik przeciwnika),
+  `fits()` w tetrisie zaglądało w `board.board`, para w pamięci nie zwalniała ręki po dopasowaniu,
+  numery wierszy migracji w `db.test.js` wypisane ręcznie.
+- Testy: 580 (backend 180, frontend 400 → +80), lint czysty, build 263 kB / 85 kB gzip.
+
+
 ## 2026-11-10 — wersja na telefon
 
 Ten sam kod, inne ułożenie: poniżej 760 px shell przestaje udawać desktop (`shell/viewport.ts`,
