@@ -47,6 +47,12 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - **Logika jako czyste funkcje z `Rng` podanym z zewnątrz** (`snake.ts`, `tetris.ts`, `bubbles.ts`,
   `twentyforty.ts`, `mines.ts`, `memory.ts`, `tictactoe.ts`). Test widzi dokładnie tę partię, a wideoki
   tylko przeklikują planszę — tak jak w notatniku i kalkulatorze.
+- **Ruszt heksów ma `parity`, nie przesuwane indeksy** (`bubbles`): dokładany rząd zmienia parzystość
+  wszystkich rzędów, a z nią offset i liczbę miejsc. Przesuwanie danych wynosi kulki za ścianę i tnie
+  sąsiedztwo; przechylona parzystość zostawia je na miejscu. Wsuwany rząd musi być **pełny** — ściana
+  czepia się sufitu.
+- **Testy losowych gier nie zakładają układu planszy**: losuje logika, więc test wybiera pola według
+  stanu („pierwsze zamknięte”, „para czy pomyłka”), a nie z góry nadanych numerów.
 - **Plansze z DOM i SVG, bez canvasu** — to samo, co widzi test (jsdom nie ma `getContext`), i skalują
   się razem z oknem (`grid-template-columns`, `viewBox`) zamiast przewijać.
 - **Wysokość okna jest w ramie** (`WindowFrame` → `height: win.height`). Wszystkie aplikacje są napisane

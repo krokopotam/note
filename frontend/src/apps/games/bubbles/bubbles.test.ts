@@ -3,11 +3,13 @@ import { rngFrom } from '../shared/random';
 import {
   COLS,
   HEIGHT,
+  R,
   ROWS,
   WIDTH,
   aimPath,
   cluster,
   colsIn,
+  center,
   createGame,
   emptyGrid,
   hanging,
@@ -87,12 +89,55 @@ describe('bąbelki', () => {
     expect(shot.score).toBeGreaterThanOrEqual(50);
   });
 
-  it('co szóstki strzałów dokłada wiersz od góry', () => {
-    let game = { ...createGame(rng(), 0), grid: emptyGrid(), shots: 5 };
-    game = shoot(game, { x: WIDTH / 2, y: 0 }, rng());
-    expect(game.shots).toBe(6);
-    // Wiersz wsunięty na górę jest pusty, więc wszystko przesunęło się w dół.
-    expect(game.grid[0].every((cell) => !cell)).toBe(true);
+  it('co szóstki strzałów dokłada wiersz od góry, nie psując rusztu', () => {
+    const game = { ...createGame(rng(), 3), shots: 5 };
+
+    const shot = shoot(game, { x: WIDTH / 2, y: 0 }, rng());
+
+    expect(shot.shots).toBe(6);
+    expect(shot.grid).toHaveLength(ROWS);
+    expect(shot.grid[0].some(Boolean)).toBe(true);
+    // Każdy wiersz nadal ma dokładnie tyle miejsc, ile mówi jego parzystość.
+    shot.grid.forEach((row, index) => expect(row).toHaveLength(colsIn(index, shot.parity)));
+    // Ściana wciąż wisi na suficie — nic nie zostało odcięte.
+    expect(hanging(shot.grid, shot.parity)).toEqual([]);
+  });
+
+  it('dociśnięcie sufitu nie przesuwa kulek w bok', () => {
+    const grid = emptyGrid();
+    grid[0][0] = '#f00';
+    grid[0][10] = '#f00';
+    grid[1][0] = '#0f0';
+    const game = { ...createGame(rng(), 0), grid, shots: 5, current: '#abc', next: '#abc' };
+    const beforeLeft = center(0, 0, game.parity).x;
+    const beforeRight = center(0, 10, game.parity).x;
+
+    const shot = shoot(game, { x: 20, y: 0 }, rng());
+
+    // Ta sama kulka jeden wiersz niżej: ten sam pion, nie przeskok o promień.
+    expect(center(1, 0, shot.parity).x).toBe(beforeLeft);
+    expect(center(1, 10, shot.parity).x).toBe(beforeRight);
+    expect(shot.grid[1][0]).toBe('#f00');
+    expect(shot.grid[1][10]).toBe('#f00');
+  });
+
+  it('po sześćdziesięciu strzałach każda kulka jest wciąż w środku planszy', () => {
+    let game = createGame(rng(), 5);
+    for (let i = 0; i < 60 && !game.over && !game.won; i += 1) {
+      game = shoot(game, { x: 20 + ((i * 37) % (WIDTH - 40)), y: (i * 53) % 220 }, rng());
+      game.grid.forEach((row, r) => {
+        expect(row).toHaveLength(colsIn(r, game.parity));
+        row.forEach((cell, c) => {
+          if (!cell) return;
+          const here = center(r, c, game.parity);
+          expect(here.x).toBeGreaterThanOrEqual(R);
+          expect(here.x).toBeLessThanOrEqual(WIDTH - R);
+        });
+      });
+      // Ściana nie może się sama odciąć od sufitu — to był ten „znikający ekran".
+      expect(hanging(game.grid, game.parity)).toEqual([]);
+    }
+    expect(game.grid.some((row) => row.some(Boolean))).toBe(true);
   });
 
   it('gra kończy się, gdy bąbelki zejdą za nisko', () => {

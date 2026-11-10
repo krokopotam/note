@@ -44,7 +44,7 @@ export function BubblesApp() {
       game.grid.flatMap((row, y) =>
         row.map((color, x) => {
           if (!color) return null;
-          const cx = x * R * 2 + R + (y % 2 === 1 ? R : 0);
+          const cx = x * R * 2 + R + ((y + game.parity) % 2 === 1 ? R : 0);
           const cy = y * Math.round(R * 1.74) + R;
           return (
             <circle

@@ -5,6 +5,7 @@ import { MemoryApp } from './MemoryApp';
 const card = (index: number) => screen.getByTestId(`memory-card-${index}`);
 const label = (index: number) => card(index).getAttribute('aria-label') ?? '';
 const faceUp = (index: number) => !label(index).includes('zakryta');
+const moves = () => Number(screen.getByText(/Ruchy/).textContent?.match(/\d+/)?.[0] ?? -1);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -12,14 +13,21 @@ afterEach(() => {
 
 describe('pamięć na ekranie', () => {
   it('druga karta liczy się jako ruch, trzecia już nie', () => {
+    // Tasowanie jest losowe, więc test nie może zakładać, że karty 0 i 1 to pomyłka:
+    // trafiona para zwalnia dłoń od razu i trzecia karta zaczyna nową turę,
+    // a pomyłka trzyma dwie karty odkryte do czasu `settle`.
+    vi.useFakeTimers();
     render(<MemoryApp />);
 
     fireEvent.click(card(0));
     fireEvent.click(card(1));
+    expect(moves()).toBe(1);
+
+    const para = label(0) === label(1);
     fireEvent.click(card(2));
 
-    expect(screen.getByText(/Ruchy/)).toHaveTextContent('1');
-    expect(faceUp(2)).toBe(false);
+    expect(moves()).toBe(1); // trzeci krzyż nigdy nie jest ruchem
+    expect(faceUp(2)).toBe(para); // w turę wchodzi tylko po trafionej parze
   });
 
   it('para zostaje odkryta, a pomyłka znika po chwili', () => {

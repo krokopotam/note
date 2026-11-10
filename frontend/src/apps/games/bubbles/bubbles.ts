@@ -33,6 +33,16 @@ export type Grid = Bubble[][];
 
 export interface ShooterGame {
   grid: Grid;
+  /**
+   * Which rows are the wide ones: row `r` is wide when `(r + parity) % 2 === 0`.
+   *
+   * Pushing a new row under the ceiling moves every existing row one place down,
+   * which would flip the parity of the whole sheet — every bubble would jump
+   * sideways, the last column of a wide row would fall outside the walls and the
+   * lattice would tear so hard that almost everything counts as hanging. So the
+   * sheet keeps its alignment and `parity` is what flips instead.
+   */
+  parity: number;
   current: string;
   next: string;
   shots: number;
@@ -46,11 +56,13 @@ export interface Point {
   y: number;
 }
 
-export const colsIn = (row: number): number => (row % 2 === 0 ? COLS : COLS - 1);
+/** Every other row is shifted by one radius and therefore holds one bubble less. */
+export const colsIn = (row: number, parity = 0): number =>
+  (row + parity) % 2 === 0 ? COLS : COLS - 1;
 
-export function center(row: number, col: number): Point {
+export function center(row: number, col: number, parity = 0): Point {
   return {
-    x: col * R * 2 + R + (row % 2 === 1 ? R : 0),
+    x: col * R * 2 + R + ((row + parity) % 2 === 1 ? R : 0),
     y: row * ROW_H + R,
   };
 }
@@ -62,12 +74,23 @@ export function emptyGrid(filledRows = 0, rng?: Rng): Grid {
   );
 }
 
-export const at = (state: Grid, row: number, col: number): Bubble =>
-  row < 0 || row >= state.length || col < 0 || col >= colsIn(row) ? null : state[row][col];
+export const at = (state: Grid, row: number, col: number, parity = 0): Bubble =>
+  row < 0 || row >= state.length || col < 0 || col >= colsIn(row, parity)
+    ? null
+    : state[row][col];
 
 export function createGame(rng: Rng, filledRows = 5): ShooterGame {
   const grid = emptyGrid(filledRows, rng);
-  const state: ShooterGame = { grid, current: '', next: '', shots: 0, score: 0, over: false, won: false };
+  const state: ShooterGame = {
+    grid,
+    parity: 0,
+    current: '',
+    next: '',
+    shots: 0,
+    score: 0,
+    over: false,
+    won: false,
+  };
   return { ...state, current: pick(COLORS, rng), next: pick(COLORS, rng) };
 }
 
@@ -84,8 +107,8 @@ export function nextShots(state: ShooterGame, rng: Rng): { current: string; next
   return { current: state.next || pick(live, rng), next: pick(live, rng) };
 }
 
-export function neighbours(row: number, col: number): [number, number][] {
-  const even = row % 2 === 0;
+export function neighbours(row: number, col: number, parity = 0): [number, number][] {
+  const even = (row + parity) % 2 === 0;
   const deltas: [number, number][] = even
     ? [[-1, -1], [-1, 0], [0, -1], [0, 1], [1, -1], [1, 0]]
     : [[-1, 0], [-1, 1], [0, -1], [0, 1], [1, 0], [1, 1]];
@@ -129,7 +152,7 @@ export function aimPath(state: ShooterGame, origin: Point, target: Point, guide 
       return { stop, path };
     }
 
-    if (touches(state.grid, { x, y })) {
+    if (touches(state.grid, { x, y }, state.parity)) {
       stop = { x, y };
       path.push(stop);
       return { stop, path };
@@ -147,11 +170,11 @@ export function aimPath(state: ShooterGame, origin: Point, target: Point, guide 
   return { stop, path };
 }
 
-function touches(grid: Grid, point: Point): boolean {
+function touches(grid: Grid, point: Point, parity: number): boolean {
   for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < colsIn(row); col += 1) {
+    for (let col = 0; col < colsIn(row, parity); col += 1) {
       if (!grid[row][col]) continue;
-      const here = center(row, col);
+      const here = center(row, col, parity);
       if (Math.hypot(here.x - point.x, here.y - point.y) < R * 1.75) return true;
     }
   }
@@ -164,11 +187,13 @@ export function landingCell(state: ShooterGame, point: Point): [number, number] 
   let bestDistance = Number.POSITIVE_INFINITY;
 
   for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < colsIn(row); col += 1) {
+    for (let col = 0; col < colsIn(row, state.parity); col += 1) {
       if (state.grid[row][col]) continue;
-      const supported = row === 0 || neighbours(row, col).some(([ry, cx]) => at(state.grid, ry, cx));
+      const supported =
+        row === 0 ||
+        neighbours(row, col, state.parity).some(([ry, cx]) => at(state.grid, ry, cx, state.parity));
       if (!supported) continue;
-      const here = center(row, col);
+      const here = center(row, col, state.parity);
       const distance = Math.hypot(here.x - point.x, here.y - point.y);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -181,8 +206,8 @@ export function landingCell(state: ShooterGame, point: Point): [number, number] 
 }
 
 /** Everything of the same colour connected to the landing spot. */
-export function cluster(grid: Grid, row: number, col: number): [number, number][] {
-  const color = at(grid, row, col);
+export function cluster(grid: Grid, row: number, col: number, parity = 0): [number, number][] {
+  const color = at(grid, row, col, parity);
   if (!color) return [];
   const seen = new Set<string>([`${row},${col}`]);
   const found: [number, number][] = [[row, col]];
@@ -190,9 +215,9 @@ export function cluster(grid: Grid, row: number, col: number): [number, number][
 
   while (queue.length > 0) {
     const [cy, cx] = queue.pop() as [number, number];
-    for (const [ny, nx] of neighbours(cy, cx)) {
+    for (const [ny, nx] of neighbours(cy, cx, parity)) {
       if (seen.has(`${ny},${nx}`)) continue;
-      if (at(grid, ny, nx) !== color) continue;
+      if (at(grid, ny, nx, parity) !== color) continue;
       seen.add(`${ny},${nx}`);
       found.push([ny, nx]);
       queue.push([ny, nx]);
@@ -202,11 +227,11 @@ export function cluster(grid: Grid, row: number, col: number): [number, number][
 }
 
 /** Bubbles cut off from the ceiling fall out of the board. */
-export function hanging(grid: Grid): [number, number][] {
+export function hanging(grid: Grid, parity = 0): [number, number][] {
   const attached = new Set<string>();
   const queue: [number, number][] = [];
 
-  for (let col = 0; col < colsIn(0); col += 1) {
+  for (let col = 0; col < colsIn(0, parity); col += 1) {
     if (grid[0][col]) {
       attached.add(`0,${col}`);
       queue.push([0, col]);
@@ -215,9 +240,9 @@ export function hanging(grid: Grid): [number, number][] {
 
   while (queue.length > 0) {
     const [cy, cx] = queue.pop() as [number, number];
-    for (const [ny, nx] of neighbours(cy, cx)) {
+    for (const [ny, nx] of neighbours(cy, cx, parity)) {
       const key = `${ny},${nx}`;
-      if (attached.has(key) || !at(grid, ny, nx)) continue;
+      if (attached.has(key) || !at(grid, ny, nx, parity)) continue;
       attached.add(key);
       queue.push([ny, nx]);
     }
@@ -225,7 +250,7 @@ export function hanging(grid: Grid): [number, number][] {
 
   const loose: [number, number][] = [];
   for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < colsIn(row); col += 1) {
+    for (let col = 0; col < colsIn(row, parity); col += 1) {
       if (grid[row][col] && !attached.has(`${row},${col}`)) loose.push([row, col]);
     }
   }
@@ -244,14 +269,14 @@ export function shoot(state: ShooterGame, target: Point, rng: Rng): ShooterGame 
   const grid = state.grid.map((entry) => [...entry]);
   grid[row][col] = state.current;
 
-  const popped = cluster(grid, row, col);
+  const popped = cluster(grid, row, col, state.parity);
   let score = 0;
   if (popped.length >= 3) {
     popped.forEach(([py, px]) => {
       grid[py][px] = null;
     });
     score += popped.length * 10;
-    const loose = hanging(grid);
+    const loose = hanging(grid, state.parity);
     loose.forEach(([ly, lx]) => {
       grid[ly][lx] = null;
     });
@@ -259,18 +284,27 @@ export function shoot(state: ShooterGame, target: Point, rng: Rng): ShooterGame 
   }
 
   const shots = state.shots + 1;
-  if (shots % SHOTS_PER_ROW === 0) {
+  let parity = state.parity;
+  // The ceiling row only comes down while there is room for it: a sheet already
+  // touching the last row has nowhere left to go, and that is the end of the game.
+  if (shots % SHOTS_PER_ROW === 0 && !grid[ROWS - 1].some(Boolean)) {
     grid.pop();
-    grid.unshift(Array.from({ length: colsIn(0) }, () => null));
-    // Pushing rows down can end it: everything moved one row closer to the floor.
+    parity = 1 - parity;
+    // The row that comes in is full of bubbles: the sheet hangs from the ceiling,
+    // so an empty row here would cut it loose and the whole wall would fall out.
+    const filler = liveColors(grid);
+    grid.unshift(
+      Array.from({ length: colsIn(0, parity) }, () => (filler.length > 0 ? pick(filler, rng) : null)),
+    );
   }
 
   const empty = grid.every((entry) => entry.every((cell) => !cell));
   const reachedFloor = grid.some((entry, r) => r > DANGER_ROW && entry.some(Boolean));
-  const dealt = nextShots({ ...state, grid }, rng);
+  const dealt = nextShots({ ...state, grid, parity }, rng);
 
   return {
     grid,
+    parity,
     current: dealt.current,
     next: dealt.next,
     shots,

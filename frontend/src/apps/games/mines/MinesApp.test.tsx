@@ -41,10 +41,16 @@ describe('saper na ekranie', () => {
   it('prawy przycisk stawia flagę bez przełączania trybu', () => {
     root = render(<MinesApp />).container;
     fireEvent.click(cell(0));
+    // Które pola są otwarte zależy od losowania min — flagę stawiamy na pierwszym
+    // zamkniętym, a nie na z góry wybranym numerze.
+    const hidden = [...Array(81).keys()].find(
+      (index) => !cell(index).getAttribute('aria-label')?.includes(': '),
+    );
+    expect(hidden).toBeDefined();
 
-    fireEvent.contextMenu(cell(80));
+    fireEvent.contextMenu(cell(hidden as number));
 
-    expect(cell(80).textContent).toBe('🚩');
+    expect(cell(hidden as number).textContent).toBe('🚩');
   });
 
   it('zmiana trudności zmienia liczbę pól', () => {
