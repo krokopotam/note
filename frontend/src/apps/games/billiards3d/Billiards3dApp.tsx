@@ -17,7 +17,15 @@ import {
   strike,
 } from '../billiards/billiards';
 import type { Point, World } from '../billiards/billiards';
-import { BALL_LIFT, CAMERA_MODES, SCALE, cameraFor, tableToScene } from './camera';
+import {
+  BALL_LIFT,
+  CAMERA_MODES,
+  FOV_DEGREES,
+  SCALE,
+  cameraFor,
+  fitFor,
+  tableToScene,
+} from './camera';
 import type { CameraMode, FreePose } from './camera';
 import { ControlStrip } from '../billiards/ControlStrip';
 import {
@@ -33,7 +41,7 @@ import {
   TILT,
   viewDrag,
 } from '../billiards/controls';
-import type { AimMode, CameraWanted, Controls } from '../billiards/controls';
+import type { AimMode, CameraWanted, Controls, Trigger } from '../billiards/controls';
 import styles from './Billiards3dApp.module.css';
 
 /** What the HUD shows; the scene reports it when a shot finishes. */
@@ -43,6 +51,9 @@ interface Hud {
   left: number;
   fouls: number;
   won: boolean;
+  /** While the balls roll there is nothing to strike. */
+  moving: boolean;
+  cueDown: boolean;
   gained: number;
   foul: boolean;
   seq: number;
@@ -66,6 +77,8 @@ const hudOf = (world: World): Hud => {
     left: leftToPot(world),
     fouls: world.fouls,
     won: world.won,
+    moving: !resting(world),
+    cueDown: cueBall(world).potted,
     gained: last?.potted.filter((entry) => entry.id !== 0).length
       ? (last?.gained ?? 0)
       : 0,
@@ -94,7 +107,7 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
   scene.background = new THREE.Color('#0d1420');
   scene.fog = new THREE.Fog('#0d1420', 26, 46);
 
-  const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 120);
+  const camera = new THREE.PerspectiveCamera(FOV_DEGREES, 1, 0.1, 120);
   camera.position.set(0, 6, 9);
 
   const disposables: { dispose: () => void }[] = [];
@@ -299,6 +312,8 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
   let distance = DISTANCE.base;
   let viewGrabbed: { x: number; y: number } | null = null;
   let frameAtGrab = { yaw, tilt, distance };
+  /** Czy React już wie, że kule lecą. */
+  let reported = false;
   let grabbed: { x: number; y: number } | null = null;
   let aimAtGrab = aim;
   let loaded = 0;
@@ -420,12 +435,18 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
   canvas.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointerup', onPointerUp);
 
+  /** Proporcje płótna — z nich liczy się kadr. */
+  let aspect = 640 / 400;
+
   const resize = () => {
     const width = host.clientWidth || 640;
     const height = host.clientHeight || 400;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    // Telefon trzymany pionowo ma ten sam kąt widzenia, ale połowę szerokości:
+    // bez tego oku trzeba odsunąć, inaczej stół jest ucięty na bandach.
+    aspect = width / height;
   };
   resize();
   const observer = new ResizeObserver(resize);
@@ -457,6 +478,13 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
         cushions = 0;
         onHud(hudOf(world));
       }
+    }
+
+    // React musi wiedzieć, że kule lecą: `Uderz` gaśnie na czas ruchu.
+    const rolling = !resting(world);
+    if (reported !== rolling) {
+      reported = rolling;
+      onHud(hudOf(world));
     }
 
     // Balls: position, and a sink when one drops.
@@ -542,14 +570,17 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     }
 
     // Camera eases towards its pose so the view glides instead of jumping.
-    const pose = cameraFor(
-      cameraWanted === 'auto' ? mode : 'free',
-      cueAt,
-      wantedPose(),
-    );
-    camPos.set(pose.position.x, pose.position.y, pose.position.z);
-    camTarget.set(pose.target.x, pose.target.y, pose.target.z);
-    camera.up.set(pose.up.x, pose.up.y, pose.up.z);
+    const auto = cameraWanted === 'auto';
+    const view = cameraWanted === 'auto' ? mode : 'free';
+    const pose = wantedPose();
+    // Kadr liczony z rogów stołu: okno może być szerokie albo wysokie, stół ma
+    // zawsze tyle samo rogów. Kadru z ręki nie ruszamy — jego dystans jest wyborem.
+    const poseAt = (value: number) => cameraFor(view, cueAt, pose, { fit: value, aspect });
+    const fit = auto ? fitFor(poseAt, aspect) : 1;
+    const cam = poseAt(fit);
+    camPos.set(cam.position.x, cam.position.y, cam.position.z);
+    camTarget.set(cam.target.x, cam.target.y, cam.target.z);
+    camera.up.set(cam.up.x, cam.up.y, cam.up.z);
     const ease = 1 - Math.exp(-dt * 7);
     camera.position.lerp(camPos, ease);
     easeTarget.lerp(camTarget, ease);
@@ -602,6 +633,21 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
       canvas.remove();
     },
   };
+}
+
+/** Zdanie w panelu zmienia się razem z widełkami — czyta się to, czego się używa. */
+function stripHint(camera: CameraWanted, aim: AimMode, trigger: Trigger): string {
+  if (camera === 'free') {
+    return 'Trzymasz kamerę: przeciągnij, aby obrócić kadr i go pochylić; celowanie śpi. Stuknij „Kij” albo „Stół”, aby wrócić — kadr zostanie jako „Własny”.';
+  }
+  const steer =
+    aim === 'table'
+      ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę.'
+      : 'Palec po suknie celuje, pociągnięcie kija uderza.' +
+        (camera === 'placed' ? ' Kadr znad ustawiania został.' : '');
+  return trigger === 'button'
+    ? `${steer} Przy „Guziku” uderza tylko przycisk „Uderz”.`
+    : `${steer} Puszczenie palca uderza.`;
 }
 
 /** Bilard 3D: ten sam stół co w 2D, tylko że z trzecim wymiarem. */
@@ -681,10 +727,6 @@ export function Billiards3dApp() {
           Faule <strong>{hud.fouls}</strong>
         </span>
         <span className={shell.hudSpacer} />
-        {/* Presety kamery mieszkają teraz w pasku sterowania, przy „Widok”. */}
-        <button type="button" className={shell.action} onClick={() => engine.current?.reset()}>
-          Nowy bilard
-        </button>
       </div>
 
       <div className={`${shell.stage} ${styles.stage}`} ref={host} data-testid="billiard3d-stage">
@@ -704,22 +746,45 @@ export function Billiards3dApp() {
         )}
       </div>
 
-      <div className={shell.hud}>
-        <span className={styles.powerLabel}>
-          Siła
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(power * 100)}
-            onChange={(event) => setPower(Number(event.target.value) / 100)}
-            aria-label="Siła uderzenia"
-            className={styles.slider}
-            data-testid="billiard3d-power"
-          />
-        </span>
+      <ControlStrip
+        controls={controls}
+        onAim={chooseAim}
+        onTrigger={(trigger) => setControls({ ...controls, trigger })}
+        camera={camera}
+        onCamera={setCamera}
+        placedAvailable={camera !== 'auto'}
+        // Presety nie mają sensu, gdy kadr trzyma palec.
+        presets={
+          camera === 'free'
+            ? undefined
+            : CAMERA_MODES.map((option) => ({ id: option.id, label: option.label }))
+        }
+        preset={camera === 'auto' ? mode : null}
+        onPreset={(id) => {
+          setCamera('auto');
+          setMode(id as CameraMode);
+        }}
+        onStrike={() => engine.current?.strike(power)}
+        disabled={hud.moving || hud.cueDown || hud.won}
+        power={
+          <label className={styles.slider}>
+            Siła
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(power * 100)}
+              onChange={(event) => setPower(Number(event.target.value) / 100)}
+              aria-label="Siła uderzenia"
+              data-testid="billiard3d-power"
+            />
+          </label>
+        }
+        hint={stripHint(camera, controls.aim, controls.trigger)}
+        testid="billiard3d"
+      >
         {camera !== 'auto' && (
-          <span className={styles.group}>
+          <label className={styles.panelRow}>
             Dystans
             <input
               type="range"
@@ -727,41 +792,14 @@ export function Billiards3dApp() {
               max={Math.round(DISTANCE.max * 10)}
               value={distance}
               onChange={(event) => setDistance(Number(event.target.value))}
-              aria-label="Dystans kamery"
-              className={styles.slider}
               data-testid="billiard3d-distance"
             />
-          </span>
+          </label>
         )}
-        <ControlStrip
-          controls={controls}
-          onChange={setControls}
-          onAim={chooseAim}
-          camera={camera}
-          onCamera={setCamera}
-          placedAvailable={camera !== 'auto'}
-          onStrike={() => engine.current?.strike(power)}
-          // Przy swobodnym widoku presety nie mają sensu — kadr trzyma palec.
-          presets={
-            camera === 'free'
-              ? undefined
-              : CAMERA_MODES.map((option) => ({ id: option.id, label: option.label }))
-          }
-          preset={camera === 'auto' ? mode : null}
-          onPreset={(id) => {
-            setCamera('auto');
-            setMode(id as CameraMode);
-          }}
-          testid="billiard3d"
-        />
-        <span className={shell.hudSpacer} />        <span className={styles.tip}>
-          {camera === 'free'
-            ? 'Przeciągnij w bok, aby obrócić kadr, i w górę albo w dół, aby go pochylić.'
-            : controls.aim === 'table'
-              ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę.'
-              : 'Rusz myszą nad stołem, aby celować; na telefonie przeciągnij w bok i w dół.'}
-        </span>
-      </div>
+        <button type="button" className={styles.panelAction} onClick={() => engine.current?.reset()}>
+          Nowy bilard
+        </button>
+      </ControlStrip>
     </div>
   );
 }

@@ -9,6 +9,9 @@ class ResizeObserverStub {
   disconnect(): void {}
 }
 
+/** Nastawy mieszkają w panelu za kropkami — najpierw stuknij w nie. */
+const openPanel = () => fireEvent.click(screen.getByTestId('billiard3d-menu'));
+
 afterEach(() => {
   vi.restoreAllMocks();
   // Wybrane sterowanie mieszka w localStorage — nie może przeciekać między testami.
@@ -19,6 +22,7 @@ describe('bilard 3D na ekranie', () => {
   it('pokazuje tablicę wyników i sterowanie kamerą', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(<Billiards3dApp />);
+    openPanel();
 
     expect(screen.getByText(/Punkty/)).toHaveTextContent('0');
     expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
@@ -33,6 +37,7 @@ describe('bilard 3D na ekranie', () => {
   it('wybór kamery zostaje na jednym guziku', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(<Billiards3dApp />);
+    openPanel();
 
     expect(screen.getByRole('button', { name: 'Za kulą' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -57,11 +62,13 @@ describe('bilard 3D na ekranie', () => {
     expect(screen.getByTestId('billiard3d-aim-cue')).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByTestId('billiard3d-aim-table'));
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard3d-trigger-button'));
     expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('uderza tylko');
     first.unmount();
 
     render(<Billiards3dApp />);
+    openPanel();
 
     expect(screen.getByTestId('billiard3d-aim-table')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('billiard3d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
@@ -73,6 +80,7 @@ describe('bilard 3D na ekranie', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(<Billiards3dApp />);
 
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
 
     expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('celowanie śpi');
@@ -85,6 +93,7 @@ describe('bilard 3D na ekranie', () => {
   it('celowanie bierze zamrożony kadr i budzi kij', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(<Billiards3dApp />);
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
 
     fireEvent.click(screen.getByTestId('billiard3d-aim-cue'));
@@ -98,6 +107,7 @@ describe('bilard 3D na ekranie', () => {
   it('preset kamery wraca do automatu', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(<Billiards3dApp />);
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard3d-camera-free'));
     fireEvent.click(screen.getByTestId('billiard3d-camera-auto'));
     fireEvent.click(screen.getByTestId('billiard3d-preset-top'));
@@ -107,11 +117,33 @@ describe('bilard 3D na ekranie', () => {
     expect(screen.queryByTestId('billiard3d-distance')).toBeNull();
   });
 
+  it('sterowanie strzału jest pod ręką, reszta pod kropkami', () => {
+    render(<Billiards3dApp />);
+
+    // Bez otwierania czegokolwiek: w co kręcę i czym uderzam.
+    expect(screen.getByTestId('billiard3d-aim-cue')).toBeInTheDocument();
+    expect(screen.getByTestId('billiard3d-power')).toBeInTheDocument();
+    expect(screen.getByTestId('billiard3d-strike')).toBeInTheDocument();
+    // A to, co ustawia się raz na wizytę, czeka w panelu.
+    expect(screen.queryByTestId('billiard3d-panel')).toBeNull();
+    expect(screen.queryByTestId('billiard3d-camera-free')).toBeNull();
+
+    openPanel();
+
+    expect(screen.getByTestId('billiard3d-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('billiard3d-camera-free')).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByTestId('billiard3d-menu-backdrop'));
+
+    expect(screen.queryByTestId('billiard3d-panel')).toBeNull();
+  });
+
   it('uderzenie i nowy bilard bez sceny niczego nie rozbijają', () => {
     render(<Billiards3dApp />);
 
     fireEvent.change(screen.getByTestId('billiard3d-power'), { target: { value: '80' } });
     fireEvent.click(screen.getByTestId('billiard3d-strike'));
+    openPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Nowy bilard' }));
 
     expect(screen.getByText(/Do wbicia/)).toHaveTextContent('10');

@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 2026-11-10 — bilard: stół ma być największy na ekranie
+
+Mechanika była dobra, a gra maleńka: pasek sterowania zjadał na telefonie ~300 z 844 pikseli,
+a kamera układała kadr pod okno, którego nikt nie miał.
+
+- **Pasek dwupoziomowy** (`ControlStrip.tsx`): zostaje `Celowanie`, suwak siły, trzy kropki i
+  `Uderz`; `Widok`, presety kamery, `Uderzenie`, `Dystans`, `Nowy bilard` i zdanie-podpowiedź
+  schodzą do panelu `position: fixed` za kropkami (ten sam gest co menu wierszy, z tłem
+  zamykającym). `Nowy bilard` zniknął znad liczników. Zdanie zmienia się razem z widełkami, więc w
+  panelu czyta się to, czego się właśnie używa.
+- **Telefon**: plansza 2D z ~200 px do **617 px** (stół obraca się wzdłuż pionu na `Auto`),
+  płótno 3D z ~350 px do **610 px**, liczniki w jednym 15-pikselowym rzędzie, `hint` gier
+  ukryty poniżej 760 px.
+- **Kadr liczony z rogów stołu** (`fitFor` + `project` w czystym `camera.ts`, ten sam rzut co
+  three.js): bisekcja cofa oko, aż najgorszy róg zmieści się z zapasem. Bez stałej zależnej od
+  okna — monitor 1.7×, telefon 2.5×, obrót telefonu nic nie wycina. `fitFor` dostaje **funkcję**
+  kadru: każda poza cofa się po swojemu, a dopasowanie czyjejś drogi cofania dawało stół
+  wystający za ramę.
+- **Pionowy ekran patrzy z góry** (`looksLengthwise`): szeroki stół w wąskim kadrze był znaczkiem
+  w niebie; z tyłu i z góry (~60°) długi bok idzie w górę ekranu — **55%×21% → 81%×63%** płótna.
+  Kadr z ręki zostaje nietknięty: jego dystans wybiera gracz.
+- Testy: 667 (backend 184, frontend 488). Nowe: każdy róg stołu w kadrze dla sześciu proporcji
+  okna i dla presetów, nienaruszalność kadru z ręki, panel zamknięty domyślnie (sterowanie strzału
+  musi być pod ręką) i zamykany tłem, stromy kadr telefonu.
+
 ## 2026-11-10 — bilard: swobodny widok i kij, który słucha palca
 
 Telefon pokazał, co nie gra: palec na stole celuje tam, gdzie przykrywa je opuszka, a kamera

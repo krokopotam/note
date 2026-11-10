@@ -4,6 +4,8 @@ import { TABLE } from '../billiards/billiards';
 import { Billiards2dApp } from './Billiards2dApp';
 
 const table = () => screen.getByTestId('billiard-table');
+/** Nastawy mieszkają w panelu za kropkami — najpierw stuknij w nie. */
+const openPanel = () => fireEvent.click(screen.getByTestId('billiard2d-menu'));
 
 /** jsdom gives every element a zero-size box; the app needs a real one to aim. */
 const stubTableBox = (width = 660, height = 348) => {
@@ -99,6 +101,7 @@ describe('bilard 2D na ekranie', () => {
     render(<Billiards2dApp />);
     stubTableBox();
     const node = table();
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard2d-trigger-button'));
 
     fireEvent.pointerDown(node, { clientX: 200, clientY: 240 });
@@ -142,13 +145,35 @@ describe('bilard 2D na ekranie', () => {
     expect(frameAngle()).toBeCloseTo(start, 6);
   });
 
+  it('sterowanie strzału jest pod ręką, reszta pod kropkami', () => {
+    render(<Billiards2dApp />);
+
+    // Bez otwierania czegokolwiek: w co kręcę i czym uderzam.
+    expect(screen.getByTestId('billiard2d-aim-cue')).toBeInTheDocument();
+    expect(screen.getByTestId('billiard2d-strike')).toBeInTheDocument();
+    // A to, co ustawia się raz na wizytę, czeka w panelu.
+    expect(screen.queryByTestId('billiard2d-panel')).toBeNull();
+    expect(screen.queryByTestId('billiard2d-camera-free')).toBeNull();
+
+    openPanel();
+
+    expect(screen.getByTestId('billiard2d-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('billiard2d-hint')).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByTestId('billiard2d-menu-backdrop'));
+
+    expect(screen.queryByTestId('billiard2d-panel')).toBeNull();
+  });
+
   it('wybrane sterowanie zostaje na następne wejście', () => {
     const first = render(<Billiards2dApp />);
     fireEvent.click(screen.getByTestId('billiard2d-aim-table'));
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard2d-trigger-button'));
     first.unmount();
 
     render(<Billiards2dApp />);
+    openPanel();
 
     expect(screen.getByTestId('billiard2d-aim-table')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('billiard2d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
@@ -178,6 +203,7 @@ describe('bilard 2D na ekranie', () => {
     stubTableBox();
     const node = table();
 
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
 
     expect(screen.queryByTestId('cue-stick')).toBeNull();
@@ -200,6 +226,7 @@ describe('bilard 2D na ekranie', () => {
     render(<Billiards2dApp />);
     stubTableBox();
     const node = table();
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
     fireEvent.pointerDown(node, { clientX: 300, clientY: 300 });
     fireEvent.pointerMove(node, { clientX: 420, clientY: 260 });
@@ -220,6 +247,7 @@ describe('bilard 2D na ekranie', () => {
     render(<Billiards2dApp />);
     stubTableBox();
     const node = table();
+    openPanel();
     fireEvent.click(screen.getByTestId('billiard2d-camera-free'));
     fireEvent.pointerDown(node, { clientX: 300, clientY: 300 });
     fireEvent.pointerMove(node, { clientX: 400, clientY: 300 });
@@ -263,6 +291,7 @@ describe('bilard 2D na ekranie', () => {
     fireEvent.keyDown(table(), { key: ' ' });
     expect(screen.getByText(/Strzały/)).toHaveTextContent('1');
 
+    openPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Nowy bilard' }));
 
     expect(screen.getByText(/Strzały/)).toHaveTextContent('0');

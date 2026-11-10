@@ -62,8 +62,12 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - **Bilard: jedna fizyka, dwa rysunki.** `games/billiards/billiards.ts` liczy zderzenia, tarcie,
   łuzy i przymiar; 2D rysuje to w SVG, 3D w three.js. Step dzieli się na podpikroki (kula nie
   przelatuje przez kulę), krok czasu podaje widok, więc test idzie na stopklatce.
-- **Trzy widełki sterowania, każdy osobno** (`games/billiards/controls.ts`, rysem `ControlStrip.tsx`
-  wspólny dla 2D i 3D):
+- **Pasek pokazuje tylko to, czego potrzebuje strzał** (`ControlStrip.tsx`): `Celowanie`, ewentualnie
+  suwak siły, trzy kropki i `Uderz`. Reszta — `Widok`, presety kamery, `Uderzenie`, `Dystans`,
+  `Nowy bilard` i zdanie o sterowaniu — mieszka w panelu za kropkami (`position: fixed`, jak menu
+  wierszy: ten sam gest, którego uczymy się raz). Telefon policzył to brzydko: trzy rzędy
+  przełączników i stolik pod lupą. Zostały dwa rzędy, plansza urosła z ~200 px do ~610 px.
+- **Trzy widełki sterowania, każdy osobno** (`games/billiards/controls.ts`):
   - **Celowanie**: `Kij` albo `Stół`. Oba czytają ten sam `dragEffect` — w bok kręci, do gracza
     nabiera siły — różnią się tym, co wolno pójść za palcem: przy kiju tylko kij (kamera trzyma
     słowo), przy stole cały świat, więc uderzenie zawsze od gracza.
@@ -82,10 +86,21 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   pionowym długa krawędź stołu staje się długą krawędzią ekranu), a palec wraca na stół przez
   `screenToTable` (odkręć, pomniejsz, przesuń). Bez tego centrującego `translate` stół stoi poza
   własnym kadrem — i tak stał, dopóki nikt nie zajrzał w zrzut z telefonu.
-- **Kamera 3D ma trzy źródła** (`cameraFor(mode, cue, pose)`): `pose` od gracza (yaw, pochylenie,
-  dystans — trzyma kadr w miejscu), `pose` z samego yaw, gdy gracz obraca stół, albo nic, czyli
-  automat `za kulą`. Presety `Z góry`/`Z boku` nie dają się przestawiać. Spojrzenie zawsze lekko
-  przechyla się ku środkowi sukna, inaczej rack wypada z kadru.
+- **Kadr 3D liczy się z rogów stołu, nie z proporcji okna** (`fitFor(poseAt, aspect)` w czystym
+  `camera.ts`, z `project()` tym samym rzutem co three.js): cztery rogi stołu są naprawdę
+  rzucane na kadr, a oko cofa się bisekcją, aż najgorszy z nich zmieści się z palcem oddechu
+  (`FILL`). Szeroki monitor oddala się o 1.7, telefon pionowy o 2.5 — i dlatego obrót telefonu
+  nie wycina stołu. `poseAt` to **funkcja** kadru, nie gotowa poza: każde ujęcie cofa się po
+  swojemu (niskie wznosi się przy okazji, stromy kadr telefonu nie), a dopasowywanie czyjejś
+  drogi cofania kończyło się stołem wystającym za ramę.
+- **Pionowy ekran patrzy na stół z góry, poziomy — znad bandy** (`looksLengthwise`): stół jest
+  szeroki i niski, kadr telefonu wysoki i wąski — te dwa kształty walczą, a stół przegrywa
+  (był znaczkiem pośrodku nieba). Z tyłu i z góry, pod ~57°, długi bok idzie w górę ekranu
+  i sukno zgadza się z ramką: 55%×21% płótna → 81%×63%. Presety `Z góry`/`Z boku` też są
+  dopasowywane, kadru z ręki — nie, jego dystans jest wyborem gracza.
+- **Wspólna odzież gier jest szczupła** (`gameShell.module.css`): 6 px zamiast 8, liczniki 12 px
+  (na telefonie 11), guziki 30 px, a `hint` na telefonie w ogóle znika — zdanie o sterowaniu
+  jest w panelu gier, a piksel należy do planszy.
 - **three.js jest leniwe** (`registry.tsx`): `lazy` + `Suspense`, osobny chunk ~137 kB gzip.
   Kamera 3D (`camera.ts`, czyste funkcje) nie zależy od kierunku celowania — obracała stołem w
   pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`. Rusza ją tylko to, co gracz

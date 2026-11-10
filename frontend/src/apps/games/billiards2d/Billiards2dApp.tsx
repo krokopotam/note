@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import shell from '../gameShell.module.css';
+import { usePhone } from '../../../shell/viewport';
 import { boardStyle } from '../shared/board';
 import {
   BALL_R,
@@ -33,8 +34,24 @@ import {
   viewRotation,
   ZOOM,
 } from '../billiards/controls';
-import type { AimMode, CameraWanted, Controls } from '../billiards/controls';
+import type { AimMode, CameraWanted, Controls, Trigger } from '../billiards/controls';
 import styles from './Billiards2dApp.module.css';
+
+/**
+ * Co panel mówi o aktualnym trybie. Jedno zdanie, ale zmienia się w zależności
+ * od wybranych widełek — gracz ma przeczytać to, czego właśnie używa.
+ */
+function stripHint(aiming: boolean, turning: boolean, trigger: Trigger): string {
+  if (!aiming) {
+    return 'Palec obraca kadr i przybliża, a celowanie śpi. Stuknij „Kij” albo „Stół”, aby wrócić — kadr zostanie jako „Własny”.';
+  }
+  const steer = turning
+    ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę. Strzałki też obracają stół.'
+    : 'Przeciągnij w bok, aby ruszyć kijem, i w dół, aby nabrać siłę. Myszka celuje po wskazanym punkcie.';
+  return trigger === 'button'
+    ? `${steer} Przy „Guziku” uderza tylko przycisk „Uderz”.`
+    : `${steer} Puszczenie palca uderza, spacja też.`;
+}
 
 /** Radians one arrow key press turns the cue. */
 const AIM_KEY = 0.02;
@@ -117,6 +134,9 @@ export function Billiards2dApp() {
   // Kamera: `auto` sama pilnuje kadru, `free` oddaje ekran palcu (celowanie śpi),
   // `placed` trzyma to, co gracz ustawił, a kij celuje w zamrożonym kadrze.
   const [camera, setCamera] = useState<CameraWanted>('auto');
+  // Telefon trzymany pionowo ma wysoki ekran i szeroką stolicę — na `auto`
+  // obracamy stół wzdłuż pionu, żeby nie grać w kopertę.
+  const phone = usePhone();
   const [view, setView] = useState({ angle: 0, zoom: 1 });
   const svg = useRef<SVGSVGElement>(null);
   const worldRef = useRef(world);
@@ -316,7 +336,15 @@ export function Billiards2dApp() {
   const board = { w: TABLE.width + RAIL * 2, h: TABLE.height + RAIL * 2 };
   const centre = { x: TABLE.width / 2, y: TABLE.height / 2 };
   const frameAngle =
-    camera === 'free' ? view.angle : turning ? viewRotation(aim) : camera === 'placed' ? view.angle : 0;
+    camera === 'free'
+      ? view.angle
+      : turning
+        ? viewRotation(aim)
+        : camera === 'placed'
+          ? view.angle
+          : phone
+            ? -90
+            : 0;
   const frameZoom = ownFrame ? view.zoom : 1;
   // The viewBox is the box the turned table really needs, so the cloth fills the
   // window at any angle instead of shrinking into a corner of a straight frame.
@@ -364,9 +392,6 @@ export function Billiards2dApp() {
             />
           </span>
         </span>
-        <button type="button" className={shell.action} onClick={restart}>
-          Nowy bilard
-        </button>
       </div>
 
       <div className={shell.stage}>
@@ -503,23 +528,20 @@ export function Billiards2dApp() {
 
       <ControlStrip
         controls={controls}
-        onChange={setControls}
         onAim={chooseAim}
+        onTrigger={(trigger) => setControls({ ...controls, trigger })}
         camera={camera}
         onCamera={setCamera}
         placedAvailable={camera !== 'auto'}
         onStrike={() => shoot(aim, powerRef.current)}
         disabled={moving || cue.potted || world.won}
+        hint={stripHint(aiming, turning, controls.trigger)}
         testid="billiard2d"
-      />
-
-      <p className={shell.hint}>
-        {!aiming
-          ? 'Przeciągnij w bok, aby obrócić stół, i w górę albo w dół, aby przybliżyć. Celowanie wzbudzisz przy „Kij” lub „Stół”.'
-          : turning
-            ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę. Strzałki też obracają stół, spacja uderza.'
-            : 'Przeciągnij w bok, aby ruszyć kijem, i w dół, aby nabrać siłę. Myszka celuje też sama, spacja uderza.'}
-      </p>
+      >
+        <button type="button" className={styles.panelAction} onClick={restart}>
+          Nowy bilard
+        </button>
+      </ControlStrip>
     </div>
   );
 }

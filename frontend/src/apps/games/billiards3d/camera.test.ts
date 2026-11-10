@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { TABLE } from '../billiards/billiards';
-import { BALL_LIFT, SCALE, cameraFor, tableToScene } from './camera';
+import {
+  BALL_LIFT,
+  FOV_DEGREES,
+  SCALE,
+  cameraFor,
+  fitFor,
+  project,
+  tableOutline,
+  tableToScene,
+} from './camera';
+import type { Pose } from './camera';
 
 describe('mostek stół → scena', () => {
   it('środek stołu jest środkiem sceny', () => {
@@ -104,6 +114,63 @@ describe('kamera', () => {
     expect(pose.target).toEqual({ x: 0, y: 0, z: 0 });
     // Bez tego stół staje na krótszej krawędzi.
     expect(pose.up).toEqual({ x: 0, y: 0, z: -1 });
+  });
+
+  it('wąskie okno patrzy na stół z góry, szerokie — znad bandy', () => {
+    const tall = cameraFor('behind', cue, null, { aspect: 382 / 610 });
+    const wide = cameraFor('behind', cue, null, { aspect: 2.2 });
+    // Strzmienny kadr: oko wznosi się wyżej, niż jest oddalone.
+    expect(tall.position.y / Math.abs(tall.target.x - tall.position.x)).toBeGreaterThan(0.9);
+    // „znad bandy”: nisko, wzrok sunie przez sukno.
+    expect(wide.position.y / Math.abs(wide.target.x - wide.position.x)).toBeLessThan(0.35);
+  });
+
+  it('każdy róg stołu mieści się w kadrze — na monitorze i na telefonie', () => {
+    for (const aspect of [2.4, 926 / 532, 1.4, 1, 0.8, 382 / 610]) {
+      const poseAt = (fit: number) => cameraFor('behind', cue, null, { fit, aspect });
+      const pose = poseAt(fitFor(poseAt, aspect));
+      for (const corner of tableOutline()) {
+        const seen = project(pose, corner, aspect, FOV_DEGREES);
+        expect(seen, `róg za okiem przy ${aspect.toFixed(2)}`).not.toBeNull();
+        expect(Math.abs(seen!.x), `za szeroko przy ${aspect.toFixed(2)}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(seen!.y), `za wysoko przy ${aspect.toFixed(2)}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('presety też się mieszczą: z góry i z boku na każdym ekranie', () => {
+    for (const mode of ['top', 'side'] as const) {
+      for (const aspect of [2.4, 1, 382 / 610]) {
+        const poseAt = (fit: number) => cameraFor(mode, cue, null, { fit, aspect });
+        const pose = poseAt(fitFor(poseAt, aspect));
+        for (const corner of tableOutline()) {
+          const seen = project(pose, corner, aspect, FOV_DEGREES);
+          expect(seen, `${mode} ${aspect.toFixed(2)}`).not.toBeNull();
+          expect(Math.abs(seen!.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(seen!.y)).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it('dystansuje tylko kamerę automatu, nie kadr gracza', () => {
+    const cueWide = cameraFor('behind', cue, null, { fit: 1 });
+    const cueTall = cameraFor('behind', cue, null, { fit: 2 });
+    const od = (pose: Pose) => Math.hypot(pose.position.x - cue.x, pose.position.z - cue.z);
+    // Oko cofa się o cały współczynnik...
+    expect(od(cueTall) / od(cueWide)).toBeGreaterThan(1.8);
+    // ...i wspina się jeszcze szybciej: na wysokim oknie patrzymy na stół z góry,
+    // inaczej połowa kadru to puste niebo nad daleką bandą.
+    expect(cueTall.position.y / cueWide.position.y).toBeGreaterThan(2);
+
+    const topWide = cameraFor('top', cue, null, { fit: 1 });
+    expect(cameraFor('top', cue, null, { fit: 2 }).position.y).toBeCloseTo(topWide.position.y * 2);
+
+    // A kadr z ręki zostaje tam, gdzie ręka go zostawiła.
+    const placed = { yaw: 0.4, tilt: 0.5, distance: 6 };
+    expect(cameraFor('behind', cue, placed, { fit: 2 })).toEqual(
+      cameraFor('behind', cue, placed, { fit: 1 }),
+    );
   });
 
   it('widok z boku jest po stronie publiczności', () => {

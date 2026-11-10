@@ -1,19 +1,28 @@
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AIM_MODES, CAMERAS, TRIGGERS } from './controls';
-import type { AimMode, CameraWanted, Controls } from './controls';
+import type { AimMode, CameraWanted, Controls, Trigger } from './controls';
 import styles from './ControlStrip.module.css';
 
+const PANEL_WIDTH = 232;
+
 /**
- * Every switch a billiard player wants, in one place: what the finger steers
- * (the cue or the table), what strikes, and where the camera is allowed to go.
- * Shared by 2D and 3D so both tables speak the same words.
+ * The controls a player uses while aiming stay on the strip; everything else
+ * hides behind three dots.
  *
- * `cameraSlot` lets 3D add its own presets next to the view switch; 2D has no
- * camera to preset and simply leaves it empty.
+ * A billiard is small and the screen is smaller — a phone showed the honest
+ * ratio: three rows of switches and a table you needed a magnifier for. So the
+ * strip keeps exactly what a shot needs (which way the finger steers, how hard,
+ * and the strike itself) and the panel behind the dots holds what a player sets
+ * once per visit: view, camera, trigger, distance, a new rack.
+ *
+ * The panel is `position: fixed` above its own button, like the row menus
+ * elsewhere in the apps — the same gesture, learned once.
  */
 export function ControlStrip({
   controls,
-  onChange,
   onAim,
+  onTrigger,
   camera,
   onCamera,
   onStrike,
@@ -21,37 +30,63 @@ export function ControlStrip({
   placedAvailable = false,
   presets,
   preset = null,
-  onPreset,
-  presetsDisabled = false,
   presetsLabel = 'Kamera',
+  onPreset,
+  power,
+  children,
+  hint,
   testid,
 }: {
   controls: Controls;
-  onChange: (next: Controls) => void;
-  /** Tapping an aiming option: wakes the cue up even if the mode was already on. */
   onAim: (mode: AimMode) => void;
+  onTrigger: (trigger: Trigger) => void;
   camera: CameraWanted;
   onCamera: (next: CameraWanted) => void;
   onStrike: () => void;
   disabled?: boolean;
   placedAvailable?: boolean;
-  /** Extra picker (the 3D camera presets) rendered in the same rhythm. */
   presets?: { id: string; label: string }[];
   preset?: string | null;
-  onPreset?: (id: string) => void;
-  presetsDisabled?: boolean;
   presetsLabel?: string;
+  onPreset?: (id: string) => void;
+  /** The strength control, inline on the strip: it changes with every shot. */
+  power?: ReactNode;
+  /** Anything else the panel should carry (new rack, distance slider). */
+  children?: ReactNode;
+  hint?: string;
   testid: string;
 }) {
-  const aiming = camera !== 'free';
-  const aimHint = AIM_MODES.find((mode) => mode.id === controls.aim)?.hint ?? '';
-  const triggerHint = TRIGGERS.find((trigger) => trigger.id === controls.trigger)?.hint ?? '';
-  const cameraHint = CAMERAS.find((entry) => entry.id === camera)?.hint ?? '';
+  const dots = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [spot, setSpot] = useState<{ left: number; bottom: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const toggle = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = dots.current?.getBoundingClientRect();
+    if (!rect) return;
+    // Na wąskim ekranie panel idzie od krawędzi do krawędzi — tak samo jak menu wierszy.
+    const width = Math.min(PANEL_WIDTH, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    setSpot({ left, bottom: window.innerHeight - rect.top + 6 });
+    setOpen(true);
+  };
 
   return (
     <div className={styles.strip}>
       <span className={styles.group}>
-        Celowanie
+        <span className={styles.label}>Celowanie</span>
         <span className={styles.buttons}>
           {AIM_MODES.map((mode) => (
             <button
@@ -68,76 +103,117 @@ export function ControlStrip({
         </span>
       </span>
 
-      <span className={styles.group}>
-        Widok
-        <span className={styles.buttons}>
-          {CAMERAS.filter((entry) => entry.id !== 'placed' || placedAvailable).map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className={`${styles.button} ${camera === entry.id ? styles.on : ''}`}
-              aria-pressed={camera === entry.id}
-              data-testid={`${testid}-camera-${entry.id}`}
-              onClick={() => onCamera(entry.id)}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </span>
-      </span>
+      {power && <span className={styles.power}>{power}</span>}
 
-      {presets && (
-        <span className={styles.group}>
-          {presetsLabel}
-          <span className={styles.buttons}>
-            {presets.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`${styles.button} ${preset === option.id ? styles.on : ''}`}
-                aria-pressed={preset === option.id}
-                disabled={presetsDisabled}
-                data-testid={`${testid}-preset-${option.id}`}
-                onClick={() => onPreset?.(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </span>
-        </span>
-      )}
+      <span className={styles.grow} />
 
-      <span className={styles.group}>
-        Uderzenie
-        <span className={styles.buttons}>
-          {TRIGGERS.map((trigger) => (
-            <button
-              key={trigger.id}
-              type="button"
-              className={`${styles.button} ${controls.trigger === trigger.id ? styles.on : ''}`}
-              aria-pressed={controls.trigger === trigger.id}
-              data-testid={`${testid}-trigger-${trigger.id}`}
-              onClick={() => onChange({ ...controls, trigger: trigger.id })}
-            >
-              {trigger.label}
-            </button>
-          ))}
-        </span>
-      </span>
-
-      <span className={styles.hint} data-testid={`${testid}-hint`}>
-        {aiming ? `${aimHint}; ${triggerHint}.` : `${cameraHint}.`}
-      </span>
+      <button
+        ref={dots}
+        type="button"
+        className={styles.dots}
+        aria-label="Ustawienia bilardu"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        data-testid={`${testid}-menu`}
+        onClick={toggle}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="3" r="1.5" />
+          <circle cx="8" cy="8" r="1.5" />
+          <circle cx="8" cy="13" r="1.5" />
+        </svg>
+      </button>
 
       <button
         type="button"
         className={styles.strike}
         onClick={onStrike}
-        disabled={disabled || !aiming}
+        disabled={disabled || camera === 'free'}
         data-testid={`${testid}-strike`}
       >
         Uderz
       </button>
+
+      {open && spot && (
+        <>
+          <div
+            className={styles.backdrop}
+            onPointerDown={() => setOpen(false)}
+            data-testid={`${testid}-menu-backdrop`}
+          />
+          <div
+            className={styles.panel}
+            role="group"
+            aria-label="Ustawienia bilardu"
+            style={{ left: spot.left, bottom: spot.bottom, width: Math.min(PANEL_WIDTH, window.innerWidth - 16) }}
+            data-testid={`${testid}-panel`}
+          >
+            <span className={styles.section}>
+              Widok
+              <span className={styles.buttons}>
+                {CAMERAS.filter((entry) => entry.id !== 'placed' || placedAvailable).map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={`${styles.button} ${camera === entry.id ? styles.on : ''}`}
+                    aria-pressed={camera === entry.id}
+                    data-testid={`${testid}-camera-${entry.id}`}
+                    onClick={() => onCamera(entry.id)}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </span>
+            </span>
+
+            {presets && (
+              <span className={styles.section}>
+                {presetsLabel}
+                <span className={styles.buttons}>
+                  {presets.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`${styles.button} ${preset === option.id ? styles.on : ''}`}
+                      aria-pressed={preset === option.id}
+                      data-testid={`${testid}-preset-${option.id}`}
+                      onClick={() => onPreset?.(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            )}
+
+            <span className={styles.section}>
+              Uderzenie
+              <span className={styles.buttons}>
+                {TRIGGERS.map((trigger) => (
+                  <button
+                    key={trigger.id}
+                    type="button"
+                    className={`${styles.button} ${controls.trigger === trigger.id ? styles.on : ''}`}
+                    aria-pressed={controls.trigger === trigger.id}
+                    data-testid={`${testid}-trigger-${trigger.id}`}
+                    onClick={() => onTrigger(trigger.id)}
+                  >
+                    {trigger.label}
+                  </button>
+                ))}
+              </span>
+            </span>
+
+            {children}
+
+            {hint && (
+              <p className={styles.hint} data-testid={`${testid}-hint`}>
+                {hint}
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
