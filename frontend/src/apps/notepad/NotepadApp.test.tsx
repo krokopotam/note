@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pickRowAction } from '../../test/rowMenu';
+import { clearViewportStub, stubViewport } from '../../test/viewport';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notesApi } from './notesApi';
 import { NotepadApp } from './NotepadApp';
@@ -47,6 +48,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cancelAutosave();
+  clearViewportStub();
   vi.useRealTimers();
 });
 
@@ -105,6 +107,26 @@ describe('notepad window', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sortuj' }), 'title_asc');
 
     expect(api.list).toHaveBeenLastCalledWith({ q: '', sort: 'title_asc' });
+  });
+
+  it('gives the whole phone screen to the list or to the note', async () => {
+    // Both halves stacked on one phone screen left a textarea too small to type in.
+    stubViewport(390);
+    renderNotepad();
+    const app = await screen.findByTestId('notepad');
+    expect(app).toHaveAttribute('data-showing', 'note');
+
+    await userEvent.click(within(app).getByTestId('note-back'));
+    expect(app).toHaveAttribute('data-showing', 'list');
+
+    await userEvent.click(within(app).getByTestId('note-row-2'));
+    await vi.waitFor(() => expect(api.get).toHaveBeenCalledWith(2));
+    expect(app).toHaveAttribute('data-showing', 'note');
+    // Tabs are a desktop convenience; the list is the switcher here.
+    expect(screen.queryByRole('tablist')).toBeNull();
+
+    await userEvent.type(within(app).getByTestId('editor'), 'X');
+    expect(await screen.findByTestId('save-status')).toHaveTextContent('Zmiany do zapisania');
   });
 
   it('saves what is typed and reports it', async () => {

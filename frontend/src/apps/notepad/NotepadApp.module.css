@@ -203,17 +203,22 @@
  * żeby nie zjadła ekranu), a pod nią to, co się właśnie czyta albo pisze.
  */
 @media (max-width: 760px) {
+  /*
+   * Na telefonie lista i notatka nie mieszczą się obok siebie ani jedno pod
+   * drugim: edytor przyduszony listą to nie edytor. Na ekranie jest to jedno
+   * albo to drugie (`data-showing` w komponencie).
+   */
   .app {
     grid-template-columns: minmax(0, 1fr);
-    /* Lista bierze tyle, ile ma wierszy, ale nie więcej niż kawałek ekranu. */
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .hidden {
+    display: none;
   }
 
   .sidebar {
     border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    max-height: 42vh;
-    overflow-y: auto;
   }
 
   .tools {
@@ -236,12 +241,45 @@
     padding: 10px;
   }
 
-  .tabButton {
-    max-width: 40vw;
-    padding: 8px;
+  /* Pasek nad edytorem: wróć do listy, tytuł, trzy kropki. */
+  .noteHead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .back {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #cdd9ee;
+    font: inherit;
+    font-size: 14px;
+  }
+
+  .back:active {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .noteHead .title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
   }
 
   .editor {
     font-size: 16px;
+  }
+
+  /* Linia statusu nie może zabierać miejsca pisaniu. */
+  .footer {
+    min-height: 32px;
+    padding: 3px 10px;
+    font-size: 11px;
   }
 }
