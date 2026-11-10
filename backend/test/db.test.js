@@ -86,7 +86,9 @@ describe('database bootstrap', () => {
       .readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith('.sql'))
       .sort()
-      .filter((name) => name !== '010_no_reused_ids.sql' && name !== '011_games.sql');
+      .filter(
+        (name) => name !== '010_no_reused_ids.sql' && name !== '011_games.sql' && name !== '012_billiards.sql',
+      );
     files.forEach((name) => {
       db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
       db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(name, 'kiedyś');
@@ -105,7 +107,7 @@ describe('database bootstrap', () => {
     const last = put('b');
     db.prepare('DELETE FROM files WHERE id = ?').run(last);
 
-    expect(migrate(db)).toEqual(['010_no_reused_ids.sql', '011_games.sql']);
+    expect(migrate(db)).toEqual(['010_no_reused_ids.sql', '011_games.sql', '012_billiards.sql']);
 
     const columns = db.prepare('PRAGMA table_info(files)').all().map((c) => c.name);
     expect(columns).toEqual(
@@ -166,6 +168,7 @@ describe('database bootstrap', () => {
       { version: '009_chat_media.sql' },
       { version: '010_no_reused_ids.sql' },
       { version: '011_games.sql' },
+      { version: '012_billiards.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -221,6 +224,7 @@ describe('upgrading a database that predates accounts', () => {
       '009_chat_media.sql',
       '010_no_reused_ids.sql',
       '011_games.sql',
+      '012_billiards.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');
@@ -331,16 +335,17 @@ describe('upgrading a database that predates accounts', () => {
 });
 
 describe('migracja 011 — folder z grami dla starych kont', () => {
-  /** Cofa bazę do stanu sprzed migracji, nie ruszając reszty pulpitu. */
+  /** Cofa bazę do stanu sprzed obu migracji gier, nie ruszając reszty pulpitu. */
   function pretendNoGamesFolder(db, owner) {
     db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
     for (const game of GAMES) {
       db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND app_id = ?').run(owner, game.id);
     }
     db.prepare("DELETE FROM schema_migrations WHERE version = '011_games.sql'").run();
+    db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
   }
 
-  it('adds the folder and all seven icons under it', () => {
+  it('adds the folder and every game icon under it', () => {
     const { db, owner } = makeDbOwned();
     seedUser(db, owner, APPS.filter((app) => !isGame(app.id)));
     pretendNoGamesFolder(db, owner);
@@ -398,6 +403,82 @@ describe('migracja 011 — folder z grami dla starych kont', () => {
   });
 });
 
+describe('migracja 012 — bilard w istniejącym folderze', () => {
+  const BILLARDS = ['billiard2d', 'billiard3d'];
+
+  const folderId = (db, owner) =>
+    db
+      .prepare("SELECT id FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = 'Gry'")
+      .get(owner).id;
+
+  /** Konto z folderem „Gry", ale bez bilardów — tak wyglądało przed tę migrację. */
+  function pretendNoBillards(db, owner) {
+    db
+      .prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('billiard2d', 'billiard3d')")
+      .run(owner);
+    db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
+  }
+
+  it('dokłada dwie gierki do foldera, który już jest', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    pretendNoBillards(db, owner);
+
+    expect(migrate(db)).toContain('012_billiards.sql');
+
+    const inside = db
+      .prepare('SELECT app_id FROM desktop_items WHERE user_id = ? AND parent_id = ? ORDER BY id')
+      .all(owner, folderId(db, owner))
+      .map((row) => row.app_id);
+    expect(inside).toEqual(expect.arrayContaining(BILLARDS));
+    expect(inside).toEqual(GAMES.map((game) => game.id));
+  });
+
+  it('stawia je w wolnych miejscach siatki, nie na sobie', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    pretendNoBillards(db, owner);
+
+    migrate(db);
+
+    const spots = db
+      .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND parent_id = ?')
+      .all(owner, folderId(db, owner))
+      .map((row) => `${row.x},${row.y}`);
+    expect(new Set(spots).size).toBe(spots.length);
+    for (const spot of spots) {
+      const [x] = spot.split(',').map(Number);
+      expect(x).toBeLessThan(4);
+    }
+  });
+
+  it('nie dodaje drugiego bilarda, gdy migracja powtórzy się', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    const before = db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n;
+    db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
+
+    migrate(db);
+
+    expect(db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n).toBe(before);
+  });
+
+  it('nie zakłada foldera „Gry" komuś, kto go usunął', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
+    pretendNoBillards(db, owner);
+
+    migrate(db);
+
+    expect(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND name = 'Gry'")
+        .get(owner).n,
+    ).toBe(0);
+  });
+});
+
 describe('seedUser', () => {
   it('places one icon per app, a folder, and fills both favourite slots', () => {
     const { db, owner } = makeDbOwned();
@@ -442,7 +523,7 @@ describe('seedUser', () => {
       .map((row) => row.app_id);
     expect(inside).toEqual(GAMES.map((game) => game.id));
 
-    // Seven more icons on the dock would bury the applications it is there for.
+    // Nine more icons on the dock would bury the applications it is there for.
     for (const slot of ['dock', 'launcher']) {
       const bar = db
         .prepare('SELECT app_id FROM favorites WHERE user_id = ? AND slot = ?')

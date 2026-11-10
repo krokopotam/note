@@ -189,8 +189,8 @@ buforowane w pamięci procesu, więc kilka dużych wysłań naraz nie podnosi RA
 
 ## Gry
 
-Siedem krótkich gierek mieszka w folderze **Gry** na pulpicie: Wężyk, Tetris, Bąbelki, 2048,
-Saper, Pamięć i Kółko i krzyżyk.
+Dziewięć krótkich gierek mieszka w folderze **Gry** na pulpicie: Wężyk, Tetris, Bąbelki, 2048,
+Saper, Pamięć, Kółko i krzyżyk oraz Bilard 2D i Bilard 3D.
 
 ```
 frontend/src/apps/games/<gra>/
@@ -210,6 +210,16 @@ frontend/src/apps/games/<gra>/
   Klawisze słucha tylko plansza (ma `tabIndex`), więc nie podsłuchuje innych okien.
 - **Skala, nie przewijanie.** Plansze rysują się na CSS Grid i SVG z `viewBox`, więc mieszczą się
   w oknie o każdej szerokości — na telefonie też, bez suwaków.
+- **Fantazja jest w widoku.** Lot kuli, pękające bąbelki, iskry z band i liczby punktów rysuje
+  widok na podstawie tego, co logika zapisała w wyniku strzału (`ShotOutcome` w bąbelkach,
+  raport `last` w bilardzie). Animacja nie ma więc własnych stanów do zepsucia i nie zmienia
+  reguł gry, a `prefers-reduced-motion` wygasza ją całą.
+- **Jeden bilard, dwa rysunki.** Fizyka stołu (`games/billiards/billiards.ts`: zderzenia, tarcie,
+  łuzy, przymiar z kulą-duchem) jest wspólna. 2D rysuje ją w SVG z góry, 3D w three.js — ta sama
+  kulka wpada tam i tam do tej samej łuzys. three.js doczytuje się osobnym chunkiem dopiero po
+  openieniu Bilarda 3D, więc reszta pulpitu nie płaci 137 kB gzipa za scenę, której nie otworzyła.
+- **3D bez WebGL nie wywraca okna.** Silnik rysowania jest w `try/catch`; bez kontekstu bilard
+  mówi, że nie ma czym rysować, i podpowiada wersję 2D.
 - Saper pierwszego kliknięcia nie zabija: miny są rozkładane dopiero po nim, poza klikniętym polem
   i jego sąsiedztwem. Kółko i krzyżyk ma przeciwnika „łatwy" (losuje, wygrywa jeśli może) i „trudny"
   (minimax, nie do pokonania — najwyższy wynik to remis).

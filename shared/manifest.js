@@ -69,7 +69,7 @@ export const SORT_ORDERS = [
  * synchronise. A round is worth losing when the window closes.
  *
  * They live in one folder on the desktop (`GAMES_FOLDER`) rather than in the icon
- * grid and the quick bars, because a desktop is not an arcade and seven icons
+ * grid and the quick bars, because a desktop is not an arcade and nine icons
  * would push the four real applications off the screen.
  */
 export const GAMES_FOLDER = 'Gry';
@@ -82,6 +82,10 @@ export const GAMES = [
   { id: 'mines', title: 'Saper', width: 560, height: 640 },
   { id: 'memory', title: 'Pamięć', width: 480, height: 640 },
   { id: 'tictactoe', title: 'Kółko i krzyżyk', width: 440, height: 600 },
+  { id: 'billiard2d', title: 'Bilard 2D', width: 860, height: 560 },
+  // The 3D table pulls in three.js, so it is a window of its own size and the
+  // library is loaded only when somebody opens it.
+  { id: 'billiard3d', title: 'Bilard 3D', width: 940, height: 660 },
 ];
 
 /** @param {string} id */

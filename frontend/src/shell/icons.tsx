@@ -147,6 +147,34 @@ export function BubblesIcon({ size = 48 }: IconProps) {
   );
 }
 
+export function Billiard2dIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <rect x="9" y="14" width="30" height="20" rx="4" fill="#15774e" stroke="#5c3520" strokeWidth="2.5" />
+      <circle cx="15" cy="24" r="2.6" fill="#0a0d13" />
+      <circle cx="33" cy="24" r="2.6" fill="#0a0d13" />
+      <circle cx="22" cy="24" r="3.1" fill="#f7f3e8" />
+      <circle cx="29" cy="21" r="3.1" fill="#d93a3a" />
+      <path d="M31 29 43 36" stroke="#d8a35c" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function Billiard3dIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <path d="M8 22 24 14l16 8-16 8z" fill="#15774e" stroke="#5c3520" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M8 22v5l16 8V22" fill="#0f5f3e" stroke="#5c3520" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M40 22v5l-16 8" fill="#0b4a30" stroke="#5c3520" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="21" cy="23" r="3.4" fill="#f7f3e8" />
+      <circle cx="29" cy="20" r="3.2" fill="#f2c744" />
+      <path d="M33 26 44 33" stroke="#d8a35c" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function TilesIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

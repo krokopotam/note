@@ -1,6 +1,9 @@
-import type { ComponentType } from 'react';
+import { lazy, Suspense } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import { appById } from '@note/shared/manifest';
 import {
+  Billiard2dIcon,
+  Billiard3dIcon,
   BubblesIcon,
   CalculatorIcon,
   ChatIcon,
@@ -16,6 +19,7 @@ import {
   TilesIcon,
   UnknownAppIcon,
 } from './icons';
+import { Billiards2dApp } from '../apps/games/billiards2d/Billiards2dApp';
 import { BubblesApp } from '../apps/games/bubbles/BubblesApp';
 import { CalculatorApp } from '../apps/calculator/CalculatorApp';
 import { ChatApp } from '../apps/chat/ChatApp';
@@ -29,6 +33,29 @@ import { TetrisApp } from '../apps/games/tetris/TetrisApp';
 import { TicTacToeApp } from '../apps/games/tictactoe/TicTacToeApp';
 import { TwentyFortyApp } from '../apps/games/twentyforty/TwentyFortyApp';
 import { FolderView } from './FolderView';
+
+/**
+ * three.js is by far the heaviest thing in this build, and most windows never
+ * want it. The 3D table is therefore loaded when somebody opens it, and the
+ * window shows a line of text while that happens.
+ */
+const Billiards3dLazy = lazy(() =>
+  import('../apps/games/billiards3d/Billiards3dApp').then((module) => ({
+    default: module.Billiards3dApp,
+  })),
+) as LazyExoticComponent<ComponentType<AppProps>>;
+
+function Billiards3dView(props: AppProps) {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ padding: 24, color: '#9fb0cc' }}>Wczytywanie silnika rysowania…</div>
+      }
+    >
+      <Billiards3dLazy {...props} />
+    </Suspense>
+  );
+}
 
 /**
  * Application registry — the only coupling point between the desktop shell and
@@ -61,6 +88,8 @@ const APP_VIEWS: Record<string, ComponentType<AppProps>> = {
   mines: MinesApp,
   memory: MemoryApp,
   tictactoe: TicTacToeApp,
+  billiard2d: Billiards2dApp,
+  billiard3d: Billiards3dView,
 };
 
 /** Shell-owned views that are not installable apps. */
@@ -107,6 +136,10 @@ export function AppGlyph({ appId, size = 48 }: { appId: string; size?: number })
       return <MemoryIcon size={size} />;
     case 'tictactoe':
       return <TicTacToeIcon size={size} />;
+    case 'billiard2d':
+      return <Billiard2dIcon size={size} />;
+    case 'billiard3d':
+      return <Billiard3dIcon size={size} />;
     case 'folder':
       return <FolderIcon size={size} />;
     default:

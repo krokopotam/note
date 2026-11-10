@@ -1,0 +1,127 @@
+.stage {
+  position: relative;
+  min-height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #17233a 0%, #0b111c 70%);
+}
+
+.stage canvas {
+  border-radius: 10px;
+}
+
+/* --- HUD ------------------------------------------------------------------- */
+
+.score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: score-bump 320ms ease-out;
+}
+
+@keyframes score-bump {
+  35% {
+    color: #ffd83d;
+    transform: scale(1.12);
+  }
+}
+
+/* Points arrive next to the counter with a jump. */
+.pop {
+  color: #ffd83d;
+  font-weight: 700;
+  animation: pop 1100ms ease-out forwards;
+}
+
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1);
+  }
+}
+
+.fouls {
+  color: #ffb4b4;
+}
+
+.modes {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.mode {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c9d6ea;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.modeOn {
+  border-color: rgba(120, 170, 255, 0.7);
+  background: rgba(47, 111, 237, 0.35);
+  color: #f2f7ff;
+}
+
+.powerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider {
+  width: 130px;
+  accent-color: #2f6fed;
+}
+
+.tip {
+  color: #8698b5;
+  font-size: 11px;
+}
+
+/* --- nakładki -------------------------------------------------------------- */
+
+.fallback,
+.won {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 24px;
+  text-align: center;
+  color: #e9effa;
+  background: rgba(8, 12, 20, 0.86);
+}
+
+.fallback p:first-child,
+.won p:first-child {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.fallback p:last-child,
+.won p:last-child {
+  color: #9fb0cc;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop,
+  .score {
+    animation-duration: 1ms;
+  }
+}

@@ -1,0 +1,283 @@
+.board {
+  display: block;
+  overflow: visible;
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+  border-radius: 14px;
+}
+
+.board:focus-visible {
+  box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.7);
+}
+
+/* --- stół ------------------------------------------------------------------ */
+
+.wood {
+  fill: #5a3620;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 1;
+}
+
+.cushion {
+  fill: #12603f;
+}
+
+.felt {
+  fill: #187a4e;
+}
+
+.pocket {
+  fill: #0a0d13;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1;
+}
+
+.sight {
+  fill: rgba(240, 232, 210, 0.75);
+}
+
+/* --- kule ------------------------------------------------------------------ */
+
+.ball {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.rim {
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 0.5;
+}
+
+.shadow {
+  fill: rgba(0, 0, 0, 0.28);
+}
+
+.gloss {
+  fill: rgba(255, 255, 255, 0.55);
+}
+
+.cueDot {
+  fill: rgba(210, 60, 60, 0.75);
+}
+
+/* A ball that went down shrinks into the hole and stays out of the way. */
+.sink {
+  animation: sink 320ms cubic-bezier(0.4, 0.1, 0.7, 0.4) forwards;
+  pointer-events: none;
+}
+
+@keyframes sink {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.24);
+    opacity: 0;
+  }
+}
+
+/* Fast balls leave a streak, so speed is visible without motion blur filters. */
+.streak {
+  opacity: 0.22;
+}
+
+/* --- przymiar -------------------------------------------------------------- */
+
+.guide {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 0.9;
+  stroke-dasharray: 4 4;
+  animation: guide-march 600ms linear infinite;
+}
+
+@keyframes guide-march {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+.ghost {
+  fill: rgba(255, 255, 255, 0.12);
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 0.7;
+  stroke-dasharray: 2 2;
+}
+
+.tangent {
+  stroke: rgba(255, 216, 61, 0.75);
+  stroke-width: 0.9;
+  stroke-dasharray: 3 3;
+}
+
+/* --- kij ------------------------------------------------------------------- */
+
+.stick {
+  stroke: #d8a35c;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.stickShadow {
+  stroke: rgba(0, 0, 0, 0.3);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  transform: translate(0.8px, 1.4px);
+}
+
+.tip {
+  fill: #63b4e8;
+}
+
+.stickIdle {
+  animation: stick-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes stick-breathe {
+  50% {
+    opacity: 0.86;
+  }
+}
+
+/* --- efekty ---------------------------------------------------------------- */
+
+.fx {
+  pointer-events: none;
+}
+
+.spark {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.1;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spark 380ms ease-out forwards;
+}
+
+.sparkPot {
+  stroke: #ffd83d;
+  stroke-width: 1.8;
+  animation-duration: 560ms;
+}
+
+.sparkClick {
+  stroke: rgba(255, 255, 255, 0.6);
+  animation-duration: 240ms;
+}
+
+@keyframes spark {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+.gain {
+  fill: #ffd83d;
+  font-size: 9px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1.6px;
+  animation: gain 1100ms ease-out forwards;
+}
+
+@keyframes gain {
+  0% {
+    opacity: 0;
+    transform: translateY(3px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1);
+  }
+}
+
+.foulText {
+  fill: #ff7b7b;
+  font-size: 11px;
+  font-weight: 700;
+  animation: gain 1400ms ease-out forwards;
+}
+
+.scratch {
+  fill: #ffb4b4;
+  font-size: 8px;
+}
+
+/* --- HUD ------------------------------------------------------------------- */
+
+.score {
+  animation: score-bump 320ms ease-out;
+}
+
+@keyframes score-bump {
+  35% {
+    color: #ffd83d;
+    transform: scale(1.12);
+  }
+}
+
+.fouls {
+  color: #ffb4b4;
+}
+
+.powerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.powerBar {
+  width: 74px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.powerFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #57d38a, #ffd83d 55%, #ff6b57);
+  transition: width 90ms linear;
+}
+
+.dim {
+  fill: rgba(6, 10, 16, 0.82);
+}
+
+.overText {
+  fill: #eef3fc;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.overScore {
+  fill: #9fb0cc;
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sink,
+  .spark,
+  .gain,
+  .foulText,
+  .score,
+  .guide,
+  .stickIdle {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}

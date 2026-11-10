@@ -15,6 +15,8 @@ import {
   hanging,
   landingCell,
   neighbours,
+  pathLength,
+  pointAlong,
   shoot,
 } from './bubbles';
 
@@ -87,6 +89,76 @@ describe('bąbelki', () => {
     expect(shot.grid[0][5]).toBe(null);
     expect(shot.grid[3][2]).toBe(null);
     expect(shot.score).toBeGreaterThanOrEqual(50);
+  });
+
+  it('mówi widokowi, co pękło i co spadło', () => {
+    const grid = emptyGrid();
+    grid[0][4] = '#f00';
+    grid[0][5] = '#f00';
+    grid[3][2] = '#f00';
+    const game = { ...createGame(rng(), 0), grid, current: '#f00', next: '#0f0' };
+
+    const shot = shoot(game, { x: 4 * 32 + 16, y: 0 }, rng());
+
+    const last = shot.last as NonNullable<typeof shot.last>;
+    expect(last.popped).toHaveLength(3);
+    expect(last.popped.every((gone) => gone.color === '#f00')).toBe(true);
+    expect(last.dropped).toEqual([{ row: 3, col: 2, color: '#f00' }]);
+    expect(last.gained).toBe(shot.score);
+    expect(last.landing.y).toBeGreaterThan(0);
+    expect(last.pushed).toBe(false);
+  });
+
+  it('numeruje kolejne strzały, żeby efekt odpalał się od nowa', () => {
+    let game = createGame(rng(), 2);
+    game = shoot(game, { x: 40, y: 0 }, rng());
+    const first = game.last?.seq;
+    game = shoot(game, { x: 300, y: 0 }, rng());
+
+    expect(first).toBe(1);
+    expect(game.last?.seq).toBe(2);
+  });
+
+  it('zgłasza dociśnięcie sufitu', () => {
+    const game = { ...createGame(rng(), 2), shots: 5 };
+    expect(shoot(game, { x: WIDTH / 2, y: 0 }, rng()).last?.pushed).toBe(true);
+  });
+
+  it('seria od pięciu kulek płaci podwójnie', () => {
+    const burst = (count: number) => {
+      const grid = emptyGrid();
+      for (let col = 0; col < count - 1; col += 1) grid[0][4 + col] = '#f00';
+      const game = { ...createGame(rng(), 0), grid, current: '#f00', next: '#0f0' };
+      return shoot(game, { x: WIDTH / 2, y: 0 }, rng());
+    };
+
+    const four = burst(4);
+    const five = burst(5);
+
+    expect(four.last?.popped).toHaveLength(4);
+    expect(four.score).toBe(40);
+    expect(five.last?.popped).toHaveLength(5);
+    // Pięć to już seria: dziesiątka za kulkę i tyleż premii.
+    expect(five.score).toBe(100);
+  });
+
+  it('długość i punkt na łamanej — kula leci dokładnie tam, gdzie linia celowania', () => {
+    const straight = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ];
+    expect(pathLength(straight)).toBe(100);
+    expect(pointAlong(straight, 25)).toEqual({ x: 25, y: 0 });
+
+    const bounced = [
+      { x: 10, y: 200 },
+      { x: 20, y: 100 },
+      { x: 40, y: 100 },
+    ];
+    expect(pathLength(bounced)).toBeCloseTo(Math.hypot(10, 100) + 20);
+    // Poza końcem łamanej nie ma czego szukać — zostaje ostatni punkt.
+    expect(pointAlong(bounced, 10_000)).toEqual({ x: 40, y: 100 });
+    expect(pointAlong(bounced, 0)).toEqual({ x: 10, y: 200 });
   });
 
   it('co szóstki strzałów dokłada wiersz od góry, nie psując rusztu', () => {

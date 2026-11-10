@@ -53,6 +53,18 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
   czepia się sufitu.
 - **Testy losowych gier nie zakładają układu planszy**: losuje logika, więc test wybiera pola według
   stanu („pierwsze zamknięte”, „para czy pomyłka”), a nie z góry nadanych numerów.
+- **Dziewięć gierek w folderze „Gry"** (`snake`, `tetris`, `bubbles`, `twentyforty`, `mines`,
+  `memory`, `tictactoe`, `billiard2d`, `billiard3d`). Logika czysta + test, widok + test. Zero bazy,
+  zero endpointów: runda żyje w oknie. Migrują je `011_games.sql` (folder) i `012_billiards.sql`.
+- **Fantazja jest w widoku, reguły w logice.** Logika mówi, co się stało (`ShotOutcome` w bąbelkach,
+  `last` w bilardzie), widok z tego rysuje lot, pęknięcia, spadanie i liczby punktów. Nie ma więc
+  drugiego stanu do rozjechania, a `prefers-reduced-motion` ścisza efekty do zera.
+- **Bilard: jedna fizyka, dwa rysunki.** `games/billiards/billiards.ts` liczy zderzenia, tarcie,
+  łuzy i przymiar; 2D rysuje to w SVG, 3D w three.js. Step dzieli się na podpikroki (kula nie
+  przelatuje przez kulę), krok czasu podaje widok, więc test idzie na stopklatce.
+- **three.js jest leniwe** (`registry.tsx`): `lazy` + `Suspense`, osobny chunk ~137 kB gzip.
+  Kamera 3D (`camera.ts`, czyste funkcje) nie zależy od kierunku celowania — obracała stołem w
+  pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`.
 - **Plansze z DOM i SVG, bez canvasu** — to samo, co widzi test (jsdom nie ma `getContext`), i skalują
   się razem z oknem (`grid-template-columns`, `viewBox`) zamiast przewijać.
 - **Wysokość okna jest w ramie** (`WindowFrame` → `height: win.height`). Wszystkie aplikacje są napisane

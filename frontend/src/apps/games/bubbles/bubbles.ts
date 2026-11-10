@@ -49,6 +49,29 @@ export interface ShooterGame {
   score: number;
   over: boolean;
   won: boolean;
+  /** What the last shot did — the view animates exactly this and nothing else. */
+  last: ShotOutcome | null;
+}
+
+export interface Gone {
+  row: number;
+  col: number;
+  color: string;
+}
+
+/**
+ * The story of one shot: where it landed, what burst, what lost its grip and how
+ * many points it brought. `seq` numbers it, so a repeated shot still restarts the
+ * animation instead of looking like the same frozen effect.
+ */
+export interface ShotOutcome {
+  seq: number;
+  landing: Point;
+  popped: Gone[];
+  dropped: Gone[];
+  gained: number;
+  /** The ceiling pushed a fresh row down with this shot. */
+  pushed: boolean;
 }
 
 export interface Point {
@@ -90,6 +113,7 @@ export function createGame(rng: Rng, filledRows = 5): ShooterGame {
     score: 0,
     over: false,
     won: false,
+    last: null,
   };
   return { ...state, current: pick(COLORS, rng), next: pick(COLORS, rng) };
 }
@@ -168,6 +192,35 @@ export function aimPath(state: ShooterGame, origin: Point, target: Point, guide 
 
   path.push(stop);
   return { stop, path };
+}
+
+/** How far a polyline is. */
+export function pathLength(path: Point[]): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i += 1) {
+    total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  }
+  return total;
+}
+
+/**
+ * Point `distance` along a polyline — the shot flies along the very same line the
+ * guide draws, so what the player saw is what the bubble takes.
+ */
+export function pointAlong(path: Point[], distance: number): Point {
+  if (path.length === 0) return { x: 0, y: 0 };
+  let left = Math.max(0, distance);
+  for (let i = 1; i < path.length; i += 1) {
+    const a = path[i - 1];
+    const b = path[i];
+    const segment = Math.hypot(b.x - a.x, b.y - a.y);
+    if (left <= segment || i === path.length - 1) {
+      const t = segment === 0 ? 0 : Math.min(1, left / segment);
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    left -= segment;
+  }
+  return path[path.length - 1];
 }
 
 function touches(grid: Grid, point: Point, parity: number): boolean {
@@ -265,26 +318,34 @@ export function shoot(state: ShooterGame, target: Point, rng: Rng): ShooterGame 
   const origin = { x: WIDTH / 2, y: HEIGHT + R };
   const { stop } = aimPath(state, origin, target, false);
   const [row, col] = landingCell(state, stop);
+  const landing = center(row, col, state.parity);
 
   const grid = state.grid.map((entry) => [...entry]);
   grid[row][col] = state.current;
 
-  const popped = cluster(grid, row, col, state.parity);
+  const poppedCells = cluster(grid, row, col, state.parity);
+  const popped: Gone[] = [];
+  const dropped: Gone[] = [];
   let score = 0;
-  if (popped.length >= 3) {
-    popped.forEach(([py, px]) => {
+  if (poppedCells.length >= 3) {
+    poppedCells.forEach(([py, px]) => {
+      popped.push({ row: py, col: px, color: grid[py][px] as string });
       grid[py][px] = null;
     });
-    score += popped.length * 10;
-    const loose = hanging(grid, state.parity);
-    loose.forEach(([ly, lx]) => {
+    score += poppedCells.length * 10;
+    hanging(grid, state.parity).forEach(([ly, lx]) => {
+      dropped.push({ row: ly, col: lx, color: grid[ly][lx] as string });
       grid[ly][lx] = null;
     });
-    score += loose.length * 20;
+    score += dropped.length * 20;
   }
+  // One burst pays ten, the fifth and every later one double: the big chains are
+  // the moment the game is playing for.
+  if (poppedCells.length >= 5) score += poppedCells.length * 10;
 
   const shots = state.shots + 1;
   let parity = state.parity;
+  let pushed = false;
   // The ceiling row only comes down while there is room for it: a sheet already
   // touching the last row has nowhere left to go, and that is the end of the game.
   if (shots % SHOTS_PER_ROW === 0 && !grid[ROWS - 1].some(Boolean)) {
@@ -296,6 +357,7 @@ export function shoot(state: ShooterGame, target: Point, rng: Rng): ShooterGame 
     grid.unshift(
       Array.from({ length: colsIn(0, parity) }, () => (filler.length > 0 ? pick(filler, rng) : null)),
     );
+    pushed = true;
   }
 
   const empty = grid.every((entry) => entry.every((cell) => !cell));
@@ -311,5 +373,15 @@ export function shoot(state: ShooterGame, target: Point, rng: Rng): ShooterGame 
     score: state.score + score,
     over: reachedFloor,
     won: empty,
+    last: {
+      seq: (state.last?.seq ?? 0) + 1,
+      // The popped bubbles sit where they were; the pushed row moves the sheet,
+      // so the effect layer keeps the coordinates of the shot that made them.
+      landing,
+      popped,
+      dropped,
+      gained: score,
+      pushed,
+    },
   };
 }
