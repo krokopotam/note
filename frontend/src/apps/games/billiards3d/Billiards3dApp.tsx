@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import shell from '../gameShell.module.css';
 import {
   BALL_R,
+  MIN_POWER,
   POCKETS,
   RAIL,
   TABLE,
@@ -18,6 +19,9 @@ import {
 import type { Point, World } from '../billiards/billiards';
 import { BALL_LIFT, CAMERA_MODES, SCALE, cameraFor, tableToScene } from './camera';
 import type { CameraMode } from './camera';
+import { ControlStrip } from '../billiards/ControlStrip';
+import { DEFAULT_CONTROLS, dragEffect, loadControls, saveControls, strikesOnRelease } from '../billiards/controls';
+import type { Controls } from '../billiards/controls';
 import styles from './Billiards3dApp.module.css';
 
 /** What the HUD shows; the scene reports it when a shot finishes. */
@@ -36,6 +40,7 @@ interface Engine {
   strike: (power: number) => void;
   reset: () => void;
   setMode: (mode: CameraMode) => void;
+  setControls: (controls: Controls) => void;
   dispose: () => void;
 }
 
@@ -265,8 +270,15 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
 
   // --- state ---------------------------------------------------------------
   let world = world0;
+  // `aim` is an angle ON THE TABLE, never on the screen. The physics reads table
+  // angles and the scene mirrors z, so a screen angle here would fire the ball to
+  // the other side of the table from where the guide points.
   let aim = 0;
   let mode: CameraMode = 'behind';
+  let controls: Controls = DEFAULT_CONTROLS;
+  // Direction the player turned the table to; only „za kulą” follows it.
+  let orbit = Math.PI / 2;
+  let orbitAtGrab = orbit;
   let grabbed: { x: number; y: number } | null = null;
   let loaded = 0;
   let pull = 0; // how far the cue is pulled back, animated
@@ -290,28 +302,46 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     line.computeLineDistances();
   };
 
+  /** Hits the white ball; both triggers (pull and button) come through here. */
+  const fire = (strength: number) => {
+    if (strength < MIN_POWER || !resting(world) || world.won || cueBall(world).potted) return;
+    world = strike(world, aim, strength);
+    striking = performance.now();
+  };
+
   const onPointerMove = (event: PointerEvent) => {
     if (!resting(world)) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const ndc = {
-      x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
-    };
     if (grabbed) {
-      loaded = Math.max(0, Math.min(1, Math.hypot(event.clientX - grabbed.x, event.clientY - grabbed.y) / 240));
+      const effect = dragEffect(grabbed, { x: event.clientX, y: event.clientY }, controls.aim);
+      if (controls.aim === 'table') {
+        // Turning the table: the world spins and the shot follows the eyes.
+        orbit = orbitAtGrab + effect.aimDelta;
+        aim = orbit;
+      }
+      loaded = effect.power;
       return;
     }
-    raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+    if (controls.aim === 'table') return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      ),
+      camera,
+    );
     if (!raycaster.ray.intersectPlane(plane, hit)) return;
-    const cue = cueBall(world);
-    const at = tableToScene(cue);
+    const at = tableToScene(cueBall(world));
+    // tableToScene keeps the axes turning the same way, so this angle is both a
+    // scene angle and a table angle — the physics can use it as it stands.
     aim = Math.atan2(hit.z - at.z, hit.x - at.x);
   };
 
   const onPointerDown = (event: PointerEvent) => {
     if (!resting(world) || world.won || cueBall(world).potted) return;
     grabbed = { x: event.clientX, y: event.clientY };
+    orbitAtGrab = orbit;
     loaded = 0;
   };
 
@@ -320,9 +350,8 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     const strength = loaded;
     grabbed = null;
     loaded = 0;
-    if (strength < 0.06) return;
-    world = strike(world, aim, strength);
-    striking = performance.now();
+    // With the button trigger a pull only loads the cue; it never strikes.
+    if (strikesOnRelease(controls.trigger)) fire(strength);
   };
 
   const canvas = renderer.domElement;
@@ -454,8 +483,8 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
       flash.mesh.scale.setScalar(0.7 + part * 2.1);
     }
 
-    // Camera eases towards its pose so turning the aim is smooth, not jumpy.
-    const pose = cameraFor(mode, { x: cueAt.x, y: BALL_LIFT, z: cueAt.z });
+    // Camera eases towards its pose so the view glides instead of jumping.
+    const pose = cameraFor(mode, cueAt, controls.aim === 'table' ? orbit : null);
     camPos.set(pose.position.x, pose.position.y, pose.position.z);
     camTarget.set(pose.target.x, pose.target.y, pose.target.z);
     camera.up.set(pose.up.x, pose.up.y, pose.up.z);
@@ -472,9 +501,7 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
 
   return {
     strike: (power: number) => {
-      const before = world;
-      world = strike(world, aim, power);
-      if (world !== before) striking = performance.now();
+      fire(power);
     },
     reset: () => {
       world = createRack();
@@ -486,6 +513,12 @@ function buildScene(host: HTMLElement, onHud: (hud: Hud) => void): Engine {
     },
     setMode: (next: CameraMode) => {
       mode = next;
+    },
+    setControls: (next: Controls) => {
+      // Switching to a turning table starts from wherever the cue already points,
+      // so the shot being lined up stays lined up.
+      controls = next;
+      if (next.aim === 'table') orbit = aim;
     },
     dispose: () => {
       cancelAnimationFrame(frame);
@@ -512,6 +545,7 @@ export function Billiards3dApp() {
   const [hud, setHud] = useState<Hud>(hudOf(createRack()));
   const [power, setPower] = useState(0.6);
   const [mode, setMode] = useState<CameraMode>('behind');
+  const [controls, setControls] = useState<Controls>(() => loadControls());
 
   useEffect(() => {
     if (!host.current) return undefined;
@@ -535,6 +569,12 @@ export function Billiards3dApp() {
   useEffect(() => {
     engine.current?.setMode(mode);
   }, [mode]);
+
+  useEffect(() => {
+    engine.current?.setControls(controls);
+    // The choice is remembered in this browser; games keep out of the database.
+    saveControls(controls);
+  }, [controls]);
 
   return (
     <div className={shell.shell} data-testid="billiard3d">
@@ -606,16 +646,18 @@ export function Billiards3dApp() {
             data-testid="billiard3d-power"
           />
         </span>
-        <button
-          type="button"
-          className={`${shell.action} ${shell.actionPrimary}`}
-          onClick={() => engine.current?.strike(power)}
-          data-testid="billiard3d-strike"
-        >
-          Uderz
-        </button>
+        <ControlStrip
+          controls={controls}
+          onChange={setControls}
+          onStrike={() => engine.current?.strike(power)}
+          testid="billiard3d"
+        />
         <span className={shell.hudSpacer} />
-        <span className={styles.tip}>Rusz myszą nad stołem, aby celować; przeciągnij, aby dobierać siłę.</span>
+        <span className={styles.tip}>
+          {controls.aim === 'table'
+            ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę.'
+            : 'Rusz myszą nad stołem, aby celować; przeciągnij wzdłuż kija, aby dobierać siłę.'}
+        </span>
       </div>
     </div>
   );

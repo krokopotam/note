@@ -1,0 +1,94 @@
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #9fb0cc;
+}
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.buttons {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #c9d6ea;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.on {
+  background: rgba(47, 111, 237, 0.55);
+  color: #f4f8ff;
+  box-shadow: inset 0 0 0 1px rgba(140, 180, 255, 0.55);
+}
+
+.hint {
+  color: #8698b5;
+  font-size: 11px;
+  flex: 1 1 140px;
+}
+
+.strike {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid rgba(120, 170, 255, 0.6);
+  border-radius: 9px;
+  background: #2f6fed;
+  color: #f4f8ff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.strike:hover {
+  background: #3d7bff;
+}
+
+.strike:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Na telefonie guziki muszą trafić palcem. */
+@media (max-width: 760px) {
+  .strip {
+    gap: 8px;
+  }
+
+  .button,
+  .strike {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .strike {
+    flex: 1 1 100%;
+  }
+}

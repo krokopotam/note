@@ -53,7 +53,13 @@ export interface Pose {
 
 const UP: Vec3 = { x: 0, y: 1, z: 0 };
 
-export function cameraFor(mode: CameraMode, cue: Vec3): Pose {
+/**
+ * `orbit` is the direction the player turned the table to (an angle in the same
+ * units as the physics), or `null` to keep the table's own axis. Only „za kulą”
+ * listens to it — that is the whole point of turning the table: you spin the world
+ * until the shot lines up with your eyes, and then the shot runs away from you.
+ */
+export function cameraFor(mode: CameraMode, cue: Vec3, orbit: number | null = null): Pose {
   if (mode === 'top') {
     // Straight down needs its own up, or the world tips over and the table ends
     // up standing on its short edge.
@@ -65,6 +71,23 @@ export function cameraFor(mode: CameraMode, cue: Vec3): Pose {
   }
   if (mode === 'side') {
     return { position: { x: 0, y: 5.4, z: 9.6 }, target: { x: 0, y: 0, z: 0 }, up: UP };
+  }
+
+  if (orbit !== null) {
+    // Turned table: the eye sits behind the ball along the chosen direction. It
+    // follows the player's drag, never the pointer, so it cannot chase itself.
+    // The gaze leans towards the middle of the cloth (which is the origin), so the
+    // rack stays in the frame instead of the ball floating in a sea of felt.
+    const forward = { x: Math.cos(orbit), z: Math.sin(orbit) };
+    return {
+      position: { x: cue.x - forward.x * 7.6, y: 4.2, z: cue.z - forward.z * 7.6 },
+      target: {
+        x: cue.x + forward.x * 5 - cue.x * 0.3,
+        y: BALL_LIFT,
+        z: cue.z + forward.z * 5 - cue.z * 0.3,
+      },
+      up: UP,
+    };
   }
 
   // Behind the white ball, looking down the length of the table. There is no aim

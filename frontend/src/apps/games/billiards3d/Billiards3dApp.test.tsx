@@ -11,6 +11,8 @@ class ResizeObserverStub {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  // Wybrane sterowanie mieszka w localStorage — nie może przeciekać między testami.
+  window.localStorage.clear();
 });
 
 describe('bilard 3D na ekranie', () => {
@@ -46,6 +48,23 @@ describe('bilard 3D na ekranie', () => {
 
     expect(screen.getByTestId('billiard3d-nogl')).toBeInTheDocument();
     expect(screen.getByTestId('billiard3d-stage')).toBeInTheDocument();
+  });
+
+  it('ma wybór sterowania i pamięta go', () => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+    const first = render(<Billiards3dApp />);
+
+    expect(screen.getByTestId('billiard3d-aim-cue')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByTestId('billiard3d-aim-table'));
+    fireEvent.click(screen.getByTestId('billiard3d-trigger-button'));
+    expect(screen.getByTestId('billiard3d-hint')).toHaveTextContent('obrócić');
+    first.unmount();
+
+    render(<Billiards3dApp />);
+
+    expect(screen.getByTestId('billiard3d-aim-table')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard3d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('uderzenie i nowy bilard bez sceny niczego nie rozbijają', () => {

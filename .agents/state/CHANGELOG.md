@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 2026-11-10 — bilard: własne sterowanie (kij albo obracany stół)
+
+Do obu bilardów wszedł pasek przełączników: czym celujemy i co odpala uderzenie.
+
+- **`games/billiards/controls.ts`** (czyste funkcje + testy): `AimMode` (`cue` | `table`),
+  `Trigger` (`pull` | `button`), `dragEffect()`, `strikesOnRelease()`, `viewRotation()`, `fitScale()`
+  oraz `loadControls()`/`saveControls()` na jednym kluczu `localStorage`. Odczyt i zapis są w
+  `try/catch` — tryb prywatny nie ma prawa wywrócić gry, po prostu zacznie od domyślnych.
+- **`ControlStrip.tsx`** wspólny dla 2D i 3D: `Celowanie [Kij][Stół]`, `Uderzenie
+  [Pociągnięcie][Guzik]`, jedno zdanie podpowiedzi i guzik **Uderz** (ten sam w obu grach,
+  `aria-pressed` na przełącznikach, na telefonie guziki 40 px a „Uderz" na cały pas).
+- **Tryb „stół" w 2D**: grupa stołu obraca się wokół środka, a `viewBox` zmienia się na pionowy,
+  więc cały stół zostaje w kadrze (`fitScale` liczy skalę z obrotu). Teksty rysowane poza grupą
+  (biała w łuzie, koniec gry) liczą swoje środki od aktualnego kadru.
+- **Tryb „stół" w 3D**: `cameraFor(mode, cue, orbit)` — tylko „za kulą" słucha obrotu, `top` i `side`
+  zostają jak były. Kamera patrzy kawałek w stronę środka sukna, inaczej rack wypada z kadru.
+  Orbit bierze się z przeciągnięcia, nigdy z kursora — dawniej kamera goniła mysz i stół wirował.
+- **Siła w pikselach ekranu** (`dragEffect`): dawniej 2D liczył ją w jednostkach stołu, a 3D własnym
+  wzorem, więc ten sam gest na telefonie znaczył co innego. Teraz 12 px to drgnienie, 212 px pełna.
+- **Naprawione przy okazji**: w 3D przymiar bywało lustrzanym odbiciem strzału — kąt liczony z rzutu
+  ekranowego szedł prosto do `strike()`, która myśli jednostkami stołu. Jeden kąt, te same jednostki.
+- Testy: 648 (backend 184, frontend 464), lint czysty. Nowe: parsowanie ustawień, `dragEffect` w obu
+  trybach, zapamiętywanie wyboru, „guzik nie uderza po puszczeniu", obrót stołu w 2D i w kamerze 3D.
+
 ## 2026-11-10 — folder z gierkami (7)
 
 Siedem krótkich gierek w jednym folderze na pulpicie: Wężyk, Tetris, Bąbelki (bubble shooter), 2048,

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BALL_R, TABLE } from '../billiards/billiards';
+import { TABLE } from '../billiards/billiards';
 import { Billiards2dApp } from './Billiards2dApp';
 
 const table = () => screen.getByTestId('billiard-table');
@@ -34,6 +34,8 @@ const roll = (ms: number) => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  // Wybrane sterowanie mieszka w localStorage — nie może przeciekać między testami.
+  window.localStorage.clear();
 });
 
 describe('bilard 2D na ekranie', () => {
@@ -67,17 +69,17 @@ describe('bilard 2D na ekranie', () => {
     expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
   });
 
-  it('pociągnięcie ładuje kij i puszczenie uderza', () => {
+  it('pociągnięcie wzdłuż kija ładuje go, a puszczenie uderza', () => {
     vi.useFakeTimers();
     render(<Billiards2dApp />);
     stubTableBox();
     const node = table();
 
-    fireEvent.pointerDown(node, px(60, 55));
-    fireEvent.pointerMove(node, px(60 + BALL_R * 14, 55));
-    expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '67%' });
+    fireEvent.pointerDown(node, { clientX: 200, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 312, clientY: 240 });
+    expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '50%' });
 
-    fireEvent.pointerUp(node, px(60 + BALL_R * 14, 55));
+    fireEvent.pointerUp(node, { clientX: 312, clientY: 240 });
 
     expect(screen.getByText(/Strzały/)).toHaveTextContent('1');
     // Kij znika, bo kula jest w ruchu.
@@ -86,6 +88,60 @@ describe('bilard 2D na ekranie', () => {
     roll(6000);
 
     expect(screen.getByTestId('cue-stick')).toBeInTheDocument();
+  });
+
+  it('przy trybie „guzik” pociągnięcie leje siłę, ale nie uderza', () => {
+    vi.useFakeTimers();
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+    fireEvent.click(screen.getByTestId('billiard2d-trigger-button'));
+
+    fireEvent.pointerDown(node, { clientX: 200, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 340, clientY: 240 });
+    fireEvent.pointerUp(node, { clientX: 340, clientY: 240 });
+
+    expect(screen.getByText(/Strzały/)).toHaveTextContent('0');
+    expect(screen.getByTestId('power-fill')).toHaveStyle({ width: '64%' });
+
+    fireEvent.click(screen.getByTestId('billiard2d-strike'));
+
+    expect(screen.getByText(/Strzały/)).toHaveTextContent('1');
+  });
+
+  it('tryb „stół” obraca planszą, a palec nie celuje', () => {
+    render(<Billiards2dApp />);
+    stubTableBox();
+    const node = table();
+
+    expect(screen.getByTestId('billiard-view').getAttribute('transform')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('billiard2d-aim-table'));
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 350, clientY: 240 });
+    fireEvent.pointerUp(node, { clientX: 350, clientY: 240 });
+
+    const before = screen.getByTestId('billiard-view').getAttribute('transform') ?? '';
+    expect(before).toContain('rotate(');
+
+    fireEvent.pointerDown(node, { clientX: 300, clientY: 240 });
+    fireEvent.pointerMove(node, { clientX: 250, clientY: 240 });
+    fireEvent.pointerUp(node, { clientX: 250, clientY: 240 });
+
+    expect(screen.getByTestId('billiard-view').getAttribute('transform')).not.toBe(before);
+  });
+
+  it('wybrane sterowanie zostaje na następne wejście', () => {
+    const first = render(<Billiards2dApp />);
+    fireEvent.click(screen.getByTestId('billiard2d-aim-table'));
+    fireEvent.click(screen.getByTestId('billiard2d-trigger-button'));
+    first.unmount();
+
+    render(<Billiards2dApp />);
+
+    expect(screen.getByTestId('billiard2d-aim-table')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard2d-trigger-button')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('billiard2d-hint')).toHaveTextContent('obrócić');
   });
 
   it('klawiatura obraca kij, dobiera siłę i uderza', () => {

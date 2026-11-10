@@ -19,19 +19,14 @@ import {
   strike,
 } from '../billiards/billiards';
 import type { Ball, Point, World } from '../billiards/billiards';
+import { ControlStrip } from '../billiards/ControlStrip';
+import { dragEffect, fitScale, loadControls, saveControls, strikesOnRelease, viewRotation } from '../billiards/controls';
+import type { Controls } from '../billiards/controls';
 import styles from './Billiards2dApp.module.css';
 
-/** How far the pointer has to be pulled for full power. */
-const PULL = BALL_R * 20;
 /** Radians one arrow key press turns the cue. */
 const AIM_KEY = 0.02;
 const CAP_RY = BALL_R * 0.42;
-
-const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
-
-/** Pull distance → power, with a dead zone so a tremble is not a shot. */
-const pull = (drag: number): number =>
-  Math.max(0, Math.min(1, (drag - BALL_R * 2) / (PULL - BALL_R * 2)));
 
 const strzały = (count: number): string =>
   count === 1 ? 'w 1 strzale' : count < 5 ? `w ${count} strzały` : `w ${count} strzałach`;
@@ -106,19 +101,29 @@ export function Billiards2dApp() {
   const [power, setPower] = useState(0.6);
   const [dragging, setDragging] = useState(false);
   const [sparks, setSparks] = useState<Spark[]>([]);
+  const [controls, setControls] = useState<Controls>(() => loadControls());
   const svg = useRef<SVGSVGElement>(null);
   const worldRef = useRef(world);
   worldRef.current = world;
+  // Where the finger came down, in screen pixels: the pull is measured on screen,
+  // so the same gesture asks for the same strength on a phone and on a monitor.
   const grab = useRef<Point | null>(null);
-  // Power of the drag in progress. A tap that never pulled the cue is not a shot,
-  // so it cannot borrow the strength left over from the keyboard.
-  const loaded = useRef(0);
+  const aimAtGrab = useRef(0);
+  // Strength right now. A tap that never pulled the cue is not a shot, so it must
+  // not borrow the force left over from the keyboard.
+  const powerRef = useRef(0.6);
   const potted = useRef<{ id: number; color: string; pocket: number; at: Point }[]>([]);
   const cushions = useRef(0);
   const sparkId = useRef(0);
 
+  // The chosen controls are remembered for the next game, in this browser only.
+  useEffect(() => {
+    saveControls(controls);
+  }, [controls]);
+
   const cue = cueBall(world);
   const moving = !resting(world);
+  const turning = controls.aim === 'table';
   const plan = useMemo(
     () => (moving || cue.potted || world.won ? null : predict(world, aim)),
     [world, aim, moving, cue.potted],
@@ -187,47 +192,59 @@ export function Billiards2dApp() {
     setWorld(struck);
   }, []);
 
+  const load = (value: number) => {
+    powerRef.current = value;
+    setPower(value);
+  };
+
   const onDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (moving || cue.potted || world.won) return;
-    const point = where(event);
-    grab.current = point;
-    loaded.current = 0;
-    setPower(0);
-    setAim(Math.atan2(point.y - cue.y, point.x - cue.x));
+    grab.current = { x: event.clientX, y: event.clientY };
+    aimAtGrab.current = aim;
+    load(0);
+    // Pointing with the cue aims where the finger lands; turning the table keeps
+    // the direction and lets the drag itself do the steering.
+    if (!turning) {
+      const point = where(event);
+      setAim(Math.atan2(point.y - cue.y, point.x - cue.x));
+    }
     setDragging(true);
     svg.current?.setPointerCapture?.(event.pointerId);
   };
 
   const onMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (moving) return;
-    const point = where(event);
-    // While the pointer is down the direction is locked and the drag only loads
-    // the cue — that is what lets a soft shot be a soft shot.
-    if (grab.current) {
-      loaded.current = pull(distance(point, grab.current));
-      setPower(loaded.current);
+    if (!grab.current) {
+      // Hovering aims the cue; a table you turn only answers to the drag.
+      if (!turning) {
+        const point = where(event);
+        setAim(Math.atan2(point.y - cue.y, point.x - cue.x));
+      }
+      return;
     }
-    else setAim(Math.atan2(point.y - cue.y, point.x - cue.x));
+    const effect = dragEffect(grab.current, { x: event.clientX, y: event.clientY }, controls.aim);
+    if (turning) setAim(aimAtGrab.current + effect.aimDelta);
+    load(effect.power);
   };
 
   const onUp = () => {
     if (!grab.current) return;
-    const strength = loaded.current;
+    const strength = powerRef.current;
     grab.current = null;
-    loaded.current = 0;
     setDragging(false);
-    shoot(aim, strength);
+    // With the button trigger a pull only loads the cue; it never strikes.
+    if (strikesOnRelease(controls.trigger)) shoot(aim, strength);
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<SVGSVGElement>) => {
     if (moving) return;
     if (event.key === 'ArrowLeft') setAim((a) => a - AIM_KEY);
     else if (event.key === 'ArrowRight') setAim((a) => a + AIM_KEY);
-    else if (event.key === 'ArrowUp') setPower((p) => Math.min(1, p + 0.08));
-    else if (event.key === 'ArrowDown') setPower((p) => Math.max(0, p - 0.08));
+    else if (event.key === 'ArrowUp') load(Math.min(1, powerRef.current + 0.08));
+    else if (event.key === 'ArrowDown') load(Math.max(0, powerRef.current - 0.08));
     else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
-      shoot(aim, power);
+      shoot(aim, powerRef.current);
       return;
     } else return;
     event.preventDefault();
@@ -235,6 +252,7 @@ export function Billiards2dApp() {
 
   const restart = () => {
     grab.current = null;
+    setDragging(false);
     potted.current = [];
     cushions.current = 0;
     setSparks([]);
@@ -242,6 +260,23 @@ export function Billiards2dApp() {
     worldRef.current = fresh;
     setWorld(fresh);
   };
+
+  // A turned table spins around its own middle, and the frame turns with it: the
+  // viewBox flips to portrait, so on a phone held upright the long edge of the
+  // table becomes the long edge of the screen instead of a stamp in the middle.
+  const board = { w: TABLE.width + RAIL * 2, h: TABLE.height + RAIL * 2 };
+  const centre = { x: TABLE.width / 2, y: TABLE.height / 2 };
+  const turn = turning ? viewRotation(aim) : 0;
+  const view = turning
+    ? `rotate(${turn}) scale(${fitScale(turn, board.w, board.h, board.h, board.w)})` +
+      ` translate(${-centre.x} ${-centre.y})`
+    : undefined;
+  // Texts drawn outside the turned group need the centre of the frame that is
+  // actually showing: the turned frame is centred on the origin.
+  const mid = turning ? { x: 0, y: 0 } : { x: TABLE.width / 2, y: TABLE.height / 2 };
+  const viewBox = turning
+    ? `${-board.h / 2} ${-board.w / 2} ${board.h} ${board.w}`
+    : `${-RAIL} ${-RAIL} ${board.w} ${board.h}`;
 
   const ghost = plan?.ghost ?? null;
   const target = plan?.target ?? null;
@@ -286,8 +321,8 @@ export function Billiards2dApp() {
         <svg
           ref={svg}
           className={`${shell.board} ${styles.board}`}
-          style={boardStyle((TABLE.width + RAIL * 2) / (TABLE.height + RAIL * 2))}
-          viewBox={`${-RAIL} ${-RAIL} ${TABLE.width + RAIL * 2} ${TABLE.height + RAIL * 2}`}
+          style={boardStyle(turning ? board.h / board.w : board.w / board.h)}
+          viewBox={viewBox}
           tabIndex={0}
           onPointerDown={onDown}
           onPointerMove={onMove}
@@ -296,7 +331,14 @@ export function Billiards2dApp() {
           onKeyDown={onKeyDown}
           data-testid="billiard-table"
         >
-          <title>Stół bilardowy: rusz myszą, aby celować, przeciągnij, aby uderzyć</title>
+          <title>
+            {turning
+              ? 'Stół bilardowy: przeciągnij w bok, aby obrócić stół, w dół, aby nabrać siły'
+              : 'Stół bilardowy: rusz myszą, aby celować, przeciągnij wzdłuż kija, aby uderzyć'}
+          </title>
+          {/* With a turning table the whole cloth spins around the white ball, so
+              every shot goes up the screen. */}
+          <g transform={view} data-testid="billiard-view">
           <Table />
 
           {plan && plan.path.length > 1 && (
@@ -376,8 +418,10 @@ export function Billiards2dApp() {
             )}
           </g>
 
+          </g>
+
           {cue.potted && !moving && !world.won && (
-            <text x={TABLE.width / 2} y={8} textAnchor="middle" className={styles.scratch}>
+            <text x={mid.x} y={turning ? -board.w / 2 + 14 : 8} textAnchor="middle" className={styles.scratch}>
               Biała wpadła — wraca na start
             </text>
           )}
@@ -385,17 +429,17 @@ export function Billiards2dApp() {
           {world.won && (
             <g>
               <rect
-                x={-RAIL}
-                y={-RAIL}
-                width={TABLE.width + RAIL * 2}
-                height={TABLE.height + RAIL * 2}
+                x={turning ? -board.h / 2 : -RAIL}
+                y={turning ? -board.w / 2 : -RAIL}
+                width={turning ? board.h : board.w}
+                height={turning ? board.w : board.h}
                 rx={14}
                 className={styles.dim}
               />
-              <text x={TABLE.width / 2} y={TABLE.height / 2 - 8} textAnchor="middle" className={styles.overText}>
+              <text x={mid.x} y={mid.y - 8} textAnchor="middle" className={styles.overText}>
                 Stół sprzątnięty!
               </text>
-              <text x={TABLE.width / 2} y={TABLE.height / 2 + 16} textAnchor="middle" className={styles.overScore}>
+              <text x={mid.x} y={mid.y + 16} textAnchor="middle" className={styles.overScore}>
                 {world.score} punktów {strzały(world.shots)}
               </text>
             </g>
@@ -403,9 +447,18 @@ export function Billiards2dApp() {
         </svg>
       </div>
 
+      <ControlStrip
+        controls={controls}
+        onChange={setControls}
+        onStrike={() => shoot(aim, powerRef.current)}
+        disabled={moving || cue.potted || world.won}
+        testid="billiard2d"
+      />
+
       <p className={shell.hint}>
-        Celuj ruchem myszy albo palcem, przeciągnij i puść, aby uderzyć. Strzałki obracają kij i dobierają siłę,
-        spacja uderza.
+        {turning
+          ? 'Przeciągnij w bok, aby obrócić stół, i w dół, aby nabrać siłę. Strzałki też obracają stół, spacja uderza.'
+          : 'Celuj ruchem myszy albo palcem, przeciągnij wzdłuż kija i puść. Strzałki obracają kij i dobierają siłę, spacja uderza.'}
       </p>
     </div>
   );

@@ -23,6 +23,25 @@ describe('mostek stół → scena', () => {
 describe('kamera', () => {
   const cue = tableToScene({ x: TABLE.width * 0.22, y: TABLE.height / 2 });
 
+  it('obrócony stół siada za kulą w wybranym kierunku', () => {
+    const pose = cameraFor('behind', cue, Math.PI / 2);
+
+    // Orbit π/2 to +z w scenie: cel leży w tę stronę, a oko po przeciwnej.
+    expect(pose.target.z - cue.z).toBeGreaterThan(4);
+    expect(pose.position.z).toBeLessThan(cue.z);
+    // Spojrzenie przechyla się ku środkowi sukna, więc stół nie ucieka z kadru.
+    expect(Math.abs(pose.target.x)).toBeLessThan(Math.abs(cue.x));
+    // Wzrok zostaje nad sukном, nie w suficie.
+    expect(pose.position.y).toBeGreaterThan(0);
+    // Brak obrotu to dokładnie dawny kadr.
+    expect(cameraFor('behind', cue)).toEqual(cameraFor('behind', cue, null));
+  });
+
+  it('góra i bok nie dają się obracać', () => {
+    expect(cameraFor('top', cue, 1.2)).toEqual(cameraFor('top', cue));
+    expect(cameraFor('side', cue, 1.2)).toEqual(cameraFor('side', cue));
+  });
+
   it('siedzi za białą i patrzy w głąb stołu', () => {
     const pose = cameraFor('behind', cue);
 

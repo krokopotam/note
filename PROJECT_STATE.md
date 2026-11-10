@@ -20,7 +20,7 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
 | Układ na telefon (ikony w przepływie, aplikacja na cały ekran, pasek na dole, safe area) | gotowy, testy |
 | Notatnik na telefonie (osobny ekran listy i osobny ekran notatki) | gotowy, działa |
-| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk (folder „Gry") | gotowy, działa |
+| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk, Bilard 2D, Bilard 3D (folder „Gry") | gotowy, działa |
 | Build produkcyjny (`frontend/dist`, 263 kB / 85 kB gzip) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
@@ -62,9 +62,23 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 - **Bilard: jedna fizyka, dwa rysunki.** `games/billiards/billiards.ts` liczy zderzenia, tarcie,
   łuzy i przymiar; 2D rysuje to w SVG, 3D w three.js. Step dzieli się na podpikroki (kula nie
   przelatuje przez kulę), krok czasu podaje widok, więc test idzie na stopklatce.
+- **Sterowanie to wybór gracza, nie widełki kodu** (`games/billiards/controls.ts`). Celowanie:
+  **kij** (palec wskazuje kierunek) albo **stół** (przeciągnięcie w bok obraca świat, a uderzenie
+  zawsze idzie od gracza). Uderzenie: **pociągnięcie** wzdłuż kija albo dopiero **guzik „Uderz”**.
+  Pasek przełączników rysem wspólny (`ControlStrip.tsx`), więc 2D i 3D mówią tymi samymi słowami.
+  Siła liczona w pikselach ekranu (`dragEffect`) — ten sam gest znaczy tyle samo na telefonie i na
+  monitorze; 200 px to pełna siła, 12 px to drgnienie ręki. Wybór mieszka w `localStorage` pod
+  jednym kluczem dla obu bilardów: gierki nie mają swoich tabel ani endpointów, a przeżycie po
+  odświeżeniu strony to cała ich pamięć.
+- **Obracany stół obraca kadr, nie tylko rysunek.** 2D obraca grupę wokół środka stołu i odwraca
+  `viewBox` na pionowy, a `fitScale()` dobiera skalę, żeby żaden kadr nie wyciął połowy bili.
+  Na telefonie trzymanym pionowo to nagroda: długa krawędź stołu staje się długą krawędzią ekranu.
+  3D obraca `orbit` (kąt w jednostkach stołu), a kamera `za kulą` patrzy kawałek w stronę środka
+  sukna, więc rack zostaje w kadrze. `top` i `side` obrotu nie słuchają.
 - **three.js jest leniwe** (`registry.tsx`): `lazy` + `Suspense`, osobny chunk ~137 kB gzip.
   Kamera 3D (`camera.ts`, czyste funkcje) nie zależy od kierunku celowania — obracała stołem w
-  pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`.
+  pętli z rzutem ekranowym; widok z góry potrzebuje własnego `up`. Słucha za to `orbit`, ale tylko
+  tego, które gracz sam przeciągnął: kursor kamery nie rusza.
 - **Plansze z DOM i SVG, bez canvasu** — to samo, co widzi test (jsdom nie ma `getContext`), i skalują
   się razem z oknem (`grid-template-columns`, `viewBox`) zamiast przewijać.
 - **Wysokość okna jest w ramie** (`WindowFrame` → `height: win.height`). Wszystkie aplikacje są napisane
@@ -235,6 +249,10 @@ nginx jest zawsze hojniejszy o zapas, żeby to aplikacja odpowiadała 413 po pol
 Do tego `proxy_request_buffering off`, żeby wolne wrzucanie nie leżało buforem na dysku serwera.
 
 ## Znane ograniczenia / następne kroki
+
+- Wybrane sterowanie bilarda pamięta **przeglądarka**, nie konto: na innym telefonie trzeba je
+  ustawić ponownie. Świadomie — gierki nie mają własnych tabel, a jedna wartość w bazie za pasek
+  przełączników to cena, której nikt nie poprosił.
 
 - Kolejność aplikacji w doku i launcherze zapisuje baza, ale nie ma jeszcze interfejsu do przeciągania
   po samych paskach.
