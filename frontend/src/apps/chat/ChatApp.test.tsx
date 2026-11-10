@@ -127,6 +127,19 @@ describe('reading', () => {
     expect(await screen.findByTestId('conversation-1')).toHaveTextContent('wiadomość usunięta');
   });
 
+  it('pushes the list of conversations away when the picker opens', async () => {
+    // On a phone the list is an overlay: a picker left behind it was unreachable.
+    renderChat();
+    const app = await screen.findByTestId('chat');
+    await userEvent.click(within(app).getByRole('button', { name: 'Rozmowy' }));
+    expect(app).toHaveAttribute('data-side', 'open');
+
+    await userEvent.click(within(app).getByRole('button', { name: 'Nowy czat' }));
+
+    expect(await screen.findByTestId('new-chat')).toBeInTheDocument();
+    expect(app).toHaveAttribute('data-side', 'closed');
+  });
+
   it('offers a way into a conversation when nothing is open', async () => {
     // A phone has no "left": nothing is open, so the way in has to be on screen.
     api.conversations.mockResolvedValue({ items: [] });

@@ -648,6 +648,36 @@ button:disabled {
     box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
   }
 
+  /* List is scrollable; its last button must not sit under the bottom bar. */
+  .side {
+    padding-bottom: 14px;
+  }
+
+  /*
+   * Choosing a person is a screen of its own here: on a narrow window the list of
+   * conversations is an overlay, and a panel in the flow opened behind it.
+   */
+  .newPanel {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+    padding: 12px;
+    background: #151b26;
+  }
+
+  /* Skoro panel ma cały ekran, lista osób go wypełnia, a nie zwija się do 180 px. */
+  .people {
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 0;
+  }
+
   .sideToggle {
     display: inline-flex;
     align-items: center;
@@ -685,6 +715,17 @@ button:disabled {
 
   .thread {
     padding: 4px 2px 6px 0;
+  }
+
+  /* Wybranie osoby to kliknięcie w wiersz, nie w punkcik o 13 px. */
+  .pick {
+    min-height: 48px;
+  }
+
+  .pick input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+    accent-color: #2f6fed;
   }
 
   /* Te przyciski są jedyną drogą do rozmowy, gdy nic nie jest otwarte. */

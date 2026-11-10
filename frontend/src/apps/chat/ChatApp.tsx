@@ -30,6 +30,12 @@ export function ChatApp(_props: AppProps) {
   /** Picture clicked in a bubble: shown big, in this window rather than a new tab. */
   const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
 
+  // Choose a person / add a member replaces the list of conversations: with the
+  // list still open on a phone the panel opened behind it and was unreachable.
+  useEffect(() => {
+    if (state.newChatOpen || state.addMemberOpen) setSideOpen(false);
+  }, [state.newChatOpen, state.addMemberOpen]);
+
   useEffect(() => {
     if (!zoom) return undefined;
     const onKey = (event: KeyboardEvent) => {
