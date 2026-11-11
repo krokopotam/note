@@ -91,6 +91,9 @@ export const GAMES = [
   // screen pixel, so the window has to be tall and still leave a column
   // beside it for the score readout.
   { id: 'pinball', title: 'Pinball', width: 720, height: 680 },
+  // Arkanoid draws a 256x320 playfield at one pixel for one, in a column, with
+  // the readout beside it. The window is that column plus the readout.
+  { id: 'arkanoid', title: 'Arkanoid', width: 640, height: 470 },
 ];
 
 /** @param {string} id */

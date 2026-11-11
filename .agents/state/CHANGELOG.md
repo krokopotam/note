@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## 2026-11-11 — arkanoid: klocki, kapsułki i kąt zamiast celownika
+
+Jedenasta gierka w „Gry", bez bibliotek: logika, rysowanie, dźwięk i widok w osobnych plikach.
+55 testów: 32 logiki, 11 rysownika, 12 przeklikiwań ekranu.
+
+- **Warstwy**: `logic.ts` (kula, klocki, kapsułki, serie, życia, plany), `draw.ts` (rysowanie z
+  pliku i zdarzeń), `sound.ts` (siedem przepisów), `ArkanoidApp.tsx` (pętla klatek i wejście).
+  Logika bierze `Rng` z zewnątrz, więc test rozgrywa dokładnie tę partię co gracz.
+- **Trzy pułapki, dwie w fizyce.** (1) Po odbiciu kula dotykała krawędzi klocka z
+  milimetra i następny podkrok liczył to jako nowe trafienie — klocek o trzech uderzeniach znikał w
+  jednej klatce. Lekcja: `LUZ = 0,06` px przy wypychaniu. (2) Klocek ze zerową wytrzymałością
+  zostawał w planie, więc warunek „plan zebrany" nigdy nie zachodził. Zbity klocek schodzi z listy,
+  a plan z samych szynek jest zaliczony z definicji, bo nie ma w nim czego zbijać.
+- **Trzecia była w zasadach, nie w kodzie.** Kula puszczona z klapki idealnie pionowo wracała
+  w jej środek i odbijała idealnie pionowo — partia bez końca. `wyrzuć` daje teraz przechył co najmniej
+  0,2 rad, a `prostuj` nie pozwala kuli opaść do lotu poziomego (|vy| ≥ 0,34 · prędkość).
+- **Podkroki co 2 px**: klocek ma 8 px grubości, kula przy 240 px/s przeskakuje go w klatkę.
+- **Sterowanie to kąt odbicia od klapki** (65° przy samej krawędzi), nie celownik; kapsułki: szeroko,
+  wąsko, kule, zwolnij, życie — dwie ostatnie są kłopotem, o których wypadnięciu decyduje `Rng` przy
+  budowie planu. Mnożnik z serii cegiełek bez dotknięcia klapki, sufit ×5.
+- **Plany w ASCII 15 × 8** (`.`, `1`–`3`, `S`), pięć sztuk, potem od nowa z szybszą kulą (sufit 240 px/s).
+- **Płótno 256 × 320 liczone z wysokości kontenera.** Na telefonie płótno stało we własnych 260 px,
+  dopóki `.płótno` nie dostało `height: 100%` — teraz **384 × 624** na 390 × 844. Licznik wyniku to
+  cyfry siedmiosegmentowe rysowane z siedmiu kawałków, bez czcionki i bez pliku z bitmapą; zera z
+  przodu przygaszone.
+- **`createSound` wyprowadzony do `games/shared/sound.ts`.** Był w pinballu, arkanoid miałby przepisywać
+  granie; teraz gra podaje przepis, generator jest wspólny. API pinballa bez zmian.
+- Migracja `014_arkanoid.sql` — pierwszy wolny slot foldera „Gry", tak jak przy pinballu. Testy
+  migracji dokładaających gierkę zamienione w pętlę (013 i 014 robią to samo) i sprawdzały zbiór
+  ikon, a nie ich kolejność: migracja dopisuje na końcu, a porządek w folderze trzyma siatka.
+- Testy: 890 (backend 192, frontend 698). `npm run lint` czysto, build przechodzi.
+
 ## 2026-11-11 — pinball: dźwignia, która naprawdę ciągnie
 
 Zgłoszenie: „prawa dźwignia słabo działa, prawie się nie podnosi”. Dwie przyczyny, obie w wyrzutniku.

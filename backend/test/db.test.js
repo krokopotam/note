@@ -91,7 +91,8 @@ describe('database bootstrap', () => {
           name !== '010_no_reused_ids.sql' &&
           name !== '011_games.sql' &&
           name !== '012_billiards.sql' &&
-          name !== '013_pinball.sql',
+          name !== '013_pinball.sql' &&
+          name !== '014_arkanoid.sql',
       );
     files.forEach((name) => {
       db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
@@ -116,6 +117,7 @@ describe('database bootstrap', () => {
       '011_games.sql',
       '012_billiards.sql',
       '013_pinball.sql',
+      '014_arkanoid.sql',
     ]);
 
     const columns = db.prepare('PRAGMA table_info(files)').all().map((c) => c.name);
@@ -179,6 +181,7 @@ describe('database bootstrap', () => {
       { version: '011_games.sql' },
       { version: '012_billiards.sql' },
       { version: '013_pinball.sql' },
+      { version: '014_arkanoid.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -236,6 +239,7 @@ describe('upgrading a database that predates accounts', () => {
       '011_games.sql',
       '012_billiards.sql',
       '013_pinball.sql',
+      '014_arkanoid.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');
@@ -356,8 +360,9 @@ describe('migracja 011 — folder z grami dla starych kont', () => {
     db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
     // Młodsze gierki też trzeba zdjąć: inaczej test porównywałby folder z dziś
     // do migracji, która w dniu swojego działania nic o nich nie wiedziała.
-    db.prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'").run(owner);
+    db.prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('pinball', 'arkanoid')").run(owner);
     db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
+    db.prepare("DELETE FROM schema_migrations WHERE version = '014_arkanoid.sql'").run();
   }
 
   it('adds the folder and every game icon under it', () => {
@@ -433,10 +438,13 @@ describe('migracja 012 — bilard w istniejącym folderze', () => {
    */
   function pretendNoBillards(db, owner) {
     db
-      .prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('billiard2d', 'billiard3d', 'pinball')")
+      .prepare(
+        "DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('billiard2d', 'billiard3d', 'pinball', 'arkanoid')",
+      )
       .run(owner);
     db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
     db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
+    db.prepare("DELETE FROM schema_migrations WHERE version = '014_arkanoid.sql'").run();
   }
 
   it('dokłada dwie gierki do foldera, który już jest', () => {
@@ -499,76 +507,87 @@ describe('migracja 012 — bilard w istniejącym folderze', () => {
   });
 });
 
-describe('migracja 013 — pinball w istniejącym folderze', () => {
-  const folderId = (db, owner) =>
-    db
-      .prepare("SELECT id FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = 'Gry'")
-      .get(owner).id;
+/**
+ * Migracje dokładające gierkę do foldera, który już stoi. Każda robi to samo i
+ * tak samo ją sprawdzam — stąd pętla, a nie trzy kopie tego samego opisu.
+ */
+const folderGry = (db, owner) =>
+  db
+    .prepare("SELECT id FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = 'Gry'")
+    .get(owner).id;
 
-  /** Konto z folderem „Gry", ale bez pinballa — tak wyglądało przed tę migrację. */
-  function pretendNoPinball(db, owner) {
-    db.prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'").run(owner);
-    db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
-  }
+const DOKŁADANE_GRY = [
+  { app: 'pinball', wersja: '013_pinball.sql' },
+  { app: 'arkanoid', wersja: '014_arkanoid.sql' },
+];
 
-  it('dokłada pinball do foldera, który już jest', () => {
-    const { db, owner } = makeDbOwned();
-    seedUser(db, owner, APPS);
-    pretendNoPinball(db, owner);
+for (const { app, wersja } of DOKŁADANE_GRY) {
+  describe(`migracja ${wersja} — ${app} w istniejącym folderze`, () => {
+    /** Konto z folderem „Gry", ale bez tej ikonki — tak wyglądało przed nią. */
+    function pretendNo(db, owner) {
+      db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND app_id = ?').run(owner, app);
+      db.prepare('DELETE FROM schema_migrations WHERE version = ?').run(wersja);
+    }
 
-    expect(migrate(db)).toContain('013_pinball.sql');
+    it(`dokłada ${app} do foldera, który już jest`, () => {
+      const { db, owner } = makeDbOwned();
+      seedUser(db, owner, APPS);
+      pretendNo(db, owner);
 
-    const inside = db
-      .prepare('SELECT app_id FROM desktop_items WHERE user_id = ? AND parent_id = ? ORDER BY id')
-      .all(owner, folderId(db, owner))
-      .map((row) => row.app_id);
-    expect(inside).toContain('pinball');
-    expect(inside).toEqual(GAMES.map((game) => game.id));
+      expect(migrate(db)).toContain(wersja);
+
+      const inside = db
+        .prepare('SELECT app_id FROM desktop_items WHERE user_id = ? AND parent_id = ? ORDER BY id')
+        .all(owner, folderGry(db, owner))
+        .map((row) => row.app_id);
+      expect(inside).toContain(app);
+      // Zbiór, nie kolejność: migracja dokłada ikonkę na końcu, a folder trzyma
+      // porządek w siatce (x, y), nie w kolejności wierszy.
+      expect([...inside].sort()).toEqual(GAMES.map((game) => game.id).sort());
+    });
+
+    it('stawia go w wolnym miejscu siatki, nie na innej ikonice', () => {
+      const { db, owner } = makeDbOwned();
+      seedUser(db, owner, APPS);
+      pretendNo(db, owner);
+
+      migrate(db);
+
+      const spots = db
+        .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND parent_id = ?')
+        .all(owner, folderGry(db, owner))
+        .map((row) => `${row.x},${row.y}`);
+      expect(new Set(spots).size).toBe(spots.length);
+    });
+
+    it('nie dodaje drugiej ikonki, gdy migracja powtórzy się', () => {
+      const { db, owner } = makeDbOwned();
+      seedUser(db, owner, APPS);
+      pretendNo(db, owner);
+      migrate(db);
+      const before = db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n;
+      pretendNo(db, owner);
+
+      migrate(db);
+
+      // Tyle samo, bo przed drugim przejściem ikonkę z foldera zdjęto.
+      expect(db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n).toBe(before);
+    });
+
+    it('nie zakłada foldera „Gry" komuś, kto go usunął', () => {
+      const { db, owner } = makeDbOwned();
+      seedUser(db, owner, APPS);
+      db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
+      pretendNo(db, owner);
+
+      migrate(db);
+
+      expect(
+        db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id = ?').get(owner, app).n,
+      ).toBe(0);
+    });
   });
-
-  it('stawia go w wolnym miejscu siatki, nie na innej ikonice', () => {
-    const { db, owner } = makeDbOwned();
-    seedUser(db, owner, APPS);
-    pretendNoPinball(db, owner);
-
-    migrate(db);
-
-    const spots = db
-      .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND parent_id = ?')
-      .all(owner, folderId(db, owner))
-      .map((row) => `${row.x},${row.y}`);
-    expect(new Set(spots).size).toBe(spots.length);
-  });
-
-  it('nie dodaje drugiego pinballa, gdy migracja powtórzy się', () => {
-    const { db, owner } = makeDbOwned();
-    seedUser(db, owner, APPS);
-    pretendNoPinball(db, owner);
-    migrate(db);
-    const before = db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n;
-    pretendNoPinball(db, owner);
-
-    migrate(db);
-
-    // Tyle samo, bo przed drugim przejściem pinballa z foldera wzięłam.
-    expect(db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n).toBe(before);
-  });
-
-  it('nie zakłada foldera „Gry" komuś, kto go usunął', () => {
-    const { db, owner } = makeDbOwned();
-    seedUser(db, owner, APPS);
-    db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
-    pretendNoPinball(db, owner);
-
-    migrate(db);
-
-    expect(
-      db
-        .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'")
-        .get(owner).n,
-    ).toBe(0);
-  });
-});
+}
 
 describe('seedUser', () => {
   it('places one icon per app, a folder, and fills both favourite slots', () => {

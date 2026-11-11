@@ -177,6 +177,27 @@ export function PinballIcon({ size = 48 }: IconProps) {
   );
 }
 
+export function ArkanoidIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <path d="M12 11h24v27H12z" fill="#101033" stroke="#3c5fa8" strokeWidth="2" />
+      <rect x="15" y="14" width="6" height="3" fill="#2f9ee0" />
+      <rect x="22" y="14" width="6" height="3" fill="#e04a35" />
+      <rect x="29" y="14" width="5" height="3" fill="#f0b429" />
+      <rect x="15" y="19" width="6" height="3" fill="#f0b429" />
+      <rect x="22" y="19" width="6" height="3" fill="#2f9ee0" />
+      <rect x="29" y="19" width="5" height="3" fill="#e04a35" />
+      <rect x="18" y="24" width="6" height="3" fill="#e04a35" />
+      <rect x="25" y="24" width="6" height="3" fill="#2f9ee0" />
+      <circle cx="24" cy="31" r="2" fill="#f7f3e8" />
+      <rect x="17" y="34" width="14" height="3" rx="1.5" fill="#f7f3e8" />
+      <rect x="17" y="34" width="3" height="3" rx="1.5" fill="#e23c1c" />
+      <rect x="28" y="34" width="3" height="3" rx="1.5" fill="#e23c1c" />
+    </svg>
+  );
+}
+
 export function Billiard3dIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

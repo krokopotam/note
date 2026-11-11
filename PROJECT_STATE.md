@@ -20,11 +20,11 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
 | Układ na telefon (ikony w przepływie, aplikacja na cały ekran, pasek na dole, safe area) | gotowy, testy |
 | Notatnik na telefonie (osobny ekran listy i osobny ekran notatki) | gotowy, działa |
-| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk, Bilard 2D, Bilard 3D, Pinball (folder „Gry") | gotowy, działa |
-| Build produkcyjny (`frontend/dist`, 329 kB / 109 kB gzip; three.js jako osobny chunk) | przechodzi |
+| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk, Bilard 2D, Bilard 3D, Pinball, Arkanoid (folder „Gry") | gotowy, działa |
+| Build produkcyjny (`frontend/dist`, 348 kB / 115 kB gzip; three.js jako osobny chunk) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 829 przechodzi (backend 188, frontend 641). `npm run lint` → czysto.
+Testy: `npm test` → 890 przechodzi (backend 192, frontend 698). `npm run lint` → czysto.
 
 Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
 i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
@@ -36,6 +36,42 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (arkanoid)
+
+- **Logika, rysowanie, dźwięk i widok w czterech plikach.** `arkanoid/logic.ts` to cała gra: kula,
+  klocki, kapsułki, serie, życia, plany. `draw.ts` dostaje stan i zdarzenia, `sound.ts` tylko
+  przepisy, `ArkanoidApp.tsx` — pętlę klatek i wejście. Partię da się rozegrać w teście bez DOM-u
+  (33 testy logiki, w tym pięć minut klapki bieżącej za kulą).
+- **Płótno 256 × 320, API canvas 2D, nie bufor programowy.** Tu nie ma czego składać jak matrycy
+  pinballa: kreski są proste, a `image-rendering: pixelated` trzyma grube piksele. Rozmiar wzięty z
+  wysokości kontenera (`flex: 0 0 auto` + `height: 100%`), nigdy z szerokości panelu — to ta sama
+  lekcja co przy pinballu. Na 390 × 844 płótno ma **384 × 624**, wcześniej stało we własnych 260 px.
+- **Cyfry siedmiosegmentowe, nie czcionka.** Licznik wyniku rysowany z siedmiu kawałków, zera z
+  przodu przygaszone. Wspólna czcionka z pinballem spleciałaby dwie gry dla kilkunastu linii;
+  własnych pliku z fontem ani bitmapy nie ma.
+- **Generator dźwięku poszedł do `games/shared/sound.ts`.** Wcześniej był w pinballu; teraz każda
+  gra podaje tylko przepis (częstotliwości, czas, kształt), a granie, włączanie ciszy i sprzątanie
+  `AudioContext` są jedne.
+- **Sterowanie to kąt, nie celownik.** `KĄT_MAX` 65° przy samej krawędzi klapki, prosto w środku.
+  Z tego wynika cała gra: podstawienie krawędzi, nie wcelowanie. Czerwone końce klapki mówią, gdzie
+  odbija najmocniej.
+- **Podkroki co 2 px i luz 0,06 px przy wypychaniu.** Klocek ma 8 px grubości, a kula przy 240 px/s
+  przeskakuje go w jednej klatce. Bez luzu kula po odbiciu dotyka krawędzi z milimetra i następny
+  podkrok liczy to jako kolejne trafienie — jeden klocek znikał w trzy klatki.
+- **Zbity klocek schodzi z planu, plan jest zaliczony, gdy zostają same szynki.** Klocek z
+  zerową wytrzymałością wiszący w powietrzu psuje i rysunek, i warunek końca poziomu. Plan, w którym
+  nie ma już czego zbić, liczy się jako zaliczony — inaczej plan ze samiuteńkich szynek wisi wiecznie.
+- **Wyrzutnik zawsze daje przechył ≥ 0,2 rad.** Kula puszczona idealnie pionowo wraca w środek
+  klapki, odbija idealnie pionowo i tak w kółko: poziom nie do przejścia. `prostuj` nie pozwala
+  kuli zejść do lotu poziomego (`|vy| ≥ 0,34 · prędkość`).
+- **Plany to ASCII 15 × 8** (`PLANY`): `.` pusto, `1`–`3` wytrzymałość, `S` szynka. Pięć planów,
+  potem kręcą się od nowa, a kula przyspiesza (`prędkośćPoziomu`, sufit 240 px/s).
+- **Kapsułki pięciu rodzajów** (`szeroko`, `wąsko`, `kule`, `zwolnij`, `życie`), dwie są kłopotem.
+  Które cegiełki je mają, rozstrzyga `Rng` przy budowie planu, więc ta sama partia wychodzi dwa razy.
+- **Mnożnik z serii**, nie z czasu: `1 + seria / 4`, sufit ×5, zeruje się przy dotknięciu klapki.
+- **Rekord w `localStorage`** (`note:arkanoid:rekord`), migracja `014_arkanoid.sql` odkłada ikonkę
+  w pierwszy wolny slot foldera „Gry".
 
 ## Decyzje (pinball)
 
@@ -336,6 +372,9 @@ Do tego `proxy_request_buffering off`, żeby wolne wrzucanie nie leżało bufore
 - Swobodna kamera nie ma gestu dwoma palcami ani kółka myszy: obraca ją przeciągnięcie, a dystans daje
   suwak. Dwa palce w jednym `PointerEvent`-owym szkielecie to osobna robota.
 
+- Arkanoid: pięć planów i po pięciu kręcą się od nowa; nie ma edytora planów, drugiego gracza ani
+  kapsułek zmieniających tor kuli (magnez, tunel). Rekord, tak jak w pinballu, zna tylko ta
+  przeglądarka.
 - Pinball: rekord żyje w `localStorage`, więc na innym urządzeniu zaczyna się od zera; nie ma
   przechylania stoiska (tilt), trybów difficulty ani zapisu partii w połowie. Dźwięk jest syntezowany,
   nie sample — brzmi jak 1989, bo tak miał.

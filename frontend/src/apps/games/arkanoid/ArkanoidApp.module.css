@@ -1,0 +1,229 @@
+/*
+ * Układ jest przeżarty lekcją z pinballa: panel nie może dyktować wysokości
+ * płótna. Płótno bierze całą dostępną wysokość (`flex: 0 0 auto` + `height:
+ * 100%`), a panel dzieli to, co zostało, i nigdy nie rozszerza się treścią.
+ */
+.okno {
+  display: flex;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+  color: #e8ecff;
+  background: #06060f;
+}
+
+.scena {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+}
+
+.płótno {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  background: #0a0a1e;
+  border: 2px solid #262a4d;
+  box-shadow: 0 0 0 1px #000, 0 12px 30px rgba(0, 0, 0, 0.55);
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  /* Palec steruje klapką, nie przewija pulpitu. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  background: #0c0d1c;
+  border: 1px solid #262a4d;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wiersz {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: #a7aed6;
+}
+
+.etykieta {
+  min-width: 58px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6f77a3;
+}
+
+.wynik {
+  font-size: 26px;
+  color: #ffe14a;
+  text-shadow: 0 0 10px rgba(255, 225, 74, 0.35);
+}
+
+.mnoznik {
+  margin-left: auto;
+  padding: 1px 7px;
+  font-size: 12px;
+  color: #06060f;
+  background: #3ce0d0;
+  border-radius: 999px;
+}
+
+.kule {
+  display: flex;
+  gap: 5px;
+  min-height: 12px;
+}
+
+.kulka {
+  width: 10px;
+  height: 10px;
+  background: #e8ecff;
+  border-radius: 50%;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * Podpowiedź ma stałą wysokość — bez tego panel rósł razem z treścią, a bo
+ * panel bierze resztę szerokości, płótno kurczyło się o kilka pikseli.
+ */
+.podpowiedź {
+  min-height: 60px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #7d85b0;
+}
+
+.doły {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.guzik {
+  flex: 1 1 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #06060f;
+  background: #ffe14a;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.guzik:disabled {
+  color: #7d85b0;
+  background: #1b1e36;
+  cursor: default;
+}
+
+.mini {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  color: #cfd5f5;
+  background: #1b1e36;
+  border: 1px solid #333a63;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.zasłona {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 15, 0.82);
+  text-align: center;
+}
+
+.napisKonca {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.16em;
+  color: #ff4f6e;
+}
+
+.wynikKonca {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #ffe14a;
+}
+
+/*
+ * Na telefonie licznik siedzi w płótnie, więc powtarzanie go pod spodem tylko
+ * zjada miejsce. Zostają kule i guziki.
+ */
+@media (max-width: 760px) {
+  .okno {
+    flex-direction: column;
+    gap: 4px;
+    padding: 3px;
+  }
+
+  .scena {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-self: center;
+  }
+
+  /* Wysokość z dostępnej przestrzeni, szerokość z proporcji. Bez `height: 100%`
+     płótno stałoby w własnym rozmiarze (256 px) i połowa słuchawki świeciłaaby pustką. */
+  .płótno {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .panel {
+    flex: 0 0 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 6px;
+  }
+
+  .wiersz,
+  .podpowiedź {
+    display: none;
+  }
+
+  .kule {
+    flex: 0 0 auto;
+    margin-right: auto;
+  }
+
+  .doły {
+    display: contents;
+  }
+
+  .guzik,
+  .mini {
+    min-height: 44px;
+  }
+}
