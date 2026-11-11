@@ -36,6 +36,20 @@ export interface Rules {
   bankDown: number;
   bumperHits: number;
   feverReady: boolean;
+  /**
+   * Sekundy obrony: kula, która odpłynie w tym czasie, wraca na wyrzutnik
+   * i nie kosztuje życia. Bez tego pierwsza kula partii potrafi zniknąć w
+   * cztery sekundy i gracz nie zdąży niczego dotknąć.
+   */
+  save: number;
+  /** Nowa litera hasła zapaliła obronę na jedno odpłynięcie. */
+  saveLit: boolean;
+  /**
+   * Czy ta kula zużyła już swoją obronę. Bez tego flaga jest dziurawa: ratunek
+   * odkłada kulę na wyrzutnik, nowy wystrzał uzbraja obronę od nowa i partia
+   * nie może się skończyć. Obrona jest jedna na kulę, nalot do tego druga.
+   */
+  saveUsed: boolean;
   over: boolean;
   /** Ostatnie hasła do bieżni punktowej, najnowsze na wierzchu. */
   ticker: string[];
@@ -59,6 +73,26 @@ export const HAZLO = ['J', 'A', 'C', 'K', 'P'];
 const MAX_MULTIPLIER = 6;
 const EXTRA_BALL_LIMIT = 2;
 const MODE_TIME: Record<ModeName, number> = { mnożnik: 20, multiball: 25, gorączka: 15 };
+/** Ile sekund po wystrzale Automat trzyma kulę nad przepaścią. */
+const START_SAVE = 8;
+/** Tyle dostaje kula po jackpocie — gracz właśnie zapracował. */
+const JACKPOT_SAVE = 12;
+
+/**
+ * Kula poszła z wyrzutnika — od tej chwili liczymy jej obronę. Fizyka nie zgłasza
+ * wypadu z toru jako zdarzenia (pole `launch` w unii wisi od pierwszej wersji),
+ * więc silnik woła to wprost w `launch()`.
+ *
+ * `saveUsed` jest tu po to, żeby ratunek nie dawał nieskończoności: ratowana kula
+ * wraca na wyrzutnik, a bez tej flagi każdy nowy wystrzał uzbrajałby obronę od
+ * nowa i gra nigdy by się nie kończyła.
+ */
+export function startBall(state: Rules): Rules {
+  return next(state, {
+    save: state.saveUsed ? state.save : START_SAVE,
+    ticker: say(state, 'WYRZUCONO'),
+  });
+}
 
 export function startGame(): Rules {
   return {
@@ -76,6 +110,9 @@ export function startGame(): Rules {
     bankDown: 0,
     bumperHits: 0,
     feverReady: false,
+    save: 0,
+    saveLit: false,
+    saveUsed: false,
     over: false,
     ticker: ['WRZUĆ KULĘ'],
   };
@@ -158,7 +195,7 @@ function reduce(state: Rules, hit: Hit, ballsInPlay: number): Step {
     case 'drain':
       return onDrain(state);
     case 'launch':
-      return { state: next(state, { ticker: say(state, 'WYRZUCONO') }), effects: [{ kind: 'sound', name: 'zbijak' }] };
+      return { state: startBall(state), effects: [{ kind: 'sound', name: 'zbijak' }] };
     case 'stuck':
       return { state, effects: [{ kind: 'banner', text: 'KULA WOLNA' }] };
     case 'wall':
@@ -259,12 +296,16 @@ function onRoll(state: Rules, hit: Hit): Step {
     }
     const letters = [...state.letters, letter];
     let current = addPoints(state, 250 * state.multiplier);
-    current = next(current, { letters, ticker: say(current, `LITERA ${letters.join('')}`) });
+    // Każda nowa litera zapala obronę na jedno odpłynięcie: to jedyne miejsce,
+    // gdzie da się ją uczciwie rozświecić — wysoko, z doskoku, a nie w zjeździe
+    // do dołka.
+    current = next(current, { letters, saveLit: true, ticker: say(current, `LITERA ${letters.join('')}`) });
     const effects: Effect[] = [
       { kind: 'float', text: `LITERA ${letter}`, at: hit.at, tone: 'tryb' },
       { kind: 'flash', tag: hit.tag },
       { kind: 'sound', name: 'cel' },
     ];
+    if (!state.saveLit && state.save <= 0) effects.push({ kind: 'banner', text: 'OBRONA ZAPALONA' });
     if (!state.jackpotLit && HAZLO.every((wanted) => letters.includes(wanted))) {
       current = next(current, { jackpotLit: true, ticker: say(current, 'JACKPOT OTWARTY') });
       effects.push({ kind: 'banner', text: 'JACKPOT OTWARTY' }, { kind: 'shake', power: 2 });
@@ -274,6 +315,9 @@ function onRoll(state: Rules, hit: Hit): Step {
 
   if (hit.tag.startsWith('nalot.')) {
     // Nalot: kula wróciła na klapkę — zawsze jakiś grosz, inaczej kary godzą.
+    // Celowo BEZ zapalania obrony: nalot leży tuż nad odpływem, więc kula
+    // zapalałaby ją w drodze do dołka i była ratowana za każdym razem. Partia
+    // robiła się nieskończona — pierwsza wersja właśnie tak wyglądała.
     return score(state, hit, 500);
   }
 
@@ -324,6 +368,9 @@ function onSaucer(state: Rules, hit: Hit, ballsInPlay: number): Step {
   let current = addPoints(state, gained);
   current = next(current, {
     jackpotLit: false,
+    // Po jackpocie Automat trzyma kulę dłużej: gracz właśnie zrobił najlepsze
+    // zagranie na stole i nie powinien za nie zapłacić życiem w następnej sekundzie.
+    save: Math.max(current.save, JACKPOT_SAVE),
     jackpotsHit: state.jackpotsHit + 1,
     // Hasło trzeba zebrać od nowa — jeden jackpot to nie darmowa maszynka.
     letters: [],
@@ -345,10 +392,23 @@ function onSaucer(state: Rules, hit: Hit, ballsInPlay: number): Step {
 }
 
 function onDrain(state: Rules): Step {
+  if (state.save > 0 || state.saveLit) {
+    // Ratunek: kula wraca na wyrzutnik, ale dorobek serii i tryby zostają —
+    // gra jej nie zabiera, tylko wyciąga z dołka.
+    return {
+      state: next(state, { save: 0, saveLit: false, saveUsed: true, ticker: say(state, 'KULA RATOWANA') }),
+      effects: [
+        { kind: 'banner', text: 'RATUNEK!' },
+        { kind: 'sound', name: 'tryb' },
+        { kind: 'shake', power: 1 },
+      ],
+    };
+  }
   const effects: Effect[] = [{ kind: 'sound', name: 'otwór' }, { kind: 'shake', power: 2 }];
   if (state.ballsLeft > 1) {
     const current = next(state, {
       ballsLeft: state.ballsLeft - 1,
+      saveUsed: false,
       combo: 0,
       mode: null,
       modeTime: 0,
@@ -376,6 +436,10 @@ function startMode(state: Rules, mode: ModeName): Rules {
 
 /** Odmierza tryby. Zwraca efekt dźwiękowy w chwili, gdy tryb gaśnie. */
 export function tick(state: Rules, dt: number): Step {
+  // Obrona tyka zawsze — tryb może nie trwać ani sekundy, a kula i tak wisi.
+  const save = state.save > 0 ? Math.max(0, state.save - dt) : 0;
+  if (save !== state.save) state = next(state, { save });
+
   if (!state.mode || state.over) return { state, effects: [] };
   const modeTime = state.modeTime - dt;
   if (modeTime > 0) return { state: next(state, { modeTime }), effects: [] };

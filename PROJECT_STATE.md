@@ -24,7 +24,7 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Build produkcyjny (`frontend/dist`, 348 kB / 115 kB gzip; three.js jako osobny chunk) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 890 przechodzi (backend 192, frontend 698). `npm run lint` → czysto.
+Testy: `npm test` → 913 przechodzi (backend 192, frontend 721). `npm run lint` → czysto.
 
 Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
 i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
@@ -75,7 +75,39 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 
 ## Decyzje (pinball)
 
-- **Wyrzutnik: prędkość rośnie z naciągnięcia liniowo, a `PULL_PEWNY` wyznacza próg, po którym kula
+- **Prawą klapkę psuł jeden znak przy lustrzeniu kąta, a nie fizyka.** Prawa
+  połowa stołu idzie do `π − θ`, było `π + θ`: spoczynek 150,2°, „góra” 145,6° —
+  zamach 4,6° w dół, w stronę odpływu. Kątów nie liczy fizyka, tylko tabelka w
+  `table.ts`, dlatego naprawa jest w jednym wierszu, a pilnują jej trzy testy w
+  `table.test.ts`: ten sam zakres po obu stronach, „góra” musi znaczyć wyżej i
+  `podbite('prawa')` musi podnieść kulę tak samo jak `podbite('lewa')`.
+  Testy fizyki od pierwszej wersji budowały klapkę lewą — dlatego usterka
+  przeżyła tyle wydań.
+- **Mapa klawiszy jest osobną funkcją (`pressKey`), bo widok jej nie sprawdzał.**
+  `PinballKeys.test.tsx` podgląda prawdziwy silnik i pilnuje, że `ArrowRight`
+  daje `right`, `ArrowUp` daje `mini`, a spacja i strzałka w dół do klapek nie
+  należą. To ten sam błąd poznawczy: przeklikiwaliśmy ekran, ale nikt nie patrzył,
+  co naprawdę trafia do symulacji.
+- **Mini-klapka (trzecia) stoi wysoko na lewej burcie**, oś (12, 250), długość
+  24, sterowana strzałką w górę. Jedna i po lewej celowo: tędy wraca większość
+  kul po wystrzale, a dwie zrobiłyby ze stołu bilard. Osobny guzik w interfejsie,
+  bo palec steruje nią inny niż klapkami głównymi.
+- **Obrona kuli: jedna na kulę, osiem sekund od strzału, dwanaście po jackpocie.**
+  Bez niej pierwsza kula partii potrafi zniknąć w cztery sekundy. `saveUsed` jest
+  krytyczne: ratunek odkłada kulę na wyrzutnik, a każdy strzał uzbraja obronę —
+  bez tej flagi partia jest nieskończona.
+- **Obrony NIE zapala nalot.** Pierwsza wersja właśnie tak wyglądała i gra była
+  nieśmiertelna: nalot leży tuż nad odpływem, więc kula wpadająca do kanału
+  zapalała obronę w drodze do dołka i była ratowana za każdym razem. Zapalają ją
+  pasy J A C K P — wysoko, z doskoku, tam, gdzie trzeba trafić.
+- **Pole `launch` w unii zdarzeń jest martwe** — fizyka nigdy go nie emituje.
+  Obrona startuje więc w `engine.launch()` przez wyeksportowane `startBall()`, a
+  nie w reduktorze zasad.
+- **Częstość kroków fizyki zmienia partię, ale nie może zmieniać reguły.** W
+  tempie 1/60 partia bez klapek kończy się w 34 s, w 1/120 kula krążyła znacznie
+  dłużej; testy partii chodzą w 1/120 i dlatego potrzebują dwukrotnie większego
+  budżetu czasu niż przed obroną.
+ a `PULL_PEWNY` wyznacza próg, po którym kula
   na pewno wychodzi z toru.** Krzywa kwadratowa z podłogą 0,35 dawała przy połowie skali ~690 px/s,
   a z toru (461 → 78 px, czyli 391 px pod górę) wynosi kulę dopiero ~771 px/s — środkowe i krótkie
   wciśnięcia nie mogły zacząć partii. `PRÓG_TORU` to 830 px/s: 771 potrzebne plus zapas na tarcie.

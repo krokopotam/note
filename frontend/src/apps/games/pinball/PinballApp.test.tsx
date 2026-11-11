@@ -89,12 +89,14 @@ describe('ekran pinballa', () => {
     expect((screen.getByTestId('pinball-strzal') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('partia bez klapek odbiera kule i sama się kończy', () => {
+  it('partia bez klapek odbiera kule i sama się kończy', { timeout: 20_000 }, () => {
     render(<PinballApp />);
     const strzał = screen.getByTestId('pinball-strzal') as HTMLButtonElement;
 
-    // Trzy kule po trzy: tyle trzeba, żeby dojść do napisu „Koniec gry".
-    for (let próba = 0; próba < 12 && faza() !== 'koniec'; próba += 1) {
+    // Sześć odpływów, nie trzy: każda kula ma dziś obronę, więc pierwsza
+    // wpadka nic nie kosztuje. Dalej musi być koniec — obrona to nie
+    // nieśmiertelność i cały sens tego testu jest w tym, że go widać.
+    for (let próba = 0; próba < 24 && faza() !== 'koniec'; próba += 1) {
       if (faza() === 'ładowanie') {
         fireEvent.pointerDown(strzał);
         fireEvent.pointerUp(strzał);

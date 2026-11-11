@@ -84,7 +84,7 @@ export type Body =
   | { kind: 'target'; at: Vec; r: number; tag: string }
   | {
       kind: 'flipper';
-      side: 'left' | 'right';
+      side: 'left' | 'right' | 'mini';
       pivot: Vec;
       length: number;
       /** Promień przy osi obrotu. */
@@ -134,6 +134,35 @@ export interface World {
 export interface Input {
   left: boolean;
   right: boolean;
+  /** Mini-klapka wysoko na lewej burcie. Nie każdy stół ją ma, więc opcjonalna. */
+  mini?: boolean;
+}
+
+/**
+ * Klawisz -> klapka. Osobna funkcja, bo mapę da się zbadać bez przeklikiwania
+ * ekranu: test na widoku nigdy nie dowiedział się, że prawa klapka jest martwa,
+ * a dwie linie tutaj pilnują, która strona co dostaje.
+ */
+export function pressKey(input: Input, key: string, down: boolean): boolean {
+  switch (key) {
+    case 'ArrowLeft':
+    case 'z':
+    case 'Z':
+      input.left = down;
+      return true;
+    case 'ArrowRight':
+    case '.':
+    case '/':
+      input.right = down;
+      return true;
+    case 'ArrowUp':
+    case 'w':
+    case 'W':
+      input.mini = down;
+      return true;
+    default:
+      return false;
+  }
 }
 
 export function createWorld(bodies: Body[], rng: () => number = () => 0.5): World {
@@ -171,7 +200,8 @@ export const liveBalls = (world: World): Ball[] => world.balls.filter((ball) => 
 export function stepFlippers(world: World, input: Input, dt: number): void {
   for (const body of world.bodies) {
     if (body.kind !== 'flipper') continue;
-    const held = body.side === 'left' ? input.left : input.right;
+    const held =
+      body.side === 'left' ? input.left : body.side === 'right' ? input.right : input.mini === true;
     const speed = held ? FLIPPER_UP : FLIPPER_DOWN;
     const target = held ? body.up : body.rest;
     const delta = target - body.angle;

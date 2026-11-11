@@ -167,6 +167,27 @@
   transform: translateY(1px);
 }
 
+/* Mini-klapka: węższa od klapek, w innym kolorze, żeby nie dało się jej
+   pomylić z jedną z głównych — steruje ją inny palec i robi inną robotę. */
+.mini {
+  flex: 0 0 46px;
+  min-height: 52px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #04231f;
+  cursor: pointer;
+  background: linear-gradient(#3fd6bd, #1c8f7d);
+  border: 1px solid #6ff0da;
+  border-radius: 7px;
+}
+
+.mini:active {
+  background: linear-gradient(#6ff0da, #24a992);
+  transform: translateY(1px);
+}
+
 .strzal {
   flex: 1 2 0;
   min-height: 52px;
@@ -282,7 +303,28 @@
   }
 
   .pad,
-  .strzal {
+  /* Mini-klapka: węższa od klapek, w innym kolorze, żeby nie dało się jej
+   pomylić z jedną z głównych — steruje ją inny palec i robi inną robotę. */
+.mini {
+  flex: 0 0 46px;
+  min-height: 52px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #04231f;
+  cursor: pointer;
+  background: linear-gradient(#3fd6bd, #1c8f7d);
+  border: 1px solid #6ff0da;
+  border-radius: 7px;
+}
+
+.mini:active {
+  background: linear-gradient(#6ff0da, #24a992);
+  transform: translateY(1px);
+}
+
+.strzal {
     min-height: 58px;
   }
 

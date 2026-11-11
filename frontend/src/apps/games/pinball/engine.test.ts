@@ -57,8 +57,14 @@ describe('start partii', () => {
     for (let i = 0; i < 120 * 3; i += 1) engine.step(KROK, NONE);
 
     expect(engine.faza()).toBe('ładowanie');
-    expect(engine.zasady().ballsLeft).toBe(2);
     expect(liveBalls(engine.swiat())).toHaveLength(0);
+
+    // Pierwsza kula partii ma obronę, więc słaby strzał kosztuje tylko czas.
+    expect(engine.zasady().ballsLeft).toBe(3);
+    // Drugi słaby strzał tej samej kuli nie ma już za co się schować.
+    engine.launch(0.2);
+    for (let i = 0; i < 120 * 3; i += 1) engine.step(KROK, NONE);
+    expect(engine.zasady().ballsLeft).toBe(2);
   });
 
   it('ramek z kulą czekającą nie rysuje kuli w świecie', () => {
@@ -85,14 +91,18 @@ describe('start partii', () => {
 describe('przebieg partii', () => {
   it('otwór zdejmuje kulę i po chwili wraca ładowanie', () => {
     const engine = createEngine();
-    graj(engine, 8);
+    // Dwanaście sekund, nie osiem: przez pierwsze osiem obrona wisi nad kulą
+    // i odpłynięcie nic nie kosztuje — patrz „obrona kuli" niżej.
+    graj(engine, 12);
     expect(engine.zasady().ballsLeft).toBeLessThan(3);
     expect(['ładowanie', 'gra']).toContain(engine.faza());
   });
 
   it('bez klapek gra sama się kończy po trzech kulach', () => {
     const engine = createEngine();
-    graj(engine, 90);
+    // Trzy kule to dziś co najmniej sześć odpływów: każda kula dostaje jedną
+    // obronę. Dalej musi jednak być koniec — obrona nie jest nieśmiertelnością.
+    graj(engine, 240);
     expect(engine.faza()).toBe('koniec');
     expect(engine.zasady().over).toBe(true);
     expect(engine.matryca().line2).toBe('KONIEC GRY');
@@ -314,5 +324,43 @@ describe('elementy stołu w akcji', () => {
     const engine = createEngine();
     expect(SAUCER.y).toBeLessThan(PLUNGER.y);
     expect(engine.rama(0, 0).loaded).toBe(true);
+  });
+});
+
+
+describe('obrona kuli', () => {
+  it('strzał wiesza ją nad kulą, czas wypala', () => {
+    const engine = createEngine(4);
+    engine.launch(1);
+    expect(engine.zasady().save).toBeGreaterThan(0);
+    graj(engine, 9);
+    expect(engine.zasady().save).toBe(0);
+  });
+
+  it('ratuje kulę, nie zdejmując życia', () => {
+    const engine = createEngine(4);
+    engine.launch(1);
+    // Sześć sekund bez klapek: kula musi w tym czasie opaść za klapki.
+    graj(engine, 6);
+    expect(engine.zasady().ballsLeft).toBe(3);
+    expect(engine.zasady().saveUsed).toBe(true);
+  });
+
+  it('tej samej kuli nie ratuje dwa razy', () => {
+    const engine = createEngine(4);
+    engine.launch(1);
+    graj(engine, 6);
+    // Po ratunku kula wraca na wyrzutnik; kolejny strzał nie może jej dokupić
+    // drugiej obrony, inaczej gra nigdy by się nie kończyła.
+    if (engine.faza() === 'ładowanie') engine.launch(1);
+    expect(engine.zasady().save).toBe(0);
+  });
+
+  it('matryca mówi, ile zostało obrony', () => {
+    const engine = createEngine(4);
+    engine.launch(1);
+    expect(engine.matryca().line2).toContain('OBRONA');
+    graj(engine, 9);
+    expect(engine.matryca().line2).not.toContain('OBRONA');
   });
 });

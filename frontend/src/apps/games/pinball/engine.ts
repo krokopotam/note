@@ -11,7 +11,7 @@ import { vec } from './geometry';
 import type { Input, World } from './physics';
 import { createWorld, liveBalls, plungerSpeed, PULL_SAG, spawnBall, stepWorld } from './physics';
 import { PLUNGER, SAUCER, buildTable } from './table';
-import { applyHits, startFever, startGame, tick } from './rules';
+import { applyHits, startBall, startFever, startGame, tick } from './rules';
 import type { Rules } from './rules';
 import { addRing, advanceFx, applyEffects, createFx, dmdLines, updateTrails } from './view';
 import type { Fx, Punkt } from './view';
@@ -159,6 +159,8 @@ export function createEngine(
     launch(pull) {
       if (faza !== 'ładowanie') return;
       spawnBall(world, PLUNGER, vec(0, -plungerSpeed(pull)));
+      // Obrona liczy się od strzału, nie od zdarzenia fizyki — patrz `startBall`.
+      rules = startBall(rules);
       faza = 'gra';
       wTorze = 0;
       dźwięk('wyrzutnik');

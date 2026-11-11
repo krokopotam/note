@@ -178,7 +178,13 @@ export function dmdLines(rules: Rules, fx: Fx): { line2: string; line3: string }
   const line2 =
     fx.bannerAge < BANNER_LIFE
       ? fx.banner
-      : rules.jackpotLit
+      : // Obrona idzie przed resztę: to informacja na tę sekundę, a nie stan,
+        // który poczekają. Bez niej ratunek wygląda jak błąd automatu.
+        rules.save > 0
+        ? `OBRONA ${Math.ceil(rules.save)}`
+        : rules.saveLit
+          ? 'OBRONA ZAPALONA'
+          : rules.jackpotLit
         ? 'JACKPOT OTWARTY'
         : rules.mode
           ? rules.mode.toUpperCase()

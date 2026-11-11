@@ -5,6 +5,7 @@ import type { Body, Hit, Input } from './physics';
 import {
   FLIPPER_LENGTH,
   LANE_TAGS,
+  LEFT_FLIPPER_PIVOT,
   PLUNGER,
   SAUCER,
   SCORE_TAGS,
@@ -99,19 +100,85 @@ describe('geometria stołu', () => {
   });
 
   it('klapki są tej samej długości i patrzą na siebie', () => {
-    const flippers = bodiesOf('flipper', bodies);
-    expect(flippers).toHaveLength(2);
-    const [l, r] = flippers;
+    const klapy = bodiesOf('flipper', bodies);
+    expect(klapy).toHaveLength(3);
+    const [l, r] = ['left', 'right'].map((strona) => klapy.find((f) => f.side === strona)!);
     expect(l.length).toBe(r.length);
     expect(l.length).toBe(FLIPPER_LENGTH);
     const leftTip = l.pivot.x + Math.cos(l.rest) * l.length;
     const rightTip = r.pivot.x + Math.cos(r.rest) * r.length;
     const free = rightTip - leftTip - 2 * l.tipRadius;
-    // Między czubkami zamkniętych klapek musi się zmieścić kula (9.2 px) —
+    // Między czubkami zamkniętych klapiek musi się zmieścić kula (9.2 px) —
     // inaczej kula siada w widełkach i patrzy na gracza. Bez przerwy zaś
     // środek stołu byłby darmowy.
     expect(free).toBeGreaterThan(9.2);
     expect(free).toBeLessThan(13);
+  });
+
+  it('obie główne klapy mają ten sam zakres i obie idą do góry', () => {
+    const klapy = bodiesOf('flipper', bodies);
+    const [l, r] = ['left', 'right'].map((strona) => klapy.find((f) => f.side === strona)!);
+    const zakres = (f: Extract<Body, { kind: 'flipper' }>) => Math.abs(f.up - f.rest);
+    const czubek = (f: Extract<Body, { kind: 'flipper' }>, kat: number) => ({
+      x: f.pivot.x + Math.cos(kat) * f.length,
+      y: f.pivot.y + Math.sin(kat) * f.length,
+    });
+
+    expect(zakres(r)).toBeCloseTo(zakres(l), 6);
+    // Klapka o zakresie mniejszym niż pół kąta prostego to ozdoba, nie klapka.
+    expect(zakres(l)).toBeGreaterThan(1);
+    for (const f of [l, r]) {
+      // „Góra" musi znaczyć wyżej po obu stronach i czubek musi wracać do środka.
+      expect(czubek(f, f.up).y).toBeLessThan(czubek(f, f.rest).y);
+      const doŚrodka = f.side === 'left' ? czubek(f, f.rest).x > f.pivot.x : czubek(f, f.rest).x < f.pivot.x;
+      expect(doŚrodka, `klapka ${f.side} patrzy nie tam, gdzie trzeba`).toBe(true);
+    }
+  });
+
+  it('prawa klapka podbija kulę tak samo jak lewa', () => {
+    // Testy fizyki od pierwszej wersji budowały klapkę lewą i tylko lewą —
+    // dlatego lustrzany znak przy „up" przeżył tyle wydań: prawa klapka miała
+    // zakres 4,6° i ruszała się w dół, w stronę odpływu.
+    const podbite = (strona: 'left' | 'right') => {
+      const w = world();
+      // Środek lemiesza jest na wysokości 458, kula siada na nim własnym
+      // ciężarem i dostaje zamach — niżej byłaby już nad odpływem.
+      spawnBall(w, vec(strona === 'left' ? 104 : 152, 449), vec(0, 0));
+      let wGórę = 0;
+      const input = strona === 'left' ? { left: true, right: false } : { left: false, right: true };
+      for (let i = 0; i < 60; i += 1) {
+        stepWorld(w, 1 / 120, input);
+        const kula = liveBalls(w)[0];
+        if (kula) wGórę = Math.min(wGórę, kula.vel.y);
+      }
+      return wGórę;
+    };
+
+    const lewa = podbite('left');
+    const prawa = podbite('right');
+    expect(lewa).toBeLessThan(-250);
+    expect(prawa).toBeLessThan(-250);
+    expect(Math.abs(prawa - lewa)).toBeLessThan(160);
+  });
+
+  it('mini-klapka stoi na lewej orbicie i robi pełny zamach', () => {
+    const mini = bodiesOf('flipper', bodies).find((f) => f.side === 'mini');
+    expect(mini).toBeDefined();
+    const f = mini as Extract<Body, { kind: 'flipper' }>;
+    expect(f.tag).toBe('klapka.mini');
+    expect(Math.abs(f.up - f.rest)).toBeGreaterThan(1);
+    expect(f.pivot.y).toBeLessThan(LEFT_FLIPPER_PIVOT.y - 100);
+    // Kula zjeżdżająca lewą burtą musi w nią trafić, a nie minąć prawą stroną.
+    expect(f.pivot.x + f.length).toBeGreaterThan(28);
+  });
+
+  it('mini-klapka nie robi kieszonki przy burcie', () => {
+    // Przy lewej burcie kula ma tyle miejsca, ile potrzebuje, by minąć oś obrotu:
+    // bez tego wisi tam w nieskończoność, a partia bez klapek nigdy się nie kończy.
+    for (const y of [244, 250, 256]) {
+      const fate = drop(14, y, vec(0, 60), 8);
+      expect(fate.stuck, `kula uwięzła przy burcie na wysokości ${y}`).toBeLessThan(2);
+    }
   });
 
   it('wszystko, co ma być na polu, mieści się w buforze', () => {

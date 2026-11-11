@@ -5,6 +5,7 @@ import {
   HAZLO,
   applyHits,
   multiplierOf,
+  startBall,
   startFever,
   startGame,
   tick,
@@ -299,5 +300,69 @@ describe('czystość', () => {
     const launch = run(startGame(), [hit('launch', 'wyrzutnik')]);
     expect(launch.state.ticker[0]).toBe('WYRZUCONO');
     expect(banners(run(startGame(), [hit('stuck', 'kula')]).effects)).toContain('KULA WOLNA');
+  });
+});
+
+describe('obrona kuli', () => {
+  it('strzał wiesza ją nad kulą na osiem sekund', () => {
+    const state = startBall(startGame());
+    expect(state.save).toBe(8);
+  });
+
+  it('tyka w dół i gaśnie', () => {
+    let state = startBall(startGame());
+    for (let i = 0; i < 100; i += 1) state = tick(state, 0.1).state;
+    expect(state.save).toBe(0);
+  });
+
+  it('ratuje kulę bez utraty życia i bez utraty serii', () => {
+    let state = startBall(startGame());
+    ({ state } = run(state, [hit('bumper', 'zbijak.1')]));
+    const combo = state.combo;
+    const { state: po, effects } = run(state, [hit('drain', 'otwór')]);
+    expect(po.ballsLeft).toBe(3);
+    expect(po.save).toBe(0);
+    expect(po.saveUsed).toBe(true);
+    expect(po.combo).toBe(combo);
+    expect(banners(effects)).toContain('RATUNEK!');
+  });
+
+  it('tej samej kuli nie ratuje dwa razy', () => {
+    let state = startBall(startGame());
+    ({ state } = run(state, [hit('drain', 'otwór')]));
+    // Ratunek odkłada kulę na wyrzutnik — nowy strzał nie może dokupić obrony.
+    state = startBall(state);
+    expect(state.save).toBe(0);
+    expect(run(state, [hit('drain', 'otwór')]).state.ballsLeft).toBe(2);
+  });
+
+  it('nowa litera hasła zapala ją na jedno odpłynięcie', () => {
+    const { state } = run(startGame(), [hit('roll', 'pas.J')]);
+    expect(state.saveLit).toBe(true);
+    const po = run(state, [hit('drain', 'otwór')]).state;
+    expect(po.ballsLeft).toBe(3);
+    expect(po.saveLit).toBe(false);
+  });
+
+  it('nalot NIE zapala obrony — leży w drodze do dołka', () => {
+    // To był błąd, przez który gra była nieskończona: kula wpadająca do kanału
+    // zahaczała po drodze o nalot, zapalała obronę i była ratowana za każdym razem.
+    const { state } = run(startGame(), [hit('roll', 'nalot.l')]);
+    expect(state.saveLit).toBe(false);
+    expect(state.ballsLeft).toBe(3);
+    expect(run(state, [hit('drain', 'otwór')]).state.ballsLeft).toBe(2);
+  });
+
+  it('odpłynięcie bez obrony zdejmuje życie i czyści flagę następnej kuli', () => {
+    const { state } = run({ ...startGame(), saveUsed: true }, [hit('drain', 'otwór')]);
+    expect(state.ballsLeft).toBe(2);
+    expect(state.saveUsed).toBe(false);
+  });
+
+  it('jackpot dokula obrony na dłużej', () => {
+    const start = withLetters({ ...startBall(startGame()), save: 0 }, [...HAZLO]);
+    const { state } = run(start, [hit('kicker', 'kielich')], 1);
+    expect(state.jackpotsHit).toBe(1);
+    expect(state.save).toBe(12);
   });
 });

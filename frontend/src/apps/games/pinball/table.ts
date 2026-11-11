@@ -34,6 +34,19 @@ export const FLIPPER_REST = 0.52;
 export const FLIPPER_UP = -0.6;
 export const FLIPPER_TIP_RADIUS = 2.3;
 
+/**
+ * Mini-klapka. Siedzi wysoko, na lewej orbicie, i ma jedno zadanie: kula, która
+ * zjedzie lewą burtą, dostaje tu drugą szansę zamiast opływać dołek. Trzecia
+ * klappa jest celowo jedna i celowo po lewej —tędy wraca większość kul po
+ * wystrzale, a dwa takie wynalazki zrobiłyby ze stołu bilard.
+ */
+export const MINI_PIVOT = vec(12, 250);
+export const MINI_LENGTH = 24;
+export const MINI_RADIUS = 3;
+export const MINI_TIP_RADIUS = 2;
+export const MINI_REST = 0.45;
+export const MINI_UP = -0.6;
+
 /** Odbicia ścian: rants gumy, drewno i metal nie są jednakowe. */
 const RAIL = 0.34;
 const GUIDE = 0.26;
@@ -223,13 +236,30 @@ function flippers(): Body[] {
     },
     {
       kind: 'flipper',
+      side: 'mini',
+      pivot: MINI_PIVOT,
+      length: MINI_LENGTH,
+      radius: MINI_RADIUS,
+      tipRadius: MINI_TIP_RADIUS,
+      rest: MINI_REST,
+      up: MINI_UP,
+      angle: MINI_REST,
+      omega: 0,
+      tag: 'klapka.mini',
+    },
+    {
+      kind: 'flipper',
       side: 'right',
       pivot: RIGHT_FLIPPER_PIVOT,
       length: FLIPPER_LENGTH,
       radius: FLIPPER_RADIUS,
       tipRadius: FLIPPER_TIP_RADIUS,
+      // Prawa klapka to ta sama geometria lustrzana co reszta stołu: kąt θ idzie
+      // do π − θ. Było tu `π + FLIPPER_UP`, czyli spoczynek 150,2° i „góra”
+      // 145,6° — klapka o 4,6° w dół, w stronę odpływu. Cała prawa strona stołu
+      // była martwa, a żadna klapki prawej w testach nie ruszała.
       rest: Math.PI - FLIPPER_REST,
-      up: Math.PI + FLIPPER_UP,
+      up: Math.PI - FLIPPER_UP,
       angle: Math.PI - FLIPPER_REST,
       omega: 0,
       tag: 'klapka.p',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { add, dot, len, norm, scale, sub, vec } from './geometry';
 import { closestOnSegment, bounce } from './geometry';
-import { BALL_R, collideCircle, collideFlipper, collideSegment, cool, createWorld, FLIPPER_UP, flipperTip, isDown, liveBalls, MAX_SPEED, plungerSpeed, PRÓG_TORU, PULL_FULL_SPEED, PULL_MIN_SPEED, PULL_PEWNY, spawnBall, stepWorld, STUCK_AFTER } from './physics';
+import { BALL_R, collideCircle, collideFlipper, collideSegment, cool, createWorld, FLIPPER_UP, flipperTip, isDown, liveBalls, MAX_SPEED, plungerSpeed, pressKey, PRÓG_TORU, PULL_FULL_SPEED, PULL_MIN_SPEED, PULL_PEWNY, spawnBall, stepWorld, STUCK_AFTER } from './physics';
 import type { Ball, Body, Input, World } from './physics';
 import { rngFrom } from '../shared/random';
 
@@ -551,5 +551,37 @@ describe('fizyka vs wektory', () => {
   it('norma zera to zero, bez NaN', () => {
     expect(norm(vec(0, 0))).toEqual({ x: 0, y: 0 });
     expect(scale(norm(vec(0, 0)), 5)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('mapa klawiszy', () => {
+  it('strzałka w prawo porusza prawą klapką, nie lewą', () => {
+    // Martwa prawa klapka przeżyła tyle wydań, bo całe testy klapek budowały
+    // lewą. Ta mapa jest teraz badana wprost, bez przeklikiwania ekranu.
+    const input = { left: false, right: false, mini: false };
+    expect(pressKey(input, 'ArrowRight', true)).toBe(true);
+    expect(input).toEqual({ left: false, right: true, mini: false });
+    pressKey(input, 'ArrowRight', false);
+    expect(input.right).toBe(false);
+  });
+
+  it('klawiszy klapek jest sześć i trafiają tam, gdzie trzeba', () => {
+    const sprawdź = (klawisz: string, strona: 'left' | 'right' | 'mini'): void => {
+      const input = { left: false, right: false, mini: false };
+      expect(pressKey(input, klawisz, true), klawisz).toBe(true);
+      expect(input[strona], klawisz).toBe(true);
+      expect([input.left, input.right, input.mini].filter(Boolean), `${klawisz} nie powinna zająć dwóch klapek`).toHaveLength(1);
+    };
+    for (const klawisz of ['ArrowLeft', 'z', 'Z']) sprawdź(klawisz, 'left');
+    for (const klawisz of ['ArrowRight', '.', '/']) sprawdź(klawisz, 'right');
+    for (const klawisz of ['ArrowUp', 'w', 'W']) sprawdź(klawisz, 'mini');
+  });
+
+  it('obca strzałka nie jest klapką', () => {
+    const input = { left: false, right: false, mini: false };
+    // Spacja i strzałka w dół należą do wyrzutnika — widok musi je obsłużyć sam.
+    expect(pressKey(input, ' ', true)).toBe(false);
+    expect(pressKey(input, 'ArrowDown', true)).toBe(false);
+    expect(input).toEqual({ left: false, right: false, mini: false });
   });
 });

@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-11-11 — pinball: prawa klapka żyje, trzecia dochodzi, kula ma obronę
+
+Zgłoszenie: „kiedy naciskam strzałkę w prawo, prawa dźwignia prawie się nie
+rusza" plus prośba o dźwignię wyżej i o charakter Pinball Fantasies.
+
+- **Prawa klapka miała zamach 4,6 stopnia i ruszał się w dół, do odpływu.**
+  `table.ts` lustrał kąt jako `π + FLIPPER_UP` zamiast `π − FLIPPER_UP`, czyli
+  spoczynek 150,2° i „góra" 145,6°. Cała prawa strona stołu była martwa, a przez
+  to i kanały boczne zbierały żniwo — to była przyczyna „ucieka bokami", nie
+  geometria kanałów. Naprawa: jeden znak.
+- **Dlaczego testy tego nie widziały: wszystkie testy klapek budowały klapkę
+  lewą.** Doszły trzy sprawdzenia na prawdziwym stole — ten sam zakres po obu
+  stronach, „góra" musi znaczyć wyżej, a `podbite('prawa')` musi podbić kulę tak
+  samo jak `podbite('lewa')` (próg −250 px/s, różnica między stronami < 160).
+- **Mapa klawiszy wyszła z widoku do `pressKey()` w fizyce**, a nowy
+  `PinballKeys.test.tsx` podgląda prawdziwy silnik i patrzy, co trafia do
+  `step()`. To ten sam błąd co wyżej: ekran był przeklikiwany, ale nikt nie
+  sprawdzał wejścia.
+- **Mini-klapka (trzecia) na lewej burcie**, oś (12, 250), długość 24, strzałka w
+  górę albo guzik ▲. Jedna i po lewej celowo. Test pilnuje, że nie robi kieszonki
+  przy burcie — inaczej kula wisi tam w nieskończoność i partia bez klapek nigdy
+  się nie kończy (i tak było przez chwilę).
+- **Obrona kuli: osiem sekund od strzału, dwanaście po jackpocie, jedna na kulę.**
+  Dwie pułapki, obie złapane bieganiem gry, nie testami:
+  1. `save` wisiał na zdarzeniu `launch`, którego fizyka nigdy nie emitowała —
+     pole w unii wisi od pierwszej wersji, gałąź w reduktorze była martwa.
+     Obrona startuje teraz w `engine.launch()` przez `startBall()`.
+  2. Nalot zapalał obronę, a nalot leży tuż nad odpływem: kula wpadająca do
+     kanału zapalała ratunek w drodze do dołka i była ratowana za każdym razem.
+     Partia była nieskończona (`kule = 3` przez 900 s symulacji). Zapalają ją
+     teraz pasy J A C K P. Flaga `saveUsed` dodatkowo nie pozwala, żeby nowy
+     strzał po ratunku dokupił drugą obronę.
+- **Matryca pokazuje `OBRONA 8` i odlicza**, potem wraca do `ZBIERAJ JACKPOT`;
+  sprawdzone w przeglądarce na żywym płótnie, nie tylko w teście.
+- Testy partii bez klapek potrzebują dziś dwa razy więcej czasu (każda kula ma
+  jedną obronę) i dostają `{ timeout: 20_000 }` — liczba jako drugi argument
+  `it()` w tej wersji vitestu jest po cichu ignorowana, test dalej miał 5 s.
+- Pomiary w przeglądarce: kadr po kadrze — `ArrowRight` podnosi prawą klapkę tak
+  samo jak `ArrowLeft` lewą, `ArrowUp` podnosi mini-klapkę.
+- Testy: 913 (backend 192, frontend 721). Lint czysto, build przechodzi.
+
 ## 2026-11-11 — arkanoid: klocki, kapsułki i kąt zamiast celownika
 
 Jedenasta gierka w „Gry", bez bibliotek: logika, rysowanie, dźwięk i widok w osobnych plikach.

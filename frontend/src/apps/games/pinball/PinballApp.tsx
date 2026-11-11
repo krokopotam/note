@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PULL_PEWNY } from './physics';
+import { pressKey, PULL_PEWNY } from './physics';
 import { createEngine } from './engine';
 import type { Engine, Faza } from './engine';
 import { buildTable } from './table';
@@ -78,7 +78,7 @@ export function PinballApp() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<Engine | null>(null);
   const soundRef = useRef(createSound());
-  const inputRef = useRef({ left: false, right: false });
+  const inputRef = useRef({ left: false, right: false, mini: false });
   const dotykRef = useRef(new Map<number, 'lewa' | 'prawa'>());
   const naciśniętyRef = useRef(false);
   const siłaRef = useRef(0);
@@ -190,23 +190,17 @@ export function PinballApp() {
     return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  // Klawiatura: strzałki i Z /. do klapek, spacja lub strzałka w dół do
-  // wyrzutnika, Enter do nowej partii.
+  // Klawiatura: strzałki i Z /. do klapek (strzałka w górę do mini-klapki),
+  // spacja lub strzałka w dół do wyrzutnika, Enter do nowej partii. Same
+  // klapki idą przez `pressKey` — ta mapa ma test, obsługa reszty klawiszy nie
+  // musi go mieć, bo nic nie obraca.
   useEffect(() => {
     const wciśnięto = (event: KeyboardEvent): void => {
+      if (pressKey(inputRef.current, event.key, true)) {
+        event.preventDefault();
+        return;
+      }
       switch (event.key) {
-        case 'ArrowLeft':
-        case 'z':
-        case 'Z':
-          inputRef.current.left = true;
-          event.preventDefault();
-          break;
-        case 'ArrowRight':
-        case '.':
-        case '/':
-          inputRef.current.right = true;
-          event.preventDefault();
-          break;
         case ' ':
         case 'ArrowDown':
           if (!event.repeat) naciśnij();
@@ -220,17 +214,8 @@ export function PinballApp() {
       }
     };
     const puszczono = (event: KeyboardEvent): void => {
+      if (pressKey(inputRef.current, event.key, false)) return;
       switch (event.key) {
-        case 'ArrowLeft':
-        case 'z':
-        case 'Z':
-          inputRef.current.left = false;
-          break;
-        case 'ArrowRight':
-        case '.':
-        case '/':
-          inputRef.current.right = false;
-          break;
         case ' ':
         case 'ArrowDown':
           puść();
@@ -280,7 +265,7 @@ export function PinballApp() {
     inputRef.current[strona === 'lewa' ? 'left' : 'right'] = false;
   };
 
-  const klapka = (strona: 'left' | 'right', on: boolean) => () => {
+  const klapka = (strona: 'left' | 'right' | 'mini', on: boolean) => () => {
     inputRef.current[strona] = on;
   };
 
@@ -356,7 +341,7 @@ export function PinballApp() {
         <div className={styles.hint}>
           {faza === 'ładowanie'
             ? 'Przytrzymaj STRZAŁ i puść. Im dłużej trzymasz, tym wyżej leci kula.'
-            : 'Strzałki lub Z i kropka — klapki. Spacja — wyrzutnik. Pasy J A C K P otwierają jackpot, bank celów — mnożnik.'}
+            : 'Strzałki lub Z i kropka — klapki, strzałka w górę — mini-klapka na lewej burcie. Spacja — wyrzutnik. Pasy J A C K P otwierają jackpot i zapalają obronę kuli.'}
         </div>
 
         <div className={styles.nalozone} aria-hidden="true">
@@ -387,6 +372,19 @@ export function PinballApp() {
             onPointerCancel={klapka('right', false)}
           >
             ▶
+          </button>
+          <button
+            type="button"
+            className={styles.mini}
+            data-testid="pinball-mini"
+            aria-label="Mini-klapka na lewej burcie"
+            title="Mini-klapka — strzałka w górę"
+            onPointerDown={klapka('mini', true)}
+            onPointerUp={klapka('mini', false)}
+            onPointerLeave={klapka('mini', false)}
+            onPointerCancel={klapka('mini', false)}
+          >
+            ▲
           </button>
 
           <button
