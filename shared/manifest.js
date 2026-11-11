@@ -86,6 +86,11 @@ export const GAMES = [
   // The 3D table pulls in three.js, so it is a window of its own size and the
   // library is loaded only when somebody opens it.
   { id: 'billiard3d', title: 'Bilard 3D', width: 940, height: 660 },
+  // A whole pinball table. The canvas is a 256x596 Amiga-style buffer (84 px
+  // of dot matrix over a 256x512 playfield) drawn one hardware pixel for one
+  // screen pixel, so the window has to be tall and still leave a column
+  // beside it for the score readout.
+  { id: 'pinball', title: 'Pinball', width: 720, height: 680 },
 ];
 
 /** @param {string} id */

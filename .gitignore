@@ -29,3 +29,7 @@ Thumbs.db
 
 # logs
 *.log
+
+# scratch scripts from visual checks, never part of the app
+tmp-*.mjs
+tmp-*.py

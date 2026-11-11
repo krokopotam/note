@@ -1,0 +1,307 @@
+/*
+ * Ekran pinballa.
+ *
+ * Płótno ma 256 × 592 pikseli i skaluje się tylko przez CSS z
+ * `image-rendering: pixelated` — żadnego liczenia skali w kodzie, żadnego
+ * rozmycia. Panel boczny mieści to, czego matryca nie pomieści: rekord,
+ * litery, tryb i guziki. Na telefonie panel schodzi pod stół.
+ */
+
+.wrap {
+  display: flex;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #1a1030 0%, #06030f 70%);
+  color: #efe8ff;
+  font-family: ui-monospace, sfmono-regular, menlo, consolas, monospace;
+  user-select: none;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+}
+
+.canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  touch-action: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #2b2140, 0 12px 34px rgb(0 0 0 / 65%);
+  cursor: crosshair;
+}
+
+.panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  /* Bez tego długi tekst w panelu rozpychał własną szerokość, a stołu było
+     coraz mniej — przy zmianie podpowiedzi płótno nagle malało o 30%. */
+  min-width: 0;
+  padding: 10px;
+  background: rgb(8 5 20 / 78%);
+  border: 1px solid #2b2140;
+  border-radius: 8px;
+}
+
+.wynik {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f2c418;
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px rgb(242 196 24 / 45%);
+  font-variant-numeric: tabular-nums;
+}
+
+.rekord {
+  font-size: 11px;
+  color: #8f93b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.wiersz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.kula {
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #e2e8fa, #343e68);
+  box-shadow: inset -1px -2px 3px rgb(0 0 0 / 60%);
+}
+
+.kula[data-padnieta='true'] {
+  background: #2b2140;
+  box-shadow: none;
+}
+
+.tryb {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+}
+
+.litery {
+  display: flex;
+  gap: 3px;
+}
+
+.litera {
+  width: 18px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: #4a4470;
+  text-align: center;
+  background: #16102c;
+  border-radius: 3px;
+}
+
+.litera[data-zebrana='true'] {
+  color: #06030f;
+  background: #f2c418;
+  box-shadow: 0 0 10px rgb(242 196 24 / 60%);
+}
+
+/*
+ * Podpowiedź ma stałą wysokość. Bez tego panel urośnie razem z treścią, a bo
+ * panel bierze resztę szerokości — płótno kurczy się w chwili wyrzucenia kuli.
+ */
+.hint {
+  min-height: 48px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #9aa0c4;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.pad {
+  flex: 1 1 0;
+  min-height: 52px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #efe8ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  background: linear-gradient(#3a2b62, #241a44);
+  border: 1px solid #4c3a7e;
+  border-radius: 7px;
+}
+
+.pad:active {
+  background: linear-gradient(#5a3f96, #33255c);
+  transform: translateY(1px);
+}
+
+.strzal {
+  flex: 1 2 0;
+  min-height: 52px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #06030f;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  background: linear-gradient(#ffd94a, #e08c10);
+  border: 1px solid #ffe98a;
+  border-radius: 7px;
+}
+
+.strzal:disabled {
+  color: #6b6b85;
+  cursor: default;
+  background: #241a44;
+  border-color: #34295c;
+}
+
+.kącik {
+  display: flex;
+  gap: 6px;
+}
+
+.mini {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11px;
+  color: #c9cdf0;
+  cursor: pointer;
+  background: #1b1436;
+  border: 1px solid #382c60;
+  border-radius: 6px;
+}
+
+.nalozone {
+  height: 6px;
+  overflow: hidden;
+  background: #1b1436;
+  border: 1px solid #382c60;
+  border-radius: 3px;
+}
+
+.nalozone span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #2ec27a, #f2c418 60%, #e23c1c);
+  transition: width 60ms linear;
+}
+
+.nakladka {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  text-align: center;
+  background: rgb(4 2 10 / 78%);
+  border-radius: 4px;
+}
+
+.nakladka h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #f2c418;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/*
+ * Na telefonie stół ma być wszystkim. Matryca w płótnie pokazuje wynik, kule,
+ * litery i mnożnik, więc powtarzanie tego pod spodem tylko zjada miejsce,
+ * którego szuka kula.
+ */
+@media (max-width: 760px) {
+  .wrap {
+    flex-direction: column;
+    gap: 4px;
+    padding: 3px;
+  }
+
+  .stage {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .panel {
+    position: relative;
+    flex: 0 0 auto;
+    gap: 5px;
+    padding: 5px;
+  }
+
+  /* Na telefonie nie ma czego tłumaczyć: matryca mówi co robić, a klawiatury
+     na słuchawce nie ma. 48 px podpowiedzi to prawie jedna klapka wysokości stołu. */
+  .hint {
+    display: none;
+  }
+
+  /* Wynik, kule i litery są na macierzy w płótnie — powtarzanie ich pod
+     spodem zabiera miejsce, którego szuka stół. */
+  .pole {
+    display: none;
+  }
+
+  .pad,
+  .strzal {
+    min-height: 58px;
+  }
+
+  /*
+   * Na telefonie „nowa" i „cisza" wysiadają z panelu i siadają tuż nad jego
+   * górną krawędzią, w ciemnym rogu stołu pod odpływem. Panel oddaje wtedy
+   * stołowi ponad 130 px, czyli prawie jedną czwartą więcej pola gry.
+   */
+  .kącik {
+    position: absolute;
+    right: 4px;
+    bottom: calc(100% + 3px);
+    z-index: 2;
+  }
+
+  .kącik .mini {
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 10px;
+    opacity: 0.88;
+  }
+}

@@ -12,6 +12,7 @@ import {
   MemoryIcon,
   MinesIcon,
   NotepadIcon,
+  PinballIcon,
   SnakeIcon,
   StickiesIcon,
   TetrisIcon,
@@ -27,6 +28,7 @@ import { MemoryApp } from '../apps/games/memory/MemoryApp';
 import { MinesApp } from '../apps/games/mines/MinesApp';
 import { FilesApp } from '../apps/files/FilesApp';
 import { NotepadApp } from '../apps/notepad/NotepadApp';
+import { PinballApp } from '../apps/games/pinball/PinballApp';
 import { StickiesApp } from '../apps/stickies/StickiesApp';
 import { SnakeApp } from '../apps/games/snake/SnakeApp';
 import { TetrisApp } from '../apps/games/tetris/TetrisApp';
@@ -89,6 +91,7 @@ const APP_VIEWS: Record<string, ComponentType<AppProps>> = {
   memory: MemoryApp,
   tictactoe: TicTacToeApp,
   billiard2d: Billiards2dApp,
+  pinball: PinballApp,
   billiard3d: Billiards3dView,
 };
 
@@ -136,6 +139,8 @@ export function AppGlyph({ appId, size = 48 }: { appId: string; size?: number })
       return <MemoryIcon size={size} />;
     case 'tictactoe':
       return <TicTacToeIcon size={size} />;
+    case 'pinball':
+      return <PinballIcon size={size} />;
     case 'billiard2d':
       return <Billiard2dIcon size={size} />;
     case 'billiard3d':

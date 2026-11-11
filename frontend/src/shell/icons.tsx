@@ -161,6 +161,22 @@ export function Billiard2dIcon({ size = 48 }: IconProps) {
   );
 }
 
+export function PinballIcon({ size = 48 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      {plate()}
+      <path d="M13 12h22v26H13z" fill="#1b1038" stroke="#6b4fa8" strokeWidth="2" />
+      <path d="M13 20c0-6 4.5-9 11-9s11 3 11 9" fill="#1b1038" stroke="#6b4fa8" strokeWidth="2" />
+      <circle cx="19" cy="20" r="3" fill="#e23c1c" />
+      <circle cx="29" cy="18" r="3" fill="#20b2c8" />
+      <circle cx="24" cy="26" r="3" fill="#f2c418" />
+      <path d="M16 34l6 4" stroke="#e23c1c" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M32 34l-6 4" stroke="#e23c1c" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="24" cy="31" r="2.4" fill="#f7f3e8" />
+    </svg>
+  );
+}
+
 export function Billiard3dIcon({ size = 48 }: IconProps) {
   return (
     <svg {...base(size)}>

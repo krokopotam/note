@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## 2026-11-11 — pinball: stół 256 × 512, matryca i fizyka od zera
+
+Nowa dziesiąta gierka w folderze „Gry": stół flipperowy w stylistyce OCS. Żadnej biblioteki —
+fizyka, reguły, rysownik, dźwięk i silnik partii są napisane wprost, każdy warstwa osobno.
+
+- **Warstwy** (`frontend/src/apps/games/pinball/`): `geometry.ts` (wektory, odbicia, zamiatanie
+  klapy), `physics.ts` (świat 256 × 512, `Hit`-y, `drain`, `stuck`), `table.ts` (druk stołu z ciał),
+  `rules.ts` (czysty reduktor: J A C K P, mnożnik, kupki, gorączka, multiball), `render.ts`
+  (bufor `Uint32Array`, plastik pieczony raz, matryca LED 5 × 7), `view.ts` (iskry, pierścienie,
+  drżenie, spawy punktów), `sound.ts` (syntezowane odezwy), `engine.ts` (partia), `PinballApp.tsx`
+  (pętla RAF i wejście).
+- **Reguły**: trzy kule, serie po zbijakach budują bonus, pasy J A C K P otwierają jackpot w kielichu,
+  bank trzech celów podbija mnożnik, kupki dają bilety (do dwóch), 20 trafień zbijaka ładowało
+  gorączkę; odpływ kasuje serie, tryb i mnożnik.
+- **Pułapka reduktora**: `next()` kopiował tablice (`letters`, `rollovers`, `ticker`) *po* włożeniu
+  `patch`, więc każdy `patch` ruszający tablicę kasował poprzedni. Kopiowanie przed `patch`.
+- **Pułapka wyrzutnika**: prędkość startowa 1180 wystrzeliwała kulę poza stół, a słabe wciśnięcie
+  zostawiało kulę leżącą w kanale na wieczność. Dziś 300–940 px/s plus `drain` po 0,5 s bezruchu.
+- **Matryca**: odstęp znaków 18 → 16 px, bo przy 240 px światła mieściło się 13 znaków i
+  „ZBIERAJ JACKPOT" traciło ogon. Najdłuższy napis ma 15 znaków, dłuższe `zmieść()` skraca kropką.
+- **Układ okna**: podpowiedź ma stałą wysokość, panel `flex: 1 1 0; min-width: 0`, stage `flex: 0 0 auto`.
+  Wcześniej treść podpowiedzi sterowała szerokością panelu, a co za tym idzie wysokością płótna —
+  przy pierwszym strzale stół zmieniał się z 245 × 571 na 175 × 408 i wracał po odpływie.
+- **Telefon**: powtarzanie wyniku z matrycy pod stołem poszło w `display: none`, klapki i `strzał`
+  zmieściły się w jednym rzędzie, `nowa`/`cisza` wskoczyły w róg nad odpływem. Płótno 194 × 452 →
+  **256 × 596**, czyli pixel-perfect.
+- **Geometria wejścia z toru**: przegroda pasów stała w korytarzu, którym kula wlatuje z wyrzutnika
+  (`y ≈ 62`) i oddawała ją z powrotem na prawą burtę — cała partia toczyła się połową stołu. Pasy na
+  `y = 84`, kupki na `y = 112`, róg `(206,44) → (248,78)`. Wynik pełnego wciśnięcia: 0 → 2350 punków,
+  plus test pilnujący, że kula bywa w lewej połowie.
+- Migracja `013_pinball.sql`: odłada ikonę do już istniejącego foldera „Gry" w **pierwszym wolnym**
+  slocie (licznikowy slots % 4 z `012` kolidował, gdy folder był już pełniejszy) i nie ożywia foldera
+  skasowanego przez użytkownika.
+- Testy: 829 (backend 188, frontend 641; w tym 153 pinball). `npm run lint` czysto, build przechodzi.
+
 ## 2026-11-10 — bilard: stół ma być największy na ekranie
 
 Mechanika była dobra, a gra maleńka: pasek sterowania zjadał na telefonie ~300 z 844 pikseli,

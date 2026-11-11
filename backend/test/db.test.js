@@ -87,7 +87,11 @@ describe('database bootstrap', () => {
       .filter((name) => name.endsWith('.sql'))
       .sort()
       .filter(
-        (name) => name !== '010_no_reused_ids.sql' && name !== '011_games.sql' && name !== '012_billiards.sql',
+        (name) =>
+          name !== '010_no_reused_ids.sql' &&
+          name !== '011_games.sql' &&
+          name !== '012_billiards.sql' &&
+          name !== '013_pinball.sql',
       );
     files.forEach((name) => {
       db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
@@ -107,7 +111,12 @@ describe('database bootstrap', () => {
     const last = put('b');
     db.prepare('DELETE FROM files WHERE id = ?').run(last);
 
-    expect(migrate(db)).toEqual(['010_no_reused_ids.sql', '011_games.sql', '012_billiards.sql']);
+    expect(migrate(db)).toEqual([
+      '010_no_reused_ids.sql',
+      '011_games.sql',
+      '012_billiards.sql',
+      '013_pinball.sql',
+    ]);
 
     const columns = db.prepare('PRAGMA table_info(files)').all().map((c) => c.name);
     expect(columns).toEqual(
@@ -169,6 +178,7 @@ describe('database bootstrap', () => {
       { version: '010_no_reused_ids.sql' },
       { version: '011_games.sql' },
       { version: '012_billiards.sql' },
+      { version: '013_pinball.sql' },
     ]);
     second.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -225,6 +235,7 @@ describe('upgrading a database that predates accounts', () => {
       '010_no_reused_ids.sql',
       '011_games.sql',
       '012_billiards.sql',
+      '013_pinball.sql',
     ]);
 
     const owner = findByUsername(db, 'wincyj');
@@ -343,6 +354,10 @@ describe('migracja 011 — folder z grami dla starych kont', () => {
     }
     db.prepare("DELETE FROM schema_migrations WHERE version = '011_games.sql'").run();
     db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
+    // Młodsze gierki też trzeba zdjąć: inaczej test porównywałby folder z dziś
+    // do migracji, która w dniu swojego działania nic o nich nie wiedziała.
+    db.prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'").run(owner);
+    db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
   }
 
   it('adds the folder and every game icon under it', () => {
@@ -411,12 +426,17 @@ describe('migracja 012 — bilard w istniejącym folderze', () => {
       .prepare("SELECT id FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = 'Gry'")
       .get(owner).id;
 
-  /** Konto z folderem „Gry", ale bez bilardów — tak wyglądało przed tę migrację. */
+  /**
+   * Konto z folderem „Gry", ale bez bilardów — tak wyglądało przed tę migrację.
+   * Pinball też schodzi: migracje odtwarzają się w kolejności i w stanie z dnia,
+   * w którym działały, a wtedy żadnego pinballa w folderze nie było.
+   */
   function pretendNoBillards(db, owner) {
     db
-      .prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('billiard2d', 'billiard3d')")
+      .prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id IN ('billiard2d', 'billiard3d', 'pinball')")
       .run(owner);
     db.prepare("DELETE FROM schema_migrations WHERE version = '012_billiards.sql'").run();
+    db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
   }
 
   it('dokłada dwie gierki do foldera, który już jest', () => {
@@ -474,6 +494,77 @@ describe('migracja 012 — bilard w istniejącym folderze', () => {
     expect(
       db
         .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND name = 'Gry'")
+        .get(owner).n,
+    ).toBe(0);
+  });
+});
+
+describe('migracja 013 — pinball w istniejącym folderze', () => {
+  const folderId = (db, owner) =>
+    db
+      .prepare("SELECT id FROM desktop_items WHERE user_id = ? AND kind = 'folder' AND name = 'Gry'")
+      .get(owner).id;
+
+  /** Konto z folderem „Gry", ale bez pinballa — tak wyglądało przed tę migrację. */
+  function pretendNoPinball(db, owner) {
+    db.prepare("DELETE FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'").run(owner);
+    db.prepare("DELETE FROM schema_migrations WHERE version = '013_pinball.sql'").run();
+  }
+
+  it('dokłada pinball do foldera, który już jest', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    pretendNoPinball(db, owner);
+
+    expect(migrate(db)).toContain('013_pinball.sql');
+
+    const inside = db
+      .prepare('SELECT app_id FROM desktop_items WHERE user_id = ? AND parent_id = ? ORDER BY id')
+      .all(owner, folderId(db, owner))
+      .map((row) => row.app_id);
+    expect(inside).toContain('pinball');
+    expect(inside).toEqual(GAMES.map((game) => game.id));
+  });
+
+  it('stawia go w wolnym miejscu siatki, nie na innej ikonice', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    pretendNoPinball(db, owner);
+
+    migrate(db);
+
+    const spots = db
+      .prepare('SELECT x, y FROM desktop_items WHERE user_id = ? AND parent_id = ?')
+      .all(owner, folderId(db, owner))
+      .map((row) => `${row.x},${row.y}`);
+    expect(new Set(spots).size).toBe(spots.length);
+  });
+
+  it('nie dodaje drugiego pinballa, gdy migracja powtórzy się', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    pretendNoPinball(db, owner);
+    migrate(db);
+    const before = db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n;
+    pretendNoPinball(db, owner);
+
+    migrate(db);
+
+    // Tyle samo, bo przed drugim przejściem pinballa z foldera wzięłam.
+    expect(db.prepare('SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ?').get(owner).n).toBe(before);
+  });
+
+  it('nie zakłada foldera „Gry" komuś, kto go usunął', () => {
+    const { db, owner } = makeDbOwned();
+    seedUser(db, owner, APPS);
+    db.prepare('DELETE FROM desktop_items WHERE user_id = ? AND kind = ?').run(owner, 'folder');
+    pretendNoPinball(db, owner);
+
+    migrate(db);
+
+    expect(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM desktop_items WHERE user_id = ? AND app_id = 'pinball'")
         .get(owner).n,
     ).toBe(0);
   });

@@ -20,11 +20,11 @@ zdjęcia w wiadomościach, emotikonki, znak na ikonie).
 | Zdjęcia w czacie (wrzucanie, miniatury, powiększanie, sprzątanie) + emotikonki | gotowy, działa |
 | Układ na telefon (ikony w przepływie, aplikacja na cały ekran, pasek na dole, safe area) | gotowy, testy |
 | Notatnik na telefonie (osobny ekran listy i osobny ekran notatki) | gotowy, działa |
-| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk, Bilard 2D, Bilard 3D (folder „Gry") | gotowy, działa |
-| Build produkcyjny (`frontend/dist`, 263 kB / 85 kB gzip) | przechodzi |
+| Gry: Wężyk, Tetris, Bąbelki, 2048, Saper, Pamięć, Kółko i krzyżyk, Bilard 2D, Bilard 3D, Pinball (folder „Gry") | gotowy, działa |
+| Build produkcyjny (`frontend/dist`, 329 kB / 109 kB gzip; three.js jako osobny chunk) | przechodzi |
 | Wdrożenie `https://note.wincyj.pl` | **działa**, certyfikat do 2027-02-07 |
 
-Testy: `npm test` → 580 przechodzi (backend 180, frontend 400). `npm run lint` → czysto.
+Testy: `npm test` → 829 przechodzi (backend 188, frontend 641). `npm run lint` → czysto.
 
 Migracje `009_chat_media.sql` (nowa tabela + indeksy) i `010_no_reused_ids.sql` (odbudowa `files`
 i `message_attachments` z `AUTOINCREMENT`) przećwiczone na **kopii produkcyjnej bazy** przed wejściem:
@@ -36,6 +36,50 @@ dostało ikonę „Czaty" i slot w obu paskach.
 
 Serwer: `/home/ubuntu/src/note`, backend `127.0.0.1:8120` (systemd `note.wincyj.pl.service`),
 baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo `wg0` stał.
+
+## Decyzje (pinball)
+
+- **Silnik poza Reactem.** `pinball/engine.ts` (`createEngine(seed, onSound, startowe)`) przeprowadza
+  całą partię przy stałym `dt` i podanym `Rng`: fazy `ładowanie / gra / koniec`, kule, tryby, efekty.
+  Komponent to tylko pętla `requestAnimationFrame`, klawiatura/mysz i `putImageData` — dzięki temu
+  partia jest testowana bez DOM-u (153 testy pinballa, w tym 10 minut ciągłej gry bez NaN i bez
+  zakleszczenia fazy).
+- **Rozdzielczość automatu, nie okna.** Bufor 256 × 512 pola gry plus 84 px matrycy DMD nad nim,
+  paleta OCS, `image-rendering: pixelated`. Płótno ma **dokładnie 256 × 596 CSS px** — jeden piksel
+  bufora to jeden piksel ekranu, więc nie ma rozmycia ani „skali okna". Układ jest sztywny:
+  `.stage { flex: 0 0 auto }`, `.panel { flex: 1 1 0; min-width: 0 }`. Wcześniej panel rósł razem z
+  treścią podpowiedzi i płótno przy pierwszym strzale malało z 245 × 571 do 175 × 408.
+- **Matryca liczy 15 znaków** (`LED_KROK = 16`, `WIERSZ_MAX`, `zmieść()`). Odstęp 18 px był o trzy za
+  duży i „ZBIERAJ JACKPOT" traciło ostatnie litery. Wszystkie napisy zasad zmieściłem w 15 znakach
+  (`MNOŻNIK W GÓRĘ`, `KUPKI +5000`, `KULA WOLNA`), a `zmieść` jest siecią bezpieczeństwa: dłuższy
+  napis dostaje kropkę, nie urwaną literę.
+- **Plastik pieczony raz, reszta rysowana co klatkę.** `createPlastic(bodies)` wypala druk stołu
+  (gradient, odblaski, kliny koloru, siatka szumów, strzałki lejów, tor wyrzutnika), `paint()` kopiuje
+  go z drżeniem ekranu i dokłada ciała, efekty i kulę. `compose()` wrzuca matrycę nad stół.
+- **Geometria rogu nad torem wyrzutnika decyduje o całej partii.** Kula leci toriem do góry i po
+  odbiciu musi pójść *w lew* róg stołu, przez pasy i zbijaki. Dwa razu to psuło: płytki róg oddawał
+  kulę na prawą burtę, a przegroda pasów wystawała dokładnie w korytarz wejściowy (kula odbijała się
+  od niej przy `y ≈ 62`) — stąd pasy zjechały na `y = 84`, kupki na `y = 112`, a róg to dziś
+  odcinek `(206,44) → (248,78)`. Test „pełne wciśnięcie prowadzi kulę przez punkty" pilnuje obu
+  rzeczy: wyniku > 0 i wizyty w lewej połowie stołu.
+- **Klapki stożkowe** (`radius` → `tipRadius`): bez zwężenia dwie klapki tworzą widełki, w których kula
+  stoi wieczność. Gdy szybka klapka obejmie kulę, normalna zetknięcia jest zdegenerowana i bierze się
+  z kierunku zamiata klapy.
+- **Słaby wyrzutnik nie zamraża gry.** Kula leżąca w kanale z małą prędkością dłużej niż 0,5 s
+  dostaje sztuczne `drain` — tak jak w automacie, który nie pilnuje kuli w torze.
+- **Brama w jedną stronę** ma `blockNormal`: wpuszcza od tyłu, blokuje od przodu. Odwrotna interpretacja
+  wyrzucała kulę z toru.
+- **Drżenie, tarcze i liczby punktów są w `view.ts`**, a nie w logice: reguły zwracają `Effect[]`,
+  `applyEffects` zamienia je na iskry, pierścienie, świecenie ciał i energię drżenia. Logika nie ma
+  stanu do rozjechania (patrz decyzja o `ShotOutcome` w bąbelkach).
+- **Dźwięk syntezowany** (`sound.ts`, oscylator + wykładnicze wybrzmienie, dziewięć odezwek), zero
+  plików. Cisza przełączana w komponencie, `AudioContext` leniwy, bez dźwięku aplikacja działa dalej.
+- **Rekord w `localStorage`** (`note:pinball:rekord`). Zgodnie z założeniem gier: żadnej tabeli,
+  żadnego endpointu, żadnych danych między urządzeniami.
+- **Telefon oddaje stołowi prawie cały ekran**: wynik, kule i litery są na matrycy w płótnie, więc ich
+  powtórka pod spodem (`pole`, `hint`) znika poniżej 760 px, klapki i `strzał` składają się w jeden
+  rząd, a `nowa` / `cisza` wysiadają z panelu do rogu nad odpływem (`.kącik`, `position: absolute`).
+  Płótno na 390 × 844: **194 × 452 → 256 × 596**, czyli pełna szerokość bufora.
 
 ## Decyzje (gry)
 
@@ -282,6 +326,9 @@ Do tego `proxy_request_buffering off`, żeby wolne wrzucanie nie leżało bufore
 - Swobodna kamera nie ma gestu dwoma palcami ani kółka myszy: obraca ją przeciągnięcie, a dystans daje
   suwak. Dwa palce w jednym `PointerEvent`-owym szkielecie to osobna robota.
 
+- Pinball: rekord żyje w `localStorage`, więc na innym urządzeniu zaczyna się od zera; nie ma
+  przechylania stoiska (tilt), trybów difficulty ani zapisu partii w połowie. Dźwięk jest syntezowany,
+  nie sample — brzmi jak 1989, bo tak miał.
 - Kolejność aplikacji w doku i launcherze zapisuje baza, ale nie ma jeszcze interfejsu do przeciągania
   po samych paskach.
 - Notatnik nie ma autoformatowania ani markerdownu — czysty tekst.
