@@ -46,12 +46,34 @@ ktoś ustawi mu hasło przez `npm run cli`). Nic nie jest usuwane ani przenoszon
 ## Kolejne wersje
 
 ```bash
-./deploy/push.sh                       # to samo: testy → build → rsync → restart serwisu
-ssh ubuntu@10.8.0.1 'sudo systemctl restart note.wincyj.pl.service'   # tylko restart
+./deploy/push.sh                       # testy → lint → build → rsync → install.sh
+ssh ubuntu@10.8.0.1 'sudo systemctl restart note.wincyj.pl.service'   # restart i migracje
 ```
+
+Na serwerze, gdzie aplikacja już stoi, `install.sh` **celowo zatrzymuje się** na sprawdzeniu
+portu: `8120` trzyma działający serwis, więc skrypt kończy pracę przed kopiowaniem plików
+systemd i nginx. To nie jest błąd wdrożenia — pliki są wtedy wysłane, a wystarcza restart,
+przy którym `openDb` nakłada migracje. Przed restartem, który niesie migrację ruszającą dane,
+robi się kopia `VACUUM INTO` plus `PRAGMA integrity_check` (patrz niżej).
 
 `rsync --delete` **nie** dotyka `data/` ani `node_modules` po stronie serwera — pliki
 wykluczone są chronione przed usunięciem. Baza (`data/note.db`) przeżywa każde wdrożenie.
+
+Kopię bazy robi się bez `sqlite3` na serwerie (go tam nie ma) — skrypt w drzewie aplikacji,
+żeby `require('better-sqlite3')` zadziałał, i jako `.cjs`, bo pakiet jest `"type": "module"`:
+
+```bash
+cat > /tmp/kopia.js <<'JS'
+const Database = require('better-sqlite3');
+const db = new Database('data/note.db', { readonly: true });
+db.prepare('VACUUM INTO ?').run(process.argv[2]);
+db.close();
+console.log(new Database(process.argv[2], { readonly: true })
+  .prepare('PRAGMA integrity_check').get());
+JS
+scp /tmp/kopia.js ubuntu@10.8.0.1:/home/ubuntu/src/note/backend/kopia-tmp.cjs
+ssh ubuntu@10.8.0.1 "cd /home/ubuntu/src/note && node backend/kopia-tmp.cjs /home/ubuntu/backups/note-\$(date +%FT%H-%M-%S).db; rm backend/kopia-tmp.cjs"
+```
 
 ## Co jest gdzie
 
@@ -101,4 +123,6 @@ ssh ubuntu@10.8.0.1 'cd /home/ubuntu/src/note && node -e "
 
 Wyłącznie własne pliki: nowa jednostka systemd, nowy `/etc/default/...`, nowy katalog logów,
 nowy vhost. Wspólny `/etc/nginx/nginx.conf` ani cudze vhosty nie są ruszane.
-`install.sh` dodatkowo sprawdza, czy port `8120` jest wolny, zanim cokolwiek zainstaluje.
+`install.sh` dodatkowo sprawdza, czy port `8120` jest wolny, zanim cokolwiek zainstaluje —
+na już postawionej maszynie ten warunek zatrzymuje skrypt i dokładnie o to chodzi (patrz
+„Kolejne wersje").
