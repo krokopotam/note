@@ -483,13 +483,35 @@ export function stepWorld(world: World, dt: number, input: Input): Hit[] {
 
 /** Wyrzutnik: trzymanie nabija sprężynę, puszczenie wystrzeliwuje w górę toru. */
 export const PULL_MAX = 1;
-export const PULL_MIN_SPEED = 240;
+/** Muśnięcie: kula podskakuje w torze i zostaje w nim, tak jak w automacie. */
+export const PULL_MIN_SPEED = 300;
 export const PULL_FULL_SPEED = 1180;
+/** O tyle pikseli kula i sprężyna siadają przy pełnym naciągnięciu. */
+export const PULL_SAG = 14;
+/**
+ * Prędkość, która wynosi kulę spod sprężyny do wylotu toru: 461 → 78 px, czyli
+ * 391 px pod górę, więc co najmniej pierwiastek z 2·g·h ≈ 771 px/s. Bierze się
+ * 830 — zapas na tarcie o ściany toru i na to, że „wyszło" ma być widoczne, a nie
+ * osiągnięte o włos.
+ */
+export const PRÓG_TORU = 830;
 
+/**
+ * Prędkość startowa wprost z naciągnięcia — liniowo. Kwadratowa krzywa zbijała
+ * środkowe wciśnięcie do ~600 px/s, czyli poniżej `PRÓG_TORU`: półautomatu nie
+ * dało się uruchomić, bo kula uczciwie naciśnięta wracała na sprężynę.
+ */
 export function plungerSpeed(pull: number): number {
   const p = clamp(pull, 0, PULL_MAX);
-  return PULL_MIN_SPEED + (PULL_FULL_SPEED - PULL_MIN_SPEED) * (0.35 + 0.65 * p * p);
+  return PULL_MIN_SPEED + (PULL_FULL_SPEED - PULL_MIN_SPEED) * p;
 }
+
+/**
+ * Najmniejsze naciągnięcie, po którym kula na pewno wychodzi z toru. Interfejs
+ * wystrzeliwuje z nie mniejszą wartością, żeby muśnięcie palcem nie wyglądało na
+ * zepsutą maszynę; poniżej tego progu jest już tylko decyzja gracza.
+ */
+export const PULL_PEWNY = (PRÓG_TORU - PULL_MIN_SPEED) / (PULL_FULL_SPEED - PULL_MIN_SPEED);
 
 /** Nudge: krótki impuls w całą kulę, potem grawitacja wraca na miejsce. */
 export function nudge(world: World, direction: Vec): void {

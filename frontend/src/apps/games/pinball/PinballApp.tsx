@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PULL_PEWNY } from './physics';
 import { createEngine } from './engine';
 import type { Engine, Faza } from './engine';
 import { buildTable } from './table';
@@ -24,7 +25,7 @@ import styles from './PinballApp.module.css';
 /** Jeden krok fizyki. 1/120 s — przy 60 klatkach dwa kroki na kadrę. */
 const KROK = 1 / 120;
 /** Pełne naciśnięcie wyrzutnika trwa tyle sekund. */
-const CZAS_NACIŚNIĘCIA = 0.85;
+const CZAS_NACIŚNIĘCIA = 0.45;
 const REKORD = 'note:pinball:rekord';
 const HASLO = ['J', 'A', 'C', 'K', 'P'];
 
@@ -114,9 +115,10 @@ export function PinballApp() {
     if (!naciśniętyRef.current) return;
     naciśniętyRef.current = false;
     const gra = engine();
-    // Muśnięcie też wystrzeliwuje — inaczej pierwsze dotknięcie na telefonie
-    // wygląda na zepsuty automat.
-    gra.launch(Math.max(0.45, siłaRef.current));
+    // Muśnięcie też wystrzeliwuje, ale nie poniżej progu, po którym kula
+    // na pewno wychodzi z toru — inaczej pierwsze dotknięcie wygląda na zepsuty
+    // automat, a nie na delikatne kopnięcie.
+    gra.launch(Math.max(PULL_PEWNY, siłaRef.current));
     siłaRef.current = 0;
     setSiła(0);
   }, []);

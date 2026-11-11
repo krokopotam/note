@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 2026-11-11 — pinball: dźwignia, która naprawdę ciągnie
+
+Zgłoszenie: „prawa dźwignia słabo działa, prawie się nie podnosi”. Dwie przyczyny, obie w wyrzutniku.
+
+- Kula czekająca na wyrzutniku jechała **do góry** (`loaded.y - plunger * 10`), czyli w stronę bramy,
+  zamiast siadać ze sprężyną. Teraz `+ PULL_SAG` (14 px), a tę samą stałą rysuje sprężyna, więc kula
+  i sprężyna nie mają jak się rozjechać. Kierunek pilnuje nowy test w `engine.test.ts` — wcześniej
+  nic go nie pilnowało, dlatego błąd przeżył tyle wersji.
+- Krzywa siły była kwadratowa z podłogą 0,35: `plungerSpeed(0.45)` dawało 693 px/s, a z toru
+  (461 → 78 px) wynosi kulę dopiero ~771 px/s. Środkowe i krótkie wciśnięcia fizycznie nie mogły
+  zacząć partii. Dziś `plungerSpeed` jest liniowa (300…1180 px/s), a `PRÓG_TORU` (830 px/s, z zapasem
+  na tarcie) wyznacza `PULL_PEWNY`, od którego interfejs strzela zawsze — muśnięcie wprowadza kulę
+  do gry. Samo muśnięcie może być za słabe tylko poniżej progu i to jest decyzja gracza.
+- Pełne naciągnięcie trwa 0,45 s zamiast 0,85 s, sprężyna gęstnieje razem z naciągnięciem, a
+  `WCIŚNIJ` nie nachodzi na razemek.
+- Testy `wyrzutnik` mierzą najwyższy punkt kuli (`szczyt`), a nie jej położenie w ostatniej klatce:
+  poprzednia wersja przechodziła tylko dlatego, że kula wciąż była w locie.
+- Test rekordu przestał zakładać, że partia bez klapek nie zbija punktów — z działającym wyrzutnikiem
+  zbija. Sprawdza teraz dwie rzeczy naprawdę ważne: gorsza partia rekordu nie nadpisuje, lepsza go podnosi.
+- Pomiary w przeglądarce: przy 100% naciągnięcia kula siada 14 px, sprężyna się zwęża; muśnięcie
+  (11% skali) wprowadza kulę do gry i licznik rośnie.
+
 ## 2026-11-11 — pinball: stół 256 × 512, matryca i fizyka od zera
 
 Nowa dziesiąta gierka w folderze „Gry": stół flipperowy w stylistyce OCS. Żadnej biblioteki —

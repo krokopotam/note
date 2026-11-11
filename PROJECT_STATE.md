@@ -39,6 +39,16 @@ baza `data/note.db`, nginx + letsencrypt. SSH poszło przez publiczny adres, bo 
 
 ## Decyzje (pinball)
 
+- **Wyrzutnik: prędkość rośnie z naciągnięcia liniowo, a `PULL_PEWNY` wyznacza próg, po którym kula
+  na pewno wychodzi z toru.** Krzywa kwadratowa z podłogą 0,35 dawała przy połowie skali ~690 px/s,
+  a z toru (461 → 78 px, czyli 391 px pod górę) wynosi kulę dopiero ~771 px/s — środkowe i krótkie
+  wciśnięcia nie mogły zacząć partii. `PRÓG_TORU` to 830 px/s: 771 potrzebne plus zapas na tarcie.
+  Muśnięcie wciąż zostawia kulę w torze; to decyzja gracza, nie usterka.
+- **Kula na naciągniętym wyrzutniku siada razem ze sprężyną** (`PULL_SAG`, wspólna stała dla
+  logiki kadru i rysowania sprężyny). Ruch do góry wygląda jak dźwignia, która wcale nie ciągnie,
+  tylko podstawia kulę pod bramę — kierunek pilnuje test w `engine.test.ts`.
+
+
 - **Silnik poza Reactem.** `pinball/engine.ts` (`createEngine(seed, onSound, startowe)`) przeprowadza
   całą partię przy stałym `dt` i podanym `Rng`: fazy `ładowanie / gra / koniec`, kule, tryby, efekty.
   Komponent to tylko pętla `requestAnimationFrame`, klawiatura/mysz i `putImageData` — dzięki temu

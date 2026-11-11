@@ -68,6 +68,18 @@ describe('start partii', () => {
     expect(rama.loaded).toBe(true);
     expect(rama.world.balls).toHaveLength(0);
   });
+
+  // Kierunek tego ruchu to całe odczucie dźwigni. Kiedyś kula na naciągniętym
+  // wyrzutniku jechała do góry, więc gracz widział maszynę, która „wcale nie
+  // ciągnie”, tylko podstawia kulę pod bramę.
+  it('kula na wyrzutniku siada razem ze sprężyną', () => {
+    const engine = createEngine();
+    const siedzi = engine.zaladowana();
+    expect(siedzi).not.toBeNull();
+    expect(engine.rama(0, 0).balls[0].y).toBeCloseTo(siedzi!.y, 3);
+    expect(engine.rama(0, 0.5).balls[0].y).toBeGreaterThan(siedzi!.y);
+    expect(engine.rama(0, 1).balls[0].y).toBeGreaterThan(engine.rama(0, 0.5).balls[0].y);
+  });
 });
 
 describe('przebieg partii', () => {

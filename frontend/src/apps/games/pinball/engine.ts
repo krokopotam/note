@@ -9,7 +9,7 @@
 
 import { vec } from './geometry';
 import type { Input, World } from './physics';
-import { createWorld, liveBalls, plungerSpeed, spawnBall, stepWorld } from './physics';
+import { createWorld, liveBalls, plungerSpeed, PULL_SAG, spawnBall, stepWorld } from './physics';
 import { PLUNGER, SAUCER, buildTable } from './table';
 import { applyHits, startFever, startGame, tick } from './rules';
 import type { Rules } from './rules';
@@ -194,7 +194,9 @@ export function createEngine(
         floats: fx.floats,
         sparks: fx.sparks,
         rings: fx.rings,
-        balls: loaded ? [...balls, { x: loaded.x, y: loaded.y - plunger * 10, trail: [] }] : balls,
+        // Kula siada razem ze sprężyną. Ruch w górę wyglądał jak dźwignia, która
+        // „wcale nie ciągnie", bo kula uciekała w stronę bramy zamiast w dół.
+        balls: loaded ? [...balls, { x: loaded.x, y: loaded.y + plunger * PULL_SAG, trail: [] }] : balls,
         plunger,
         loaded: loaded !== null,
         time: clock,

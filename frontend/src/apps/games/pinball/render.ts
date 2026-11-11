@@ -17,7 +17,7 @@
  * pisać jeden piksel jednym zapisem i rozmywać alpha bez dzielenia na kanały.
  */
 
-import { BALL_R } from './physics';
+import { BALL_R, PULL_SAG } from './physics';
 import type { Body, World } from './physics';
 import { bodiesOf } from './table';
 import type { Rules } from './rules';
@@ -548,9 +548,12 @@ export function paint(buf: Buf, frame: Frame): void {
 
   // 5. wyrzutnik
   const pulled = frame.plunger;
-  buf.rect(233, 462 + pulled * 12, 13, 3, PAL.stal);
+  const dźwignia = 462 + pulled * PULL_SAG;
+  buf.rect(233, dźwignia, 13, 3, PAL.stal);
+  // Sprężyna gęstnieje razem z naciągnięciem — po tym widać, ile jeszcze zostało.
+  const skok = 3 - pulled;
   for (let i = 0; i < 5; i += 1) {
-    buf.rect(233, 468 + pulled * 12 + i * 3, 13, 1, i % 2 === 0 ? PAL.metal : PAL.plastikCiemny);
+    buf.rect(233, dźwignia + 6 + i * skok, 13, 1, i % 2 === 0 ? PAL.metal : PAL.plastikCiemny);
   }
   // Obok sprężyny, w ciemnym kącie pod prawą klapką — tam nie przeszkadza
   // ani razemarkowi, ani kuli.

@@ -178,12 +178,8 @@ describe('ekran pinballa', () => {
     expect(guzik.textContent).toContain('dźwięk');
   });
 
-  it('rekord z pamięci przeglądarki wchodzi na ekran i przeżywa partię', () => {
-    window.localStorage.setItem('note:pinball:rekord', '4321');
-    render(<PinballApp />);
-    expect(cyfry(screen.getByTestId('pinball-rekord').textContent ?? '')).toBe('4321');
-
-    const strzał = screen.getByTestId('pinball-strzal') as HTMLButtonElement;
+  // Gra do końca, kulkami rządzi sam automat — klapki nieme.
+  const doKońca = (strzał: HTMLButtonElement): void => {
     for (let próba = 0; próba < 12 && faza() !== 'koniec'; próba += 1) {
       if (faza() === 'ładowanie') {
         fireEvent.pointerDown(strzał);
@@ -191,10 +187,30 @@ describe('ekran pinballa', () => {
       }
       pustyCzas(4);
     }
-
-    // Partia bez trafień nie pobija rekordu — i nie ma prawa go nadpisać.
     expect(faza()).toBe('koniec');
-    expect(window.localStorage.getItem('note:pinball:rekord')).toBe('4321');
-    expect(cyfry(screen.getByTestId('pinball-rekord').textContent ?? '')).toBe('4321');
+  };
+
+  it('rekord z pamięci przeglądarki wchodzi na ekran i gorsza partia go nie nadpisuje', () => {
+    // Celowo wysoko: partia bez klapek też coś zbija, a chodzi wyłącznie o to,
+    // czy wynik słabszy od rekordu przypadkiem go nie zastępuje.
+    window.localStorage.setItem('note:pinball:rekord', '999999');
+    render(<PinballApp />);
+    expect(cyfry(screen.getByTestId('pinball-rekord').textContent ?? '')).toBe('999999');
+
+    doKońca(screen.getByTestId('pinball-strzal') as HTMLButtonElement);
+
+    expect(window.localStorage.getItem('note:pinball:rekord')).toBe('999999');
+    expect(cyfry(screen.getByTestId('pinball-rekord').textContent ?? '')).toBe('999999');
+  });
+
+  it('rekord rośnie, kiedy partia go pobije, i zostaje po następnej', () => {
+    window.localStorage.setItem('note:pinball:rekord', '0');
+    render(<PinballApp />);
+
+    doKońca(screen.getByTestId('pinball-strzal') as HTMLButtonElement);
+
+    const zapisany = Number(window.localStorage.getItem('note:pinball:rekord'));
+    expect(zapisany).toBeGreaterThan(0);
+    expect(cyfry(screen.getByTestId('pinball-rekord').textContent ?? '')).toBe(String(zapisany));
   });
 });

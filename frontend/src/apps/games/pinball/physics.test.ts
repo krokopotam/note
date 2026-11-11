@@ -1,24 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { add, dot, len, norm, scale, sub, vec } from './geometry';
 import { closestOnSegment, bounce } from './geometry';
-import {
-  BALL_R,
-  FLIPPER_UP,
-  MAX_SPEED,
-  PULL_FULL_SPEED,
-  PULL_MIN_SPEED,
-  STUCK_AFTER,
-  collideCircle,
-  collideFlipper,
-  collideSegment,
-  cool,
-  createWorld,
-  flipperTip,
-  isDown,
-  plungerSpeed,
-  spawnBall,
-  stepWorld,
-} from './physics';
+import { BALL_R, collideCircle, collideFlipper, collideSegment, cool, createWorld, FLIPPER_UP, flipperTip, isDown, liveBalls, MAX_SPEED, plungerSpeed, PRÓG_TORU, PULL_FULL_SPEED, PULL_MIN_SPEED, PULL_PEWNY, spawnBall, stepWorld, STUCK_AFTER } from './physics';
 import type { Ball, Body, Input, World } from './physics';
 import { rngFrom } from '../shared/random';
 
@@ -34,6 +17,17 @@ const ballAt = (world: World, at: { x: number; y: number }, vel = vec(0, 0)): Ba
 const run = (world: World, seconds: number, input: Input = NONE): void => {
   const steps = Math.round(seconds / (1 / 120));
   for (let i = 0; i < steps; i += 1) stepWorld(world, 1 / 120, input);
+};
+
+/** Najwyżej, jak kula podskoczy w tym czasie (najmniejsze `y`); po odpływie cisza. */
+const szczyt = (world: World, seconds: number): number => {
+  let highest = 9999;
+  const steps = Math.round(seconds / (1 / 120));
+  for (let i = 0; i < steps; i += 1) {
+    stepWorld(world, 1 / 120, NONE);
+    for (const ball of liveBalls(world)) highest = Math.min(highest, ball.pos.y);
+  }
+  return highest;
 };
 
 /** Jak wyżej, ale zwraca „rodzaj:tag” wszystkich zdarzeń po drodze. */
@@ -434,35 +428,36 @@ describe('kula, która stanęła', () => {
 });
 
 describe('wyrzutnik', () => {
-  it('nabita mocniej wystrzeliwuje dalej, a minimum wyprowadza kulę z toru', () => {
-    expect(plungerSpeed(0)).toBeGreaterThanOrEqual(PULL_MIN_SPEED);
+  // Sam korytarz toru, bez reszty stołu — tu chodzi wyłącznie o to, czy kula
+  // wylezie spod sprężyny na górę (y poniżej 60), czy nie.
+  const korytarz = (): World =>
+    worldOf(
+      { kind: 'wall', a: vec(236, 40), b: vec(236, 470), tag: 'tor' },
+      { kind: 'wall', a: vec(250, 40), b: vec(250, 470), tag: 'tor' },
+    );
+
+  const strzel = (pull: number): number => {
+    const world = korytarz();
+    ballAt(world, { x: 243, y: 460 }, vec(0, -plungerSpeed(pull)));
+    return szczyt(world, 1.2);
+  };
+
+  it('prędkość rośnie wprost z naciągnięcia', () => {
+    expect(plungerSpeed(0)).toBe(PULL_MIN_SPEED);
     expect(plungerSpeed(0.5)).toBeGreaterThan(plungerSpeed(0.2));
     expect(plungerSpeed(1)).toBeCloseTo(PULL_FULL_SPEED, 0);
   });
 
   it('pełne wciśnięcie wyprowadza kulę z prawego toru na górę stołu', () => {
-    const world = worldOf(
-      { kind: 'wall', a: vec(236, 40), b: vec(236, 470), tag: 'tor' },
-      { kind: 'wall', a: vec(250, 40), b: vec(250, 470), tag: 'tor' },
-    );
-    ballAt(world, { x: 243, y: 460 }, vec(0, -plungerSpeed(1)));
-
-    run(world, 1.1);
-
-    expect(world.balls.length).toBe(1);
-    expect(world.balls[0].pos.y).toBeLessThan(60);
+    expect(strzel(1)).toBeLessThan(60);
   });
 
-  it('za słabe kopnięcie nie wyprowadza kuli z toru', () => {
-    const world = worldOf(
-      { kind: 'wall', a: vec(236, 40), b: vec(236, 470), tag: 'tor' },
-      { kind: 'wall', a: vec(250, 40), b: vec(250, 470), tag: 'tor' },
-    );
-    ballAt(world, { x: 243, y: 460 }, vec(0, -plungerSpeed(0)));
-
-    run(world, 1.4);
-
-    expect(world.balls[0].pos.y).toBeGreaterThan(60);
+  // Całe „dźwignia prawie się nie podnosi” siedziało w krzywej siły: kwadratowa
+  // zostawiała środek skali poniżej progu i kula wracała na sprężynę.
+  it('próg pewny wynosi kulę z toru, muśnięcie zostawia ją w środku', () => {
+    expect(plungerSpeed(PULL_PEWNY)).toBeGreaterThanOrEqual(PRÓG_TORU);
+    expect(strzel(PULL_PEWNY)).toBeLessThan(60);
+    expect(strzel(0)).toBeGreaterThan(60);
   });
 });
 
